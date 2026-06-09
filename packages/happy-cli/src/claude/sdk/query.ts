@@ -41,6 +41,11 @@ export function query(params: { prompt: QueryPrompt; options?: QueryOptions }): 
         mcpServers: opts?.mcpServers as Options['mcpServers'],
         systemPrompt,
         settings: opts?.settingsPath,
+        // Load filesystem settings (CLAUDE.md, hooks, skills, MCP) for remote/SDK
+        // turns too. Without this the SDK defaults to settingSources: [] (isolation
+        // mode in claude-agent-sdk@0.2.96), so phone-driven turns would silently run
+        // without the user's harness while local mode keeps it. See E01 slice-1 proof.
+        settingSources: ['user', 'project', 'local'],
         strictMcpConfig: opts?.strictMcpConfig,
         sessionId: undefined,
         effort: opts?.effort,
