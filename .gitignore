@@ -76,3 +76,6 @@ happy-workspaces/
 
 # third party tools
 .supervibe/
+
+# Happy standalone server data (master secret + PGlite) — never commit
+.standalone-data/
