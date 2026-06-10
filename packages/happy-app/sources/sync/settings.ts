@@ -97,7 +97,7 @@ export const settingsDefaults: Settings = {
     avatarStyle: 'brutalist',
     showFlavorIcons: false,
 
-    hideInactiveSessions: false,
+    hideInactiveSessions: true,
     expResumeSession: false,
     fileDiffsSidebar: false,
     groupToolCalls: false,
