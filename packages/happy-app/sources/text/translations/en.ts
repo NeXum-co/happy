@@ -507,6 +507,12 @@ export const en: TranslationStructure = {
         newSession: 'New session',
     },
 
+    fleet: {
+        needsYou: ({ count }: { count: number }) => `Needs you (${count})`,
+        activeIn: ({ project, count }: { project: string; count: number }) => `${project} (${count} active)`,
+        earlier: ({ count }: { count: number }) => `Earlier (${count})`,
+    },
+
     zen: {
         toggle: 'Zen mode',
     },

@@ -494,6 +494,12 @@ export const ja: TranslationStructure = {
         newSession: '新しいセッション',
     },
 
+    fleet: {
+        needsYou: ({ count }: { count: number }) => `要対応 (${count})`,
+        activeIn: ({ project, count }: { project: string; count: number }) => `${project}（アクティブ ${count}）`,
+        earlier: ({ count }: { count: number }) => `以前 (${count})`,
+    },
+
     zen: {
         toggle: 'Zenモード',
     },

@@ -6,7 +6,7 @@ import { SessionListViewItem, SessionRowData } from '@/sync/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { type SessionState, formatLastSeen, vibingMessages } from '@/utils/sessionUtils';
 import { Avatar } from './Avatar';
-import { ActiveSessionsGroupCompact } from './ActiveSessionsGroupCompact';
+import { NeedsYouBand } from './NeedsYouBand';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
 import { Typography } from '@/constants/Typography';
@@ -46,23 +46,6 @@ const stylesheet = StyleSheet.create((theme) => ({
         color: theme.colors.groupped.sectionTitle,
         letterSpacing: 0.1,
         ...Typography.default('semiBold'),
-    },
-    projectGroup: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        backgroundColor: theme.colors.surface,
-    },
-    projectGroupTitle: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: theme.colors.text,
-        ...Typography.default('semiBold'),
-    },
-    projectGroupSubtitle: {
-        fontSize: 11,
-        color: theme.colors.textSecondary,
-        marginTop: 2,
-        ...Typography.default(),
     },
     sessionItem: {
         height: 88,
@@ -191,8 +174,13 @@ const stylesheet = StyleSheet.create((theme) => ({
     archiveToggleText: {
         fontSize: 12,
         color: theme.colors.textSecondary,
-        paddingHorizontal: 12,
+        paddingLeft: 12,
+        paddingRight: 4,
         ...Typography.default('semiBold'),
+    },
+    archiveToggleChevron: {
+        color: theme.colors.textSecondary,
+        marginRight: 12,
     },
 }));
 
@@ -233,9 +221,9 @@ export function SessionsList() {
     const keyExtractor = React.useCallback((item: SessionListViewItem, index: number) => {
         switch (item.type) {
             case 'header': return `header-${item.title}-${index}`;
-            case 'active-sessions': return 'active-sessions';
+            case 'needs-you': return 'needs-you';
             case 'archive-toggle': return 'archive-toggle';
-            case 'project-group': return `project-group-${item.machine.id}-${item.displayPath}-${index}`;
+            case 'project-group': return `project-group-${item.displayPath}-${index}`;
             case 'session': return `session-${item.session.id}`;
         }
     }, []);
@@ -256,15 +244,20 @@ export function SessionsList() {
                     <Pressable style={styles.archiveToggle} onPress={toggleArchived}>
                         <View style={styles.archiveToggleLine} />
                         <Text style={styles.archiveToggleText}>
-                            {item.hidden ? t('sidebar.showArchived') : t('sidebar.hideArchived')}
+                            {t('fleet.earlier', { count: item.count })}
                         </Text>
+                        <Ionicons
+                            name={item.hidden ? 'chevron-forward' : 'chevron-down'}
+                            size={12}
+                            style={styles.archiveToggleChevron}
+                        />
                         <View style={styles.archiveToggleLine} />
                     </Pressable>
                 );
 
-            case 'active-sessions':
+            case 'needs-you':
                 return (
-                    <ActiveSessionsGroupCompact
+                    <NeedsYouBand
                         sessions={item.sessions}
                         selectedSessionId={selectedSessionId}
                     />
@@ -272,23 +265,26 @@ export function SessionsList() {
 
             case 'project-group':
                 return (
-                    <View style={styles.projectGroup}>
-                        <Text style={styles.projectGroupTitle}>
-                            {item.displayPath}
-                        </Text>
-                        <Text style={styles.projectGroupSubtitle}>
-                            {item.machine.metadata?.displayName || item.machine.metadata?.host || item.machine.id}
+                    <View style={styles.headerSection}>
+                        <Text style={styles.headerText}>
+                            {t('fleet.activeIn', {
+                                project: item.displayPath || t('status.unknown'),
+                                count: item.count,
+                            })}
                         </Text>
                     </View>
                 );
 
             case 'session':
-                // Determine card styling based on position within date group
+                // Determine card styling based on position within its group
                 const prevItem = index > 0 ? data[index - 1] : null;
                 const nextItem = index < data.length - 1 ? data[index + 1] : null;
 
-                const isFirst = prevItem?.type === 'header';
-                const isLast = nextItem?.type === 'header' || nextItem == null || nextItem?.type === 'active-sessions';
+                const isFirst = prevItem?.type === 'header' || prevItem?.type === 'project-group';
+                const isLast = nextItem == null
+                    || nextItem.type === 'header'
+                    || nextItem.type === 'project-group'
+                    || nextItem.type === 'archive-toggle';
                 const isSingle = isFirst && isLast;
                 const selected = item.session.id === selectedSessionId;
 

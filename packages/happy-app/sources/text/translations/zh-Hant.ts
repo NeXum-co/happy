@@ -493,6 +493,12 @@ export const zhHant: TranslationStructure = {
         newSession: '新建對話',
     },
 
+    fleet: {
+        needsYou: ({ count }: { count: number }) => `需要你處理（${count}）`,
+        activeIn: ({ project, count }: { project: string; count: number }) => `${project}（${count} 個活躍）`,
+        earlier: ({ count }: { count: number }) => `更早（${count}）`,
+    },
+
     zen: {
         toggle: '禪模式',
     },

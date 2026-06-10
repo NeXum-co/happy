@@ -493,6 +493,12 @@ export const ca: TranslationStructure = {
         newSession: 'Nova sessió',
     },
 
+    fleet: {
+        needsYou: ({ count }: { count: number }) => `Et necessita (${count})`,
+        activeIn: ({ project, count }: { project: string; count: number }) => `${project} (${count} actives)`,
+        earlier: ({ count }: { count: number }) => `Anteriors (${count})`,
+    },
+
     zen: {
         toggle: 'Mode zen',
     },
