@@ -34,6 +34,7 @@ import { extractNoSandboxFlag } from './utils/sandboxFlags'
 import { handleResumeCommand } from '@/resume/handleResumeCommand'
 import { ensureDaemonRunning } from './daemon/ensureDaemonRunning'
 import { handleCodexCommand } from './commands/codexCommand'
+import { runFleetCommand } from './fleet/fleetStatus'
 
 
 (async () => {
@@ -74,6 +75,9 @@ Conversation history is preserved on the server, but in-flight tool calls are in
       process.exit(0)
     }
     await runDoctorCommand();
+    return;
+  } else if (subcommand === 'fleet') {
+    await runFleetCommand(args.slice(1));
     return;
   } else if (subcommand === 'auth') {
     // Handle auth subcommands
