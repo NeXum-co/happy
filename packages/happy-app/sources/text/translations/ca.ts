@@ -97,6 +97,7 @@ export const ca: TranslationStructure = {
         restoreAccount: 'Restaura el compte',
         enterSecretKey: 'Introdueix la teva clau secreta',
         invalidSecretKey: 'Clau secreta no vàlida. Comprova-ho i torna-ho a provar.',
+        secureContextRequired: 'Restaurar el compte requereix una connexió segura (HTTPS). Obre l\'aplicació mitjançant HTTPS o localhost i torna-ho a provar.',
         enterUrlManually: 'Introdueix l\'URL manualment',
     },
 

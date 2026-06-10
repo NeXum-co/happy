@@ -96,6 +96,7 @@ export const it: TranslationStructure = {
         restoreAccount: 'Ripristina account',
         enterSecretKey: 'Inserisci la chiave segreta',
         invalidSecretKey: 'Chiave segreta non valida. Controlla e riprova.',
+        secureContextRequired: 'Il ripristino dell\'account richiede una connessione sicura (HTTPS). Apri l\'app tramite HTTPS o localhost e riprova.',
         enterUrlManually: 'Inserisci URL manualmente',
     },
 

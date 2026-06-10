@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/auth/AuthContext';
 import { RoundButton } from '@/components/RoundButton';
@@ -79,16 +79,32 @@ export default function Restore() {
             return;
         }
 
+        // Encryption needs WebCrypto, which only exists in secure contexts
+        // (https / localhost). Without this check a perfectly valid key fails
+        // deep inside login and gets misreported as "invalid secret key".
+        if (Platform.OS === 'web' && !globalThis.crypto?.subtle) {
+            Modal.alert(t('common.error'), t('connect.secureContextRequired'));
+            return;
+        }
+
+        let normalizedKey: string;
+        let secretBytes: Uint8Array;
         try {
             // Normalize the key (handles both base64url and formatted input)
-            const normalizedKey = normalizeSecretKey(trimmedKey);
+            normalizedKey = normalizeSecretKey(trimmedKey);
 
             // Validate the secret key format
-            const secretBytes = decodeBase64(normalizedKey, 'base64url');
+            secretBytes = decodeBase64(normalizedKey, 'base64url');
             if (secretBytes.length !== 32) {
                 throw new Error('Invalid secret key length');
             }
+        } catch (error) {
+            console.error('Restore error (key format):', error);
+            Modal.alert(t('common.error'), t('connect.invalidSecretKey'));
+            return;
+        }
 
+        try {
             // Get token from secret
             const token = await authGetToken(secretBytes);
             if (!token) {
@@ -98,12 +114,12 @@ export default function Restore() {
             // Login with new credentials
             await auth.login(token, normalizedKey);
 
-            // Dismiss
-            router.back();
+            // Land in the app; router.back() would return to the QR screen.
+            router.replace('/');
 
         } catch (error) {
             console.error('Restore error:', error);
-            Modal.alert(t('common.error'), t('connect.invalidSecretKey'));
+            Modal.alert(t('common.error'), t('server.failedToConnectToServer'));
         }
     };
 

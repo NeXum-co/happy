@@ -720,10 +720,14 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         </CenteredInputWidth>
     ) : null;
 
+    // Replace (not stack) the composer for disconnected sessions: nothing
+    // consumes a send there, and the extra hint height pushes the composer's
+    // button row below the visual viewport on mobile web — a dead textarea
+    // with an unreachable send button.
     const input = (
         <>
             {inactiveHint}
-            {composer}
+            {isDisconnected ? null : composer}
         </>
     );
 

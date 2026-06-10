@@ -97,6 +97,7 @@ export const pt: TranslationStructure = {
         restoreAccount: 'Restaurar conta',
         enterSecretKey: 'Por favor, insira uma chave secreta',
         invalidSecretKey: 'Chave secreta inválida. Verifique e tente novamente.',
+        secureContextRequired: 'A restauração da conta requer uma conexão segura (HTTPS). Abra o aplicativo via HTTPS ou localhost e tente novamente.',
         enterUrlManually: 'Inserir URL manualmente',
     },
 

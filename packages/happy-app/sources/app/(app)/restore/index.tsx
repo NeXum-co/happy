@@ -104,7 +104,9 @@ export default function Restore() {
                     const secretString = encodeBase64(credentials.secret, 'base64url');
                     await auth.login(credentials.token, secretString);
                     if (!isCancelledRef.current) {
-                        router.back();
+                        // Land in the app; router.back() would strand the
+                        // freshly authenticated user on the welcome screen.
+                        router.replace('/');
                     }
                 } else if (!isCancelledRef.current) {
                     Modal.alert(t('common.error'), t('errors.authenticationFailed'));

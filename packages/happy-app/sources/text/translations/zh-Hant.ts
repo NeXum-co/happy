@@ -98,6 +98,7 @@ export const zhHant: TranslationStructure = {
         restoreAccount: '恢復帳戶',
         enterSecretKey: '請輸入金鑰',
         invalidSecretKey: '無效的金鑰，請檢查後重試。',
+        secureContextRequired: '還原帳戶需要安全連線（HTTPS）。請透過 HTTPS 或 localhost 開啟應用程式後再試一次。',
         enterUrlManually: '手動輸入 URL',
     },
 

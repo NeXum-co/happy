@@ -77,6 +77,7 @@ export const ru: TranslationStructure = {
         restoreAccount: 'Восстановить аккаунт',
         enterSecretKey: 'Пожалуйста, введите секретный ключ',
         invalidSecretKey: 'Неверный секретный ключ. Проверьте и попробуйте снова.',
+        secureContextRequired: 'Для восстановления аккаунта требуется защищённое соединение (HTTPS). Откройте приложение через HTTPS или localhost и попробуйте снова.',
         enterUrlManually: 'Ввести URL вручную',
     },
 

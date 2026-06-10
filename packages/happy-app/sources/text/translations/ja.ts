@@ -99,6 +99,7 @@ export const ja: TranslationStructure = {
         restoreAccount: 'アカウントを復元',
         enterSecretKey: 'シークレットキーを入力してください',
         invalidSecretKey: 'シークレットキーが無効です。確認して再試行してください。',
+        secureContextRequired: 'アカウントの復元には安全な接続（HTTPS）が必要です。HTTPSまたはlocalhost経由でアプリを開き、もう一度お試しください。',
         enterUrlManually: 'URLを手動で入力',
     },
 

@@ -99,6 +99,7 @@ export const zhHans: TranslationStructure = {
         restoreAccount: '恢复账户',
         enterSecretKey: '请输入密钥',
         invalidSecretKey: '无效的密钥，请检查后重试。',
+        secureContextRequired: '恢复账户需要安全连接（HTTPS）。请通过 HTTPS 或 localhost 打开应用后重试。',
         enterUrlManually: '手动输入 URL',
     },
 
