@@ -30,6 +30,7 @@ import { getCurrentRealtimeSessionId, getVoiceSession } from '@/realtime/Realtim
 import { isMutableTool } from "@/components/tools/knownTools";
 import { DecryptedArtifact } from "./artifactTypes";
 import { FeedItem } from "./feedTypes";
+import { computeFleetLayout } from "./fleetLayout";
 
 // Debounce timer for realtimeMode changes
 let realtimeModeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -132,9 +133,9 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
 // Unified list item type for SessionsList component
 export type SessionListViewItem =
     | { type: 'header'; title: string }
-    | { type: 'active-sessions'; sessions: SessionRowData[] }
-    | { type: 'archive-toggle'; hidden: boolean }
-    | { type: 'project-group'; displayPath: string; machine: Machine }
+    | { type: 'needs-you'; sessions: SessionRowData[] }
+    | { type: 'archive-toggle'; hidden: boolean; count: number }
+    | { type: 'project-group'; displayPath: string; count: number }
     | { type: 'session'; session: SessionRowData };
 
 // Legacy type for backward compatibility - to be removed
@@ -235,28 +236,38 @@ function buildSessionListViewData(
     sessions: Record<string, Session>,
     unreadSessionIds?: Set<string>,
 ): SessionListViewItem[] {
-    // Separate active and inactive sessions
-    const activeSessions: Session[] = [];
-    const inactiveSessions: Session[] = [];
+    // Fleet layout (E02): needs-you band, then active sessions per project
+    // group, then inactive sessions (day-grouped below).
+    const layout = computeFleetLayout(Object.values(sessions).map(session => ({
+        id: session.id,
+        active: isSessionActive(session),
+        activeAt: session.activeAt,
+        createdAt: session.createdAt,
+        // Mirrors the 'permission_required' state in buildSessionRowData
+        needsYou: session.presence === 'online'
+            && !!(session.agentState?.requests && Object.keys(session.agentState.requests).length > 0),
+        path: session.metadata?.path ?? null,
+        homeDir: session.metadata?.homeDir ?? null,
+        session,
+    })));
 
-    Object.values(sessions).forEach(session => {
-        if (isSessionActive(session)) {
-            activeSessions.push(session);
-        } else {
-            inactiveSessions.push(session);
-        }
-    });
-
-    // Sort by creation date (newest first) — matches applySessions behavior
-    activeSessions.sort((a, b) => b.createdAt - a.createdAt);
-    inactiveSessions.sort((a, b) => b.createdAt - a.createdAt);
+    // Inactive sessions sorted by creation date (newest first) — matches applySessions behavior
+    const inactiveSessions = layout.inactive.map(f => f.session);
 
     // Build unified list view data
     const listData: SessionListViewItem[] = [];
 
-    // Add active sessions as a single item at the top (if any)
-    if (activeSessions.length > 0) {
-        listData.push({ type: 'active-sessions', sessions: activeSessions.map(s => buildSessionRowData(s, unreadSessionIds)) });
+    // Needs-you band at the very top: sessions waiting on the user, across all projects
+    if (layout.needsYou.length > 0) {
+        listData.push({ type: 'needs-you', sessions: layout.needsYou.map(f => buildSessionRowData(f.session, unreadSessionIds)) });
+    }
+
+    // Remaining active sessions per project group, most recent activity first
+    for (const group of layout.projectGroups) {
+        listData.push({ type: 'project-group', displayPath: group.key, count: group.sessions.length });
+        group.sessions.forEach(f => {
+            listData.push({ type: 'session', session: buildSessionRowData(f.session, unreadSessionIds) });
+        });
     }
 
     // Group inactive sessions by date

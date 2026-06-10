@@ -494,6 +494,12 @@ export const zhHans: TranslationStructure = {
         newSession: '新建会话',
     },
 
+    fleet: {
+        needsYou: ({ count }: { count: number }) => `需要你处理（${count}）`,
+        activeIn: ({ project, count }: { project: string; count: number }) => `${project}（${count} 个活跃）`,
+        earlier: ({ count }: { count: number }) => `更早（${count}）`,
+    },
+
     zen: {
         toggle: '禅模式',
     },
