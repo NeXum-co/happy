@@ -19,7 +19,10 @@ import { layout } from './layout';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
 import { useSessionActionAlert } from '@/hooks/useSessionQuickActions';
-import { useSettingMutable } from '@/sync/storage';
+import { useSettingMutable, storage } from '@/sync/storage';
+import { sessionArchive } from '@/sync/ops';
+import { useHappyAction } from '@/hooks/useHappyAction';
+import { Modal } from '@/modal';
 import { t } from '@/text';
 
 const stylesheet = StyleSheet.create((theme) => ({
@@ -182,6 +185,16 @@ const stylesheet = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         marginRight: 12,
     },
+    archiveTogglePressable: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    cleanupActionText: {
+        fontSize: 12,
+        color: theme.colors.textLink,
+        paddingHorizontal: 12,
+        ...Typography.default('semiBold'),
+    },
 }));
 
 export function SessionsList() {
@@ -194,6 +207,24 @@ export function SessionsList() {
     const toggleArchived = React.useCallback(() => {
         setHideInactiveSessions(!hideInactiveSessions);
     }, [hideInactiveSessions, setHideInactiveSessions]);
+    // Bulk cleanup: archive all inactive sessions older than 7 days (confirmed first)
+    const [, performCleanup] = useHappyAction(React.useCallback(async () => {
+        const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const stale = Object.values(storage.getState().sessions)
+            .filter(session => !session.active && session.activeAt < cutoff);
+        const confirmed = await Modal.confirm(
+            t('fleet.cleanup.confirmTitle'),
+            t('fleet.cleanup.confirmBody', { count: stale.length }),
+            { destructive: true },
+        );
+        if (!confirmed) {
+            return;
+        }
+        for (const session of stale) {
+            await sessionArchive(session.id);
+        }
+        Modal.alert(t('fleet.cleanup.confirmTitle'), t('fleet.cleanup.done', { count: stale.length }));
+    }, []));
     // Selection is derived once from pathname so the data array stays stable
     // across navigations. This keeps FlatList virtualization intact: only
     // the previously- and newly-selected rows re-render, instead of the
@@ -241,18 +272,25 @@ export function SessionsList() {
 
             case 'archive-toggle':
                 return (
-                    <Pressable style={styles.archiveToggle} onPress={toggleArchived}>
+                    <View style={styles.archiveToggle}>
                         <View style={styles.archiveToggleLine} />
-                        <Text style={styles.archiveToggleText}>
-                            {t('fleet.earlier', { count: item.count })}
-                        </Text>
-                        <Ionicons
-                            name={item.hidden ? 'chevron-forward' : 'chevron-down'}
-                            size={12}
-                            style={styles.archiveToggleChevron}
-                        />
+                        <Pressable style={styles.archiveTogglePressable} onPress={toggleArchived}>
+                            <Text style={styles.archiveToggleText}>
+                                {t('fleet.earlier', { count: item.count })}
+                            </Text>
+                            <Ionicons
+                                name={item.hidden ? 'chevron-forward' : 'chevron-down'}
+                                size={12}
+                                style={styles.archiveToggleChevron}
+                            />
+                        </Pressable>
+                        <Pressable onPress={performCleanup}>
+                            <Text style={styles.cleanupActionText}>
+                                {t('fleet.cleanup.action')}
+                            </Text>
+                        </Pressable>
                         <View style={styles.archiveToggleLine} />
-                    </Pressable>
+                    </View>
                 );
 
             case 'needs-you':
@@ -298,7 +336,7 @@ export function SessionsList() {
                     />
                 );
         }
-    }, [selectedSessionId, data, toggleArchived]);
+    }, [selectedSessionId, data, toggleArchived, performCleanup]);
 
 
     // Remove this section as we'll use FlatList for all items now

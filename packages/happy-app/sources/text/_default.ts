@@ -511,6 +511,16 @@ export const en = {
         needsYou: ({ count }: { count: number }) => `Needs you (${count})`,
         activeIn: ({ project, count }: { project: string; count: number }) => `${project} (${count} active)`,
         earlier: ({ count }: { count: number }) => `Earlier (${count})`,
+        cleanup: {
+            action: 'Clean up…',
+            confirmTitle: 'Clean up sessions',
+            confirmBody: ({ count }: { count: number }) => count === 1
+                ? 'Archive 1 inactive session older than 7 days?'
+                : `Archive ${count} inactive sessions older than 7 days?`,
+            done: ({ count }: { count: number }) => count === 1
+                ? 'Archived 1 session'
+                : `Archived ${count} sessions`,
+        },
     },
 
     zen: {

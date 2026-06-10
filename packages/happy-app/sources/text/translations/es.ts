@@ -497,6 +497,16 @@ export const es: TranslationStructure = {
         needsYou: ({ count }: { count: number }) => `Te necesita (${count})`,
         activeIn: ({ project, count }: { project: string; count: number }) => `${project} (${count} activas)`,
         earlier: ({ count }: { count: number }) => `Anteriores (${count})`,
+        cleanup: {
+            action: 'Limpiar…',
+            confirmTitle: 'Limpiar sesiones',
+            confirmBody: ({ count }: { count: number }) => count === 1
+                ? '¿Archivar 1 sesión inactiva de más de 7 días?'
+                : `¿Archivar ${count} sesiones inactivas de más de 7 días?`,
+            done: ({ count }: { count: number }) => count === 1
+                ? '1 sesión archivada'
+                : `${count} sesiones archivadas`,
+        },
     },
 
     zen: {

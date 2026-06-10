@@ -498,6 +498,12 @@ export const zhHans: TranslationStructure = {
         needsYou: ({ count }: { count: number }) => `需要你处理（${count}）`,
         activeIn: ({ project, count }: { project: string; count: number }) => `${project}（${count} 个活跃）`,
         earlier: ({ count }: { count: number }) => `更早（${count}）`,
+        cleanup: {
+            action: '清理…',
+            confirmTitle: '清理会话',
+            confirmBody: ({ count }: { count: number }) => `归档 ${count} 个超过 7 天的非活跃会话？`,
+            done: ({ count }: { count: number }) => `已归档 ${count} 个会话`,
+        },
     },
 
     zen: {

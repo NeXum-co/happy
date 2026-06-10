@@ -10,6 +10,14 @@ import chalk from 'chalk';
 import { Credentials } from '@/persistence';
 import { connectionState, isNetworkError } from '@/utils/serverConnectionErrors';
 
+/** Raw session row from GET /v1/sessions — metadata is still encrypted base64. */
+export type SessionListItem = {
+  id: string;
+  active: boolean;
+  activeAt: number;
+  metadata: string;
+};
+
 export class ApiClient {
 
   static async create(credential: Credentials) {
@@ -401,6 +409,25 @@ export class ApiClient {
       logger.debug(`[API] [ERROR] Failed to get vendor token:`, error);
       return null;
     }
+  }
+
+  /**
+   * List all sessions of this account as the server stores them.
+   * Metadata stays encrypted (base64) — callers decrypt with the
+   * per-session key they hold (e.g. from ~/.happy/sessions.json).
+   */
+  async getSessions(): Promise<SessionListItem[]> {
+    const response = await axios.get<{ sessions: SessionListItem[] }>(
+      `${configuration.serverUrl}/v1/sessions`,
+      {
+        headers: {
+          'Authorization': `Bearer ${this.credential.token}`,
+          'X-Happy-Client': `cli-coding-session/${configuration.currentCliVersion}`,
+        },
+        timeout: 10000,
+      },
+    );
+    return response.data.sessions;
   }
 
   /**

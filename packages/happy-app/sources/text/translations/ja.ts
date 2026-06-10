@@ -498,6 +498,12 @@ export const ja: TranslationStructure = {
         needsYou: ({ count }: { count: number }) => `要対応 (${count})`,
         activeIn: ({ project, count }: { project: string; count: number }) => `${project}（アクティブ ${count}）`,
         earlier: ({ count }: { count: number }) => `以前 (${count})`,
+        cleanup: {
+            action: '整理…',
+            confirmTitle: 'セッションの整理',
+            confirmBody: ({ count }: { count: number }) => `7日以上前の非アクティブなセッション（${count}件）をアーカイブしますか？`,
+            done: ({ count }: { count: number }) => `${count}件のセッションをアーカイブしました`,
+        },
     },
 
     zen: {

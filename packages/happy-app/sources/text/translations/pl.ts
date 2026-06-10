@@ -513,6 +513,12 @@ export const pl: TranslationStructure = {
         needsYou: ({ count }: { count: number }) => `Wymaga Twojej uwagi (${count})`,
         activeIn: ({ project, count }: { project: string; count: number }) => `${project} (aktywne: ${count})`,
         earlier: ({ count }: { count: number }) => `Wcześniej (${count})`,
+        cleanup: {
+            action: 'Wyczyść…',
+            confirmTitle: 'Czyszczenie sesji',
+            confirmBody: ({ count }: { count: number }) => `Zarchiwizować nieaktywne sesje starsze niż 7 dni (${count})?`,
+            done: ({ count }: { count: number }) => `Zarchiwizowano sesje: ${count}`,
+        },
     },
 
     zen: {

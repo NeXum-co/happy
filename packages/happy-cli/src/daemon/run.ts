@@ -18,6 +18,7 @@ import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquire
 import type { PersistedSession } from '@/persistence';
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stopDaemon } from './controlClient';
+import { runReaperOnce } from './reaper';
 import { startDaemonControlServer } from './controlServer';
 import { statSync } from 'fs';
 import { join } from 'path';
@@ -833,6 +834,16 @@ export async function startDaemon(): Promise<void> {
     // Connect to server
     apiMachine.connect();
 
+    // Lifecycle reaper: archive server-active sessions whose host process on
+    // this machine is dead (kill -9, closed terminal, crash). Once at start
+    // (reconcile after downtime), then on every heartbeat tick below.
+    const reaperDeps = {
+      readPersistedSessions,
+      getSessions: () => api.getSessions(),
+      deactivateSession: (sessionId: string) => api.deactivateSession(sessionId),
+    };
+    void runReaperOnce(reaperDeps);
+
     // Every 60 seconds:
     // 1. Prune stale sessions
     // 2. Check if daemon needs update
@@ -861,6 +872,9 @@ export async function startDaemon(): Promise<void> {
           pidToTrackedSession.delete(pid);
         }
       }
+
+      // Archive server-active sessions whose host process died (see daemon/reaper.ts)
+      await runReaperOnce(reaperDeps);
 
       // Check if daemon needs update by detecting whether `dist/index.mjs` was
       // replaced on disk since the daemon started (npm install rewrites the file).

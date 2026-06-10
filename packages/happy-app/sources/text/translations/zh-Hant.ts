@@ -497,6 +497,12 @@ export const zhHant: TranslationStructure = {
         needsYou: ({ count }: { count: number }) => `需要你處理（${count}）`,
         activeIn: ({ project, count }: { project: string; count: number }) => `${project}（${count} 個活躍）`,
         earlier: ({ count }: { count: number }) => `更早（${count}）`,
+        cleanup: {
+            action: '清理…',
+            confirmTitle: '清理工作階段',
+            confirmBody: ({ count }: { count: number }) => `封存 ${count} 個超過 7 天的非活躍工作階段？`,
+            done: ({ count }: { count: number }) => `已封存 ${count} 個工作階段`,
+        },
     },
 
     zen: {
