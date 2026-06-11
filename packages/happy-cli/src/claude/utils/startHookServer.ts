@@ -76,8 +76,8 @@ export interface SessionHookData {
 export interface HookServerOptions {
     /** Called when a session hook is received with a valid session ID */
     onSessionHook: (sessionId: string, data: SessionHookData) => void;
-    /** Called for Notification hook events with the notification message (E02 AC-6) */
-    onNotification?: (message: string) => void;
+    /** Called for Notification hook events with the notification message and notification_type (E02 AC-6) */
+    onNotification?: (message: string, notificationType?: string) => void;
     /** Called for non-Notification events on /hook/event (PostToolUse, UserPromptSubmit, Stop, …) */
     onClearSignal?: (eventName: string) => void;
 }
@@ -135,8 +135,9 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
                         const eventName = data.hook_event_name ?? '';
                         if (eventName === 'Notification') {
                             const message = typeof data.message === 'string' ? data.message : '';
-                            logger.debug(`[hookServer] Notification hook received: ${message}`);
-                            onNotification?.(message);
+                            const notificationType = typeof data.notification_type === 'string' ? data.notification_type : undefined;
+                            logger.debug(`[hookServer] Notification hook received: ${message} (type: ${notificationType ?? 'none'})`);
+                            onNotification?.(message, notificationType);
                         } else if (eventName) {
                             logger.debug(`[hookServer] Hook event received: ${eventName}`);
                             onClearSignal?.(eventName);

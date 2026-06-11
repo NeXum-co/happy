@@ -115,4 +115,44 @@ describe('countNeedsAttention', () => {
 
         expect(countNeedsAttention(sessions, keys)).toBe(0)
     })
+
+    // TTL safety net (D-E02-13): an interactive deny in the Claude TUI fires
+    // no hook event at all, so a localRequest can go stale. Read-side TTL
+    // keeps the fleet from showing such a session as needs-you forever.
+    it('ignores a localRequest older than 30 minutes (TTL, D-E02-13)', () => {
+        const key = getRandomBytes(32)
+        const now = Date.now()
+        const stale: AgentState = {
+            localRequest: { message: 'Claude needs your permission', createdAt: now - 31 * 60 * 1000 },
+        }
+        const sessions = [makeSession('session-a', stale, key)]
+        const keys = makeKeys([{ id: 'session-a', key }])
+
+        expect(countNeedsAttention(sessions, keys, now)).toBe(0)
+    })
+
+    it('still counts a localRequest younger than 30 minutes', () => {
+        const key = getRandomBytes(32)
+        const now = Date.now()
+        const fresh: AgentState = {
+            localRequest: { message: 'Claude needs your permission', createdAt: now - 29 * 60 * 1000 },
+        }
+        const sessions = [makeSession('session-a', fresh, key)]
+        const keys = makeKeys([{ id: 'session-a', key }])
+
+        expect(countNeedsAttention(sessions, keys, now)).toBe(1)
+    })
+
+    it('still counts remote requests when the localRequest is stale', () => {
+        const key = getRandomBytes(32)
+        const now = Date.now()
+        const mixed: AgentState = {
+            ...pendingRequest,
+            localRequest: { message: 'Claude needs your permission', createdAt: now - 31 * 60 * 1000 },
+        }
+        const sessions = [makeSession('session-a', mixed, key)]
+        const keys = makeKeys([{ id: 'session-a', key }])
+
+        expect(countNeedsAttention(sessions, keys, now)).toBe(1)
+    })
 })

@@ -23,15 +23,39 @@ describe('resolveLocalAttention', () => {
         })).toBe('set')
     })
 
-    it('ignores idle notifications (waiting for input is not needs-you)', () => {
+    it('sets on notification_type permission_prompt even with a generic message', () => {
+        expect(resolveLocalAttention({
+            type: 'notification',
+            message: 'Some new wording',
+            notificationType: 'permission_prompt',
+        })).toBe('set')
+    })
+
+    it('clears on idle notifications (idle-backstop, D-E02-13): waiting for input means no permission prompt is pending', () => {
         expect(resolveLocalAttention({
             type: 'notification',
             message: 'Claude is waiting for your input',
-        })).toBe('none')
+            notificationType: 'idle_prompt',
+        })).toBe('clear')
+    })
+
+    it('clears on an idle message even without notification_type', () => {
+        expect(resolveLocalAttention({
+            type: 'notification',
+            message: 'Claude is waiting for your input',
+        })).toBe('clear')
     })
 
     it('ignores notifications without a message', () => {
         expect(resolveLocalAttention({ type: 'notification', message: undefined })).toBe('none')
+    })
+
+    it('ignores unrelated notification types', () => {
+        expect(resolveLocalAttention({
+            type: 'notification',
+            message: 'Something else happened',
+            notificationType: 'other',
+        })).toBe('none')
     })
 
     it('clears on PostToolUse (tool ran, so the prompt was approved)', () => {
@@ -61,5 +85,68 @@ describe('resolveLocalAttention', () => {
     it('does nothing for unrelated hook events', () => {
         expect(resolveLocalAttention({ type: 'hook', eventName: 'SessionStart' })).toBe('none')
         expect(resolveLocalAttention({ type: 'hook', eventName: 'PreToolUse' })).toBe('none')
+    })
+
+    // Transcript-clear (D-E02-13): a conversation line written to the Claude
+    // JSONL after the prompt was set means the turn moved on — the prompt is
+    // no longer pending.
+    it('clears on a user transcript line written after the prompt was set', () => {
+        expect(resolveLocalAttention({
+            type: 'transcript',
+            lineType: 'user',
+            timestampMs: 2_000,
+            isSidechain: false,
+            requestCreatedAt: 1_000,
+        })).toBe('clear')
+    })
+
+    it('clears on an assistant transcript line written after the prompt was set', () => {
+        expect(resolveLocalAttention({
+            type: 'transcript',
+            lineType: 'assistant',
+            timestampMs: 2_000,
+            isSidechain: false,
+            requestCreatedAt: 1_000,
+        })).toBe('clear')
+    })
+
+    it('does not clear on the assistant tool_use line that belongs to the prompt itself (written before the Notification)', () => {
+        expect(resolveLocalAttention({
+            type: 'transcript',
+            lineType: 'assistant',
+            timestampMs: 500,
+            isSidechain: false,
+            requestCreatedAt: 1_000,
+        })).toBe('none')
+    })
+
+    it('does not clear on sidechain (subagent) transcript lines', () => {
+        expect(resolveLocalAttention({
+            type: 'transcript',
+            lineType: 'user',
+            timestampMs: 2_000,
+            isSidechain: true,
+            requestCreatedAt: 1_000,
+        })).toBe('none')
+    })
+
+    it('does not clear on transcript lines without a timestamp (summary etc.)', () => {
+        expect(resolveLocalAttention({
+            type: 'transcript',
+            lineType: 'summary',
+            timestampMs: null,
+            isSidechain: false,
+            requestCreatedAt: 1_000,
+        })).toBe('none')
+    })
+
+    it('does not clear on non-conversation transcript lines (system) even when recent', () => {
+        expect(resolveLocalAttention({
+            type: 'transcript',
+            lineType: 'system',
+            timestampMs: 2_000,
+            isSidechain: false,
+            requestCreatedAt: 1_000,
+        })).toBe('none')
     })
 })

@@ -315,6 +315,36 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         return false;
     };
 
+    // Local-mode permission visibility (E02 AC-6 / D-E02-13): terminal
+    // permission prompts live in Claude's TUI and never reach
+    // agentState.requests. The Notification hook sets agentState.localRequest;
+    // answered prompts clear it via the hook / thinking / transcript / idle
+    // paths (decision logic in localAttention.ts). localRequestActive mirrors
+    // our own writes so the frequent clear signals (every PostToolUse) only
+    // emit an update-state when there is actually something to clear.
+    // Declared before the session scanner below: its onMessage callback feeds
+    // the transcript-clear path and can fire during scanner creation.
+    let localRequestActive = false;
+    let localRequestCreatedAt = 0;
+    const setLocalRequest = (message: string) => {
+        localRequestActive = true;
+        localRequestCreatedAt = Date.now();
+        session.updateAgentState((currentState) => ({
+            ...currentState,
+            localRequest: { message, createdAt: localRequestCreatedAt }
+        }));
+    };
+    const clearLocalRequest = () => {
+        if (!localRequestActive) {
+            return;
+        }
+        localRequestActive = false;
+        session.updateAgentState((currentState) => ({
+            ...currentState,
+            localRequest: null
+        }));
+    };
+
     // Remote-mode session scanner: catches user-typed prompts that
     // appeared in the Claude JSONL while we weren't looking — typically
     // because the user opened `claude --resume <id>` in a terminal next
@@ -328,6 +358,25 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         sessionId: initialScannerSessionId,
         workingDirectory,
         onMessage: (raw) => {
+            // Transcript-clear (D-E02-13): a conversation line written after
+            // the pending prompt was set means the turn moved on, so the
+            // prompt is no longer waiting. (Claude Code 2.1.173 defers
+            // conversation writes, so this path is a no-op there; it covers
+            // versions that do write the deny tool_result to the JSONL.)
+            if (localRequestActive) {
+                const lineTimestamp = (raw as any).timestamp;
+                const parsedTimestamp = typeof lineTimestamp === 'string' ? Date.parse(lineTimestamp) : NaN;
+                if (resolveLocalAttention({
+                    type: 'transcript',
+                    lineType: raw.type,
+                    timestampMs: Number.isNaN(parsedTimestamp) ? null : parsedTimestamp,
+                    isSidechain: !!(raw as any).isSidechain,
+                    requestCreatedAt: localRequestCreatedAt,
+                }) === 'clear') {
+                    logger.debug('[START] Transcript line written after pending local prompt — clearing localRequest');
+                    clearLocalRequest();
+                }
+            }
             // Only user-typed prompts. SDK pipeline owns assistant and
             // tool_result-bearing user messages.
             if (raw.type !== 'user') return;
@@ -351,37 +400,18 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     // Used by hook server to notify Session when Claude changes session ID
     let currentSession: Session | null = null;
 
-    // Local-mode permission visibility (E02 AC-6): terminal permission
-    // prompts live in Claude's TUI and never reach agentState.requests.
-    // The Notification hook sets agentState.localRequest; answered prompts
-    // clear it. localRequestActive mirrors our own writes so the frequent
-    // clear signals (every PostToolUse) only emit an update-state when
-    // there is actually something to clear.
-    let localRequestActive = false;
-    const setLocalRequest = (message: string) => {
-        localRequestActive = true;
-        session.updateAgentState((currentState) => ({
-            ...currentState,
-            localRequest: { message, createdAt: Date.now() }
-        }));
-    };
-    const clearLocalRequest = () => {
-        if (!localRequestActive) {
-            return;
-        }
-        localRequestActive = false;
-        session.updateAgentState((currentState) => ({
-            ...currentState,
-            localRequest: null
-        }));
-    };
-
     // Start Hook server for receiving Claude session notifications
     const hookServer = await startHookServer({
-        onNotification: (message) => {
-            if (resolveLocalAttention({ type: 'notification', message }) === 'set') {
+        onNotification: (message, notificationType) => {
+            const action = resolveLocalAttention({ type: 'notification', message, notificationType });
+            if (action === 'set') {
                 logger.debug(`[START] Local permission prompt detected: ${message}`);
                 setLocalRequest(message);
+            } else if (action === 'clear') {
+                // Idle-backstop (D-E02-13): the session is waiting for user
+                // input, so no permission prompt can still be pending.
+                logger.debug('[START] Idle notification — clearing local permission prompt');
+                clearLocalRequest();
             }
         },
         onClearSignal: (eventName) => {

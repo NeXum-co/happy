@@ -17,6 +17,7 @@ import axios from 'axios'
 
 import { decodeBase64, decrypt } from '@/api/encryption'
 import type { AgentState } from '@/api/types'
+import { LOCAL_REQUEST_TTL_MS } from '@/claude/utils/localAttention'
 import { configuration } from '@/configuration'
 import { readCredentials, readPersistedSessions } from '@/persistence'
 
@@ -43,9 +44,11 @@ type WaybarOutput = {
  * agentState has at least one open permission request — remote-driven
  * (`requests`) or a local terminal prompt (`localRequest`, E02 AC-6). A
  * session with both counts once. Sessions without a persisted key, without
- * agentState, or that fail to decrypt are ignored.
+ * agentState, or that fail to decrypt are ignored. A localRequest older than
+ * LOCAL_REQUEST_TTL_MS is ignored too (D-E02-13): an interactive deny in the
+ * Claude TUI fires no hook event, so the signal can go stale.
  */
-export function countNeedsAttention(sessions: RawActiveSession[], keys: SessionKeyLookup): number {
+export function countNeedsAttention(sessions: RawActiveSession[], keys: SessionKeyLookup, now: number = Date.now()): number {
     let count = 0
     for (const session of sessions) {
         const persisted = keys[session.id]
@@ -58,7 +61,9 @@ export function countNeedsAttention(sessions: RawActiveSession[], keys: SessionK
             decodeBase64(session.agentState),
         ) as AgentState | null
         const hasRemoteRequests = !!(agentState?.requests && Object.keys(agentState.requests).length > 0)
-        if (hasRemoteRequests || agentState?.localRequest) {
+        const hasFreshLocalRequest = !!agentState?.localRequest
+            && now - agentState.localRequest.createdAt <= LOCAL_REQUEST_TTL_MS
+        if (hasRemoteRequests || hasFreshLocalRequest) {
             count++
         }
     }

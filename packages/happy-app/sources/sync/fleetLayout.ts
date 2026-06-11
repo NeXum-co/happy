@@ -31,13 +31,20 @@ export interface AgentAttention {
     local: boolean;
 }
 
+/**
+ * A localRequest older than this is ignored (D-E02-13): an interactive deny
+ * in the Claude TUI fires no hook event, so the CLI cannot always clear the
+ * signal — without a TTL such a session would stay "needs you" forever.
+ */
+export const LOCAL_REQUEST_TTL_MS = 30 * 60 * 1000;
+
 export function computeAgentAttention(agentState: {
     requests?: Record<string, unknown> | null;
     localRequest?: { message: string; createdAt: number } | null;
-} | null | undefined): AgentAttention {
+} | null | undefined, now: number = Date.now()): AgentAttention {
     return {
         remote: !!(agentState?.requests && Object.keys(agentState.requests).length > 0),
-        local: !!agentState?.localRequest,
+        local: !!agentState?.localRequest && now - agentState.localRequest.createdAt <= LOCAL_REQUEST_TTL_MS,
     };
 }
 

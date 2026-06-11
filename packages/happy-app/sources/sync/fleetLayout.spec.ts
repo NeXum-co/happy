@@ -72,7 +72,7 @@ describe('computeAgentAttention', () => {
     it('flags local attention for a terminal permission prompt (localRequest, AC-6)', () => {
         const attention = computeAgentAttention({
             localRequest: { message: 'Claude needs your permission to use Bash', createdAt: 1 },
-        });
+        }, 1_000);
         expect(attention).toEqual({ remote: false, local: true });
     });
 
@@ -80,7 +80,7 @@ describe('computeAgentAttention', () => {
         const attention = computeAgentAttention({
             requests: { 'req-1': { tool: 'Bash', arguments: {}, createdAt: 1 } },
             localRequest: { message: 'Permission required', createdAt: 1 },
-        });
+        }, 1_000);
         expect(attention).toEqual({ remote: true, local: true });
     });
 
@@ -88,5 +88,29 @@ describe('computeAgentAttention', () => {
         expect(computeAgentAttention({ requests: {}, localRequest: null })).toEqual({ remote: false, local: false });
         expect(computeAgentAttention(null)).toEqual({ remote: false, local: false });
         expect(computeAgentAttention(undefined)).toEqual({ remote: false, local: false });
+    });
+
+    // TTL safety net (D-E02-13): an interactive deny in the Claude TUI fires
+    // no hook event, so a localRequest can go stale; ignore it after 30 min.
+    it('ignores a localRequest older than 30 minutes (TTL, D-E02-13)', () => {
+        const now = 100 * 60 * 1000;
+        expect(computeAgentAttention({
+            localRequest: { message: 'Claude needs your permission', createdAt: now - 31 * 60 * 1000 },
+        }, now)).toEqual({ remote: false, local: false });
+    });
+
+    it('still flags a localRequest younger than 30 minutes', () => {
+        const now = 100 * 60 * 1000;
+        expect(computeAgentAttention({
+            localRequest: { message: 'Claude needs your permission', createdAt: now - 29 * 60 * 1000 },
+        }, now)).toEqual({ remote: false, local: true });
+    });
+
+    it('keeps remote attention when the localRequest is stale', () => {
+        const now = 100 * 60 * 1000;
+        expect(computeAgentAttention({
+            requests: { 'req-1': { tool: 'Bash', arguments: {}, createdAt: 1 } },
+            localRequest: { message: 'Claude needs your permission', createdAt: now - 31 * 60 * 1000 },
+        }, now)).toEqual({ remote: true, local: false });
     });
 });
