@@ -74,6 +74,12 @@ export interface SessionHookData {
 }
 
 export interface HookServerOptions {
+    /**
+     * Per-session shared secret (SEC-001). The forwarder sends it as the
+     * X-Hook-Secret header; requests without the correct value are rejected
+     * with 401. Lives only in memory and in the user-only settings file.
+     */
+    secret: string;
     /** Called when a session hook is received with a valid session ID */
     onSessionHook: (sessionId: string, data: SessionHookData) => void;
     /** Called for Notification hook events with the notification message and notification_type (E02 AC-6) */
@@ -96,13 +102,22 @@ export interface HookServer {
  * @returns Promise resolving to the server instance with port info
  */
 export async function startHookServer(options: HookServerOptions): Promise<HookServer> {
-    const { onSessionHook, onNotification, onClearSignal } = options;
+    const { secret, onSessionHook, onNotification, onClearSignal } = options;
 
     return new Promise((resolve, reject) => {
         const server: Server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
             // Handle POST to /hook/session-start (claudeSessionId capture) and
             // /hook/event (local-attention events, E02 AC-6)
             if (req.method === 'POST' && (req.url === '/hook/session-start' || req.url === '/hook/event')) {
+                // Shared-secret check (SEC-001): any same-user process can
+                // reach this localhost port, so only the forwarder spawned by
+                // this session (which got the secret via the settings file)
+                // may post hooks.
+                if (req.headers['x-hook-secret'] !== secret) {
+                    logger.debug('[hookServer] Rejected hook request without valid X-Hook-Secret');
+                    res.writeHead(401).end('unauthorized');
+                    return;
+                }
                 // Set timeout to prevent hanging if Claude doesn't close stdin
                 const timeout = setTimeout(() => {
                     if (!res.headersSent) {

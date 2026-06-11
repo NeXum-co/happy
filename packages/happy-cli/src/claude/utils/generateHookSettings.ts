@@ -10,6 +10,7 @@
  * which routes them on hook_event_name.
  */
 
+import { randomBytes } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { writeFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
 import { configuration } from '@/configuration';
@@ -17,12 +18,21 @@ import { logger } from '@/ui/logger';
 import { projectPath } from '@/projectPath';
 
 /**
+ * Generate a per-session shared secret for the hook server (SEC-001).
+ * Lives in memory and in the user-only settings file — nowhere else on disk.
+ */
+export function generateHookSecret(): string {
+    return randomBytes(32).toString('hex');
+}
+
+/**
  * Generate a temporary settings file with SessionStart hook configuration
- * 
+ *
  * @param port - The port where Happy server is listening
+ * @param secret - Per-session shared secret the forwarder must echo back (SEC-001)
  * @returns Path to the generated settings file
  */
-export function generateHookSettingsFile(port: number): string {
+export function generateHookSettingsFile(port: number, secret: string): string {
     const hooksDir = join(configuration.happyHomeDir, 'tmp', 'hooks');
     mkdirSync(hooksDir, { recursive: true });
 
@@ -32,7 +42,7 @@ export function generateHookSettingsFile(port: number): string {
 
     // Path to the hook forwarder script
     const forwarderScript = resolve(projectPath(), 'scripts', 'session_hook_forwarder.cjs');
-    const hookCommand = `node "${forwarderScript}" ${port}`;
+    const hookCommand = `node "${forwarderScript}" ${port} ${secret}`;
 
     const forwarderHook = {
         matcher: "*",

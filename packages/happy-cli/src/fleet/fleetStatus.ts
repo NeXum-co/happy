@@ -20,6 +20,7 @@ import type { AgentState } from '@/api/types'
 import { LOCAL_REQUEST_TTL_MS } from '@/claude/utils/localAttention'
 import { configuration } from '@/configuration'
 import { readCredentials, readPersistedSessions } from '@/persistence'
+import { logger } from '@/ui/logger'
 
 /** Session record as returned by GET /v2/sessions/active (encrypted fields are base64). */
 export type RawActiveSession = {
@@ -55,11 +56,19 @@ export function countNeedsAttention(sessions: RawActiveSession[], keys: SessionK
         if (!persisted || !session.agentState) {
             continue
         }
-        const agentState = decrypt(
-            decodeBase64(persisted.encryptionKey),
-            persisted.encryptionVariant,
-            decodeBase64(session.agentState),
-        ) as AgentState | null
+        // Per-session catch (SF-001, consistent with the reaper): one
+        // undecryptable session must not take down the whole fleet count.
+        let agentState: AgentState | null
+        try {
+            agentState = decrypt(
+                decodeBase64(persisted.encryptionKey),
+                persisted.encryptionVariant,
+                decodeBase64(session.agentState),
+            ) as AgentState | null
+        } catch (error) {
+            logger.debug(`[FLEET] Failed to decrypt agentState for session ${session.id}, skipping`, error)
+            continue
+        }
         const hasRemoteRequests = !!(agentState?.requests && Object.keys(agentState.requests).length > 0)
         const hasFreshLocalRequest = !!agentState?.localRequest
             && now - agentState.localRequest.createdAt <= LOCAL_REQUEST_TTL_MS
@@ -90,7 +99,7 @@ async function buildWaybarOutput(): Promise<WaybarOutput> {
         return {
             text: String(count),
             class: 'needs-attention',
-            tooltip: count === 1 ? '1 sessie wacht op jou' : `${count} sessies wachten op jou`,
+            tooltip: count === 1 ? '1 session waiting for you' : `${count} sessions waiting for you`,
         }
     }
     return { text: '', class: 'idle', tooltip: 'Fleet OK' }

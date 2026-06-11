@@ -17,10 +17,13 @@ export const UsageSchema = z.object({
 // Main schema with minimal validation for only the fields we use
 // NOTE: Schema is intentionally lenient to handle various Claude Code message formats
 // including synthetic error messages, API errors, and different SDK versions
+// timestamp and isSidechain are validated on every variant so the
+// transcript-clear path in runClaude.ts can read them without casts (COMP-002).
 export const RawJSONLinesSchema = z.discriminatedUnion("type", [
   // User message - validates uuid and message.content
   z.object({
     type: z.literal("user"),
+    timestamp: z.string().optional(), // Used in runClaude.ts (transcript-clear)
     isSidechain: z.boolean().optional(),
     isMeta: z.boolean().optional(),
     uuid: z.string(), // Used in getMessageKey()
@@ -35,6 +38,8 @@ export const RawJSONLinesSchema = z.discriminatedUnion("type", [
   z.object({
     uuid: z.string(),
     type: z.literal("assistant"),
+    timestamp: z.string().optional(), // Used in runClaude.ts (transcript-clear)
+    isSidechain: z.boolean().optional(),
     message: z.object({
       usage: UsageSchema.optional(), // Used in apiSession.ts
       model: z.string().optional(), // Used for cost calculation
@@ -44,6 +49,8 @@ export const RawJSONLinesSchema = z.discriminatedUnion("type", [
   // Summary message - validates summary and leafUuid
   z.object({
     type: z.literal("summary"),
+    timestamp: z.string().optional(),
+    isSidechain: z.boolean().optional(),
     summary: z.string(), // Used in apiSession.ts
     leafUuid: z.string() // Used in getMessageKey()
   }).passthrough(),
@@ -51,6 +58,8 @@ export const RawJSONLinesSchema = z.discriminatedUnion("type", [
   // System message - validates uuid
   z.object({
     type: z.literal("system"),
+    timestamp: z.string().optional(),
+    isSidechain: z.boolean().optional(),
     uuid: z.string() // Used in getMessageKey()
   }).passthrough()
 ]);

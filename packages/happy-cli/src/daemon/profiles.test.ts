@@ -27,20 +27,20 @@ describe('loadProfiles', () => {
 
   it('loads a valid profiles file and expands ~ in directories', () => {
     writeFileSync(join(dir, 'profiles.json'), JSON.stringify({
-      nexum: { directory: '~/code/nexum', claudeArgs: ['--dangerously-skip-permissions'], tmuxSession: 'nexum' },
-      proxuma: { directory: '~/code/proxuma', claudeArgs: ['--dangerously-skip-permissions'], tmuxSession: 'proxuma' },
-      dxfferent: { directory: '~/code/dxfferent', claudeArgs: ['--dangerously-skip-permissions'], tmuxSession: 'dxfferent' },
+      alpha: { directory: '~/code/alpha', claudeArgs: ['--dangerously-skip-permissions'], tmuxSession: 'alpha' },
+      beta: { directory: '~/code/beta', claudeArgs: ['--dangerously-skip-permissions'], tmuxSession: 'beta' },
+      gamma: { directory: '~/code/gamma', claudeArgs: ['--dangerously-skip-permissions'], tmuxSession: 'gamma' },
     }))
 
     const profiles = loadProfiles(dir)
 
     expect(profiles).toHaveLength(3)
-    expect(profiles.map(p => p.name)).toEqual(['nexum', 'proxuma', 'dxfferent'])
+    expect(profiles.map(p => p.name)).toEqual(['alpha', 'beta', 'gamma'])
     expect(profiles[0]).toEqual({
-      name: 'nexum',
-      directory: join(homedir(), 'code/nexum'),
+      name: 'alpha',
+      directory: join(homedir(), 'code/alpha'),
       claudeArgs: ['--dangerously-skip-permissions'],
-      tmuxSession: 'nexum',
+      tmuxSession: 'alpha',
     })
   })
 
@@ -73,6 +73,15 @@ describe('loadProfiles', () => {
   it('returns an empty list for schema-invalid content without throwing', () => {
     writeFileSync(join(dir, 'profiles.json'), JSON.stringify({
       broken: { directory: 42, claudeArgs: 'not-an-array' },
+    }))
+
+    expect(() => loadProfiles(dir)).not.toThrow()
+    expect(loadProfiles(dir)).toEqual([])
+  })
+
+  it('rejects a tmuxSession with characters outside [a-zA-Z0-9_-] via the soft-fail path (SEC-003)', () => {
+    writeFileSync(join(dir, 'profiles.json'), JSON.stringify({
+      evil: { directory: '~/code/alpha', tmuxSession: 'evil:0' },
     }))
 
     expect(() => loadProfiles(dir)).not.toThrow()

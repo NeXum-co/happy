@@ -80,7 +80,13 @@ export async function runReaperOnce(deps: ReaperDeps): Promise<void> {
 
       if (shouldArchive({ serverActive: server.active, hostPid: metadata?.hostPid }, pidAlive)) {
         const archived = await deps.deactivateSession(sessionId);
-        logger.debug(`[REAPER] Session ${sessionId} active on server but hostPid ${metadata?.hostPid} is dead — archive ${archived ? 'succeeded' : 'failed'}`);
+        if (archived) {
+          logger.debug(`[REAPER] Session ${sessionId} active on server but hostPid ${metadata?.hostPid} is dead — archive succeeded`);
+        } else {
+          // SF-004: a failed archive keeps a dead session visible as live;
+          // warn so repeated failures show up (pass reruns every heartbeat).
+          logger.warn(`[REAPER] Session ${sessionId} active on server but hostPid ${metadata?.hostPid} is dead — archive failed, will retry on next heartbeat`);
+        }
       }
     }
   } catch (error) {

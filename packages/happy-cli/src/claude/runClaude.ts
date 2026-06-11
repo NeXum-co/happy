@@ -17,7 +17,7 @@ import { notifyDaemonSessionStarted } from '@/daemon/controlClient';
 import { initialMachineMetadata } from '@/daemon/run';
 import { startHappyServer } from '@/claude/utils/startHappyServer';
 import { startHookServer } from '@/claude/utils/startHookServer';
-import { generateHookSettingsFile, cleanupHookSettingsFile } from '@/claude/utils/generateHookSettings';
+import { generateHookSettingsFile, generateHookSecret, cleanupHookSettingsFile } from '@/claude/utils/generateHookSettings';
 import { resolveLocalAttention } from '@/claude/utils/localAttention';
 import { registerKillSessionHandler } from './registerKillSessionHandler';
 import { projectPath } from '../projectPath';
@@ -364,13 +364,12 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             // conversation writes, so this path is a no-op there; it covers
             // versions that do write the deny tool_result to the JSONL.)
             if (localRequestActive) {
-                const lineTimestamp = (raw as any).timestamp;
-                const parsedTimestamp = typeof lineTimestamp === 'string' ? Date.parse(lineTimestamp) : NaN;
+                const parsedTimestamp = raw.timestamp !== undefined ? Date.parse(raw.timestamp) : NaN;
                 if (resolveLocalAttention({
                     type: 'transcript',
                     lineType: raw.type,
                     timestampMs: Number.isNaN(parsedTimestamp) ? null : parsedTimestamp,
-                    isSidechain: !!(raw as any).isSidechain,
+                    isSidechain: !!raw.isSidechain,
                     requestCreatedAt: localRequestCreatedAt,
                 }) === 'clear') {
                     logger.debug('[START] Transcript line written after pending local prompt — clearing localRequest');
@@ -400,8 +399,12 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     // Used by hook server to notify Session when Claude changes session ID
     let currentSession: Session | null = null;
 
-    // Start Hook server for receiving Claude session notifications
+    // Start Hook server for receiving Claude session notifications.
+    // The per-session secret (SEC-001) is shared between the server and the
+    // forwarder via the settings file only — never anywhere else on disk.
+    const hookSecret = generateHookSecret();
     const hookServer = await startHookServer({
+        secret: hookSecret,
         onNotification: (message, notificationType) => {
             const action = resolveLocalAttention({ type: 'notification', message, notificationType });
             if (action === 'set') {
@@ -450,7 +453,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     logger.debug(`[START] Hook server started on port ${hookServer.port}`);
 
     // Generate hook settings file for Claude
-    const hookSettingsPath = generateHookSettingsFile(hookServer.port);
+    const hookSettingsPath = generateHookSettingsFile(hookServer.port, hookSecret);
     logger.debug(`[START] Generated hook settings file: ${hookSettingsPath}`);
 
     // Print log file path

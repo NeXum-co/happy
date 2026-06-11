@@ -23,7 +23,9 @@ import { logger } from '@/ui/logger'
 const ProfileSchema = z.object({
   directory: z.string().min(1),
   claudeArgs: z.array(z.string()).optional(),
-  tmuxSession: z.string().optional(),
+  // tmux session names reach tmux commands; restrict to safe characters so a
+  // crafted name (e.g. with ':') cannot retarget windows/panes (SEC-003).
+  tmuxSession: z.string().regex(/^[a-zA-Z0-9_-]+$/).optional(),
 })
 
 const ProfilesFileSchema = z.record(z.string(), ProfileSchema)

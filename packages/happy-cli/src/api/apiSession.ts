@@ -730,8 +730,11 @@ export class ApiSessionClient extends EventEmitter {
                     }
                     throw new Error('Agent state version mismatch');
                 } else if (answer.result === 'error') {
-                    // console.error('Agent state update error', answer);
-                    // Hard error - ignore
+                    // Hard server error — no retry (TTL + the next update
+                    // cover it), but it must be visible (SF-002): a silently
+                    // dropped localRequest set/clear makes the needs-you
+                    // badge lie until the 30-min TTL.
+                    logger.warn(`[API] Agent state update rejected by server for session ${this.sessionId}:`, answer);
                 }
             });
         });

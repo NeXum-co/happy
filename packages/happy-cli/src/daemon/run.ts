@@ -409,6 +409,9 @@ export async function startDaemon(): Promise<void> {
         // Check if tmux is available and should be used
         const tmuxAvailable = await isTmuxAvailable();
         let useTmux = tmuxAvailable;
+        // When tmux was requested but the spawn failed, the fallback result
+        // message must say so (SF-003) — the user expects a tmux window.
+        let tmuxSpawnError: string | undefined;
 
         // Get tmux session name from environment variables (now set by profile system)
         // Empty string means "use current/most recent session" (tmux default behavior)
@@ -518,7 +521,8 @@ export async function startDaemon(): Promise<void> {
               });
             });
           } else {
-            logger.debug(`[DAEMON RUN] Failed to spawn in tmux: ${tmuxResult.error}, falling back to regular spawning`);
+            logger.warn(`[DAEMON RUN] Failed to spawn in tmux: ${tmuxResult.error}, falling back to regular spawning`);
+            tmuxSpawnError = tmuxResult.error ?? 'unknown error';
             useTmux = false;
           }
         }
@@ -569,6 +573,12 @@ export async function startDaemon(): Promise<void> {
 
           // TODO: In future, sessionId could be used with --resume to continue existing sessions
           // For now, we ignore it - each spawn creates a new session
+          const messageParts = [
+            directoryCreated ? `The path '${directory}' did not exist. We created a new folder and spawned a new session there.` : undefined,
+            // SF-003: tmux was requested but failed — without this note the
+            // user silently gets a detached session instead of a tmux window.
+            tmuxSpawnError !== undefined ? `tmux spawn failed (${tmuxSpawnError}); the session is running detached instead of in tmux.` : undefined,
+          ].filter((part): part is string => part !== undefined);
           return spawnTrackedHappyProcess({
             args,
             cwd: directory,
@@ -577,7 +587,7 @@ export async function startDaemon(): Promise<void> {
               ...extraEnv
             },
             directoryCreated,
-            message: directoryCreated ? `The path '${directory}' did not exist. We created a new folder and spawned a new session there.` : undefined,
+            message: messageParts.length > 0 ? messageParts.join(' ') : undefined,
           });
         }
 

@@ -45,6 +45,9 @@ export type LocalAttentionAction = 'set' | 'clear' | 'none';
  * Consumers (waybar count, needs-you band) ignore a localRequest older than
  * this. Safety net for the deny path: an interactive deny fires no hook
  * event and writes nothing, so without a TTL the signal would stay forever.
+ *
+ * Keep in sync with happy-app sources/sync/fleetLayout.ts (cannot be shared:
+ * separate packages, fork-diff).
  */
 export const LOCAL_REQUEST_TTL_MS = 30 * 60 * 1000;
 
