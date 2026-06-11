@@ -505,6 +505,7 @@ export const zhHant: TranslationStructure = {
         needsYou: ({ count }: { count: number }) => `需要你處理（${count}）`,
         activeIn: ({ project, count }: { project: string; count: number }) => `${project}（${count} 個活躍）`,
         earlier: ({ count }: { count: number }) => `更早（${count}）`,
+        waitsInTerminal: '在終端機中等待',
         cleanup: {
             action: '清理…',
             confirmTitle: '清理工作階段',

@@ -72,7 +72,8 @@ const NeedsYouRow = React.memo(({ session, selected, showBorder }: {
                     {projectKey ? `${projectKey} · ${session.name}` : session.name}
                 </Text>
                 <Text style={styles.rowSubtitle} numberOfLines={1}>
-                    {t('status.permissionRequired')}
+                    {/* Local-only prompts (AC-6) must be answered in the terminal — make that explicit */}
+                    {session.waitsInTerminal ? t('fleet.waitsInTerminal') : t('status.permissionRequired')}
                 </Text>
             </View>
         </Pressable>

@@ -330,6 +330,13 @@ export type Metadata = {
 
 export type AgentState = {
   controlledByUser?: boolean | null | undefined
+  /**
+   * Local-mode terminal permission prompt (E02 AC-6): set via the
+   * Notification hook while Claude's TUI waits for an answer in the
+   * terminal, cleared when the prompt is answered. Distinct from
+   * `requests`, which only carries remote-driven permission requests.
+   */
+  localRequest?: { message: string, createdAt: number } | null
   requests?: {
     [id: string]: {
       tool: string,

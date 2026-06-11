@@ -505,6 +505,7 @@ export const ca: TranslationStructure = {
         needsYou: ({ count }: { count: number }) => `Et necessita (${count})`,
         activeIn: ({ project, count }: { project: string; count: number }) => `${project} (${count} actives)`,
         earlier: ({ count }: { count: number }) => `Anteriors (${count})`,
+        waitsInTerminal: 'Esperant al terminal',
         cleanup: {
             action: 'Neteja…',
             confirmTitle: 'Netejar sessions',

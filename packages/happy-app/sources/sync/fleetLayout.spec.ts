@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeFleetLayout, FleetSessionLike } from './fleetLayout';
+import { computeAgentAttention, computeFleetLayout, FleetSessionLike } from './fleetLayout';
 
 function fleetSession(overrides: Partial<FleetSessionLike> & { id: string }): FleetSessionLike {
     return {
@@ -58,5 +58,35 @@ describe('computeFleetLayout', () => {
         ]);
         expect(layout.projectGroups.map(g => g.key)).toEqual(['control-plane', 'proxuma']);
         expect(layout.projectGroups[1].sessions.map(s => s.id)).toEqual(['old-project-2', 'old-project']);
+    });
+});
+
+describe('computeAgentAttention', () => {
+    it('flags remote attention for open permission requests', () => {
+        const attention = computeAgentAttention({
+            requests: { 'req-1': { tool: 'Bash', arguments: {}, createdAt: 1 } },
+        });
+        expect(attention).toEqual({ remote: true, local: false });
+    });
+
+    it('flags local attention for a terminal permission prompt (localRequest, AC-6)', () => {
+        const attention = computeAgentAttention({
+            localRequest: { message: 'Claude needs your permission to use Bash', createdAt: 1 },
+        });
+        expect(attention).toEqual({ remote: false, local: true });
+    });
+
+    it('flags both when remote requests and a localRequest coexist', () => {
+        const attention = computeAgentAttention({
+            requests: { 'req-1': { tool: 'Bash', arguments: {}, createdAt: 1 } },
+            localRequest: { message: 'Permission required', createdAt: 1 },
+        });
+        expect(attention).toEqual({ remote: true, local: true });
+    });
+
+    it('flags nothing for empty requests, a cleared localRequest, or missing agentState', () => {
+        expect(computeAgentAttention({ requests: {}, localRequest: null })).toEqual({ remote: false, local: false });
+        expect(computeAgentAttention(null)).toEqual({ remote: false, local: false });
+        expect(computeAgentAttention(undefined)).toEqual({ remote: false, local: false });
     });
 });

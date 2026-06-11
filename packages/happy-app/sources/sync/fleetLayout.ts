@@ -19,6 +19,28 @@ export interface FleetProjectGroup<S extends FleetSessionLike> {
     sessions: S[];
 }
 
+/**
+ * Why a session needs the user, derived from its agentState:
+ * - `remote`: open remote-driven permission requests (`agentState.requests`)
+ * - `local`: a terminal permission prompt (`agentState.localRequest`, AC-6) —
+ *   the answer has to be given in the terminal, not in the app.
+ * Shared by the needs-you predicate and the `permission_required` row state.
+ */
+export interface AgentAttention {
+    remote: boolean;
+    local: boolean;
+}
+
+export function computeAgentAttention(agentState: {
+    requests?: Record<string, unknown> | null;
+    localRequest?: { message: string; createdAt: number } | null;
+} | null | undefined): AgentAttention {
+    return {
+        remote: !!(agentState?.requests && Object.keys(agentState.requests).length > 0),
+        local: !!agentState?.localRequest,
+    };
+}
+
 export interface FleetLayout<S extends FleetSessionLike> {
     needsYou: S[];
     projectGroups: FleetProjectGroup<S>[];

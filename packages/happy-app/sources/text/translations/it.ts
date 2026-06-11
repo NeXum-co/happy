@@ -503,6 +503,7 @@ export const it: TranslationStructure = {
         needsYou: ({ count }: { count: number }) => `Ha bisogno di te (${count})`,
         activeIn: ({ project, count }: { project: string; count: number }) => `${project} (${count} attive)`,
         earlier: ({ count }: { count: number }) => `Precedenti (${count})`,
+        waitsInTerminal: 'In attesa nel terminale',
         cleanup: {
             action: 'Pulisci…',
             confirmTitle: 'Pulizia sessioni',

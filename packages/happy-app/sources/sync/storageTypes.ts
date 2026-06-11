@@ -66,6 +66,12 @@ export type Metadata = z.infer<typeof MetadataSchema>;
 
 export const AgentStateSchema = z.object({
     controlledByUser: z.boolean().nullish(),
+    // Local-mode terminal permission prompt (E02 AC-6) — z.object strips
+    // unknown keys, so without this field the app never sees the signal.
+    localRequest: z.object({
+        message: z.string(),
+        createdAt: z.number()
+    }).nullish(),
     requests: z.record(z.string(), z.object({
         tool: z.string(),
         arguments: z.any(),

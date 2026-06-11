@@ -18,6 +18,7 @@ import { initialMachineMetadata } from '@/daemon/run';
 import { startHappyServer } from '@/claude/utils/startHappyServer';
 import { startHookServer } from '@/claude/utils/startHookServer';
 import { generateHookSettingsFile, cleanupHookSettingsFile } from '@/claude/utils/generateHookSettings';
+import { resolveLocalAttention } from '@/claude/utils/localAttention';
 import { registerKillSessionHandler } from './registerKillSessionHandler';
 import { projectPath } from '../projectPath';
 import { resolve } from 'node:path';
@@ -350,8 +351,44 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     // Used by hook server to notify Session when Claude changes session ID
     let currentSession: Session | null = null;
 
+    // Local-mode permission visibility (E02 AC-6): terminal permission
+    // prompts live in Claude's TUI and never reach agentState.requests.
+    // The Notification hook sets agentState.localRequest; answered prompts
+    // clear it. localRequestActive mirrors our own writes so the frequent
+    // clear signals (every PostToolUse) only emit an update-state when
+    // there is actually something to clear.
+    let localRequestActive = false;
+    const setLocalRequest = (message: string) => {
+        localRequestActive = true;
+        session.updateAgentState((currentState) => ({
+            ...currentState,
+            localRequest: { message, createdAt: Date.now() }
+        }));
+    };
+    const clearLocalRequest = () => {
+        if (!localRequestActive) {
+            return;
+        }
+        localRequestActive = false;
+        session.updateAgentState((currentState) => ({
+            ...currentState,
+            localRequest: null
+        }));
+    };
+
     // Start Hook server for receiving Claude session notifications
     const hookServer = await startHookServer({
+        onNotification: (message) => {
+            if (resolveLocalAttention({ type: 'notification', message }) === 'set') {
+                logger.debug(`[START] Local permission prompt detected: ${message}`);
+                setLocalRequest(message);
+            }
+        },
+        onClearSignal: (eventName) => {
+            if (resolveLocalAttention({ type: 'hook', eventName }) === 'clear') {
+                clearLocalRequest();
+            }
+        },
         onSessionHook: (sessionId, data) => {
             logger.debug(`[START] Session hook received: ${sessionId}`, data);
 
@@ -782,6 +819,19 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         onSessionReady: (sessionInstance) => {
             // Store reference for hook server callback
             currentSession = sessionInstance;
+
+            // Clear the local permission signal when thinking flips to true
+            // (existing fd-3 path in claudeLocal): covers the deny path,
+            // where a denied tool prompt makes Claude continue thinking
+            // without any PostToolUse event. Wrapped here because the
+            // launcher wires session.onThinkingChange into claudeLocal.
+            const baseOnThinkingChange = sessionInstance.onThinkingChange;
+            sessionInstance.onThinkingChange = (thinking: boolean) => {
+                baseOnThinkingChange(thinking);
+                if (resolveLocalAttention({ type: 'thinking', thinking }) === 'clear') {
+                    clearLocalRequest();
+                }
+            };
         },
         onAbort: resetCurrentModeDefaults,
         mcpServers: {

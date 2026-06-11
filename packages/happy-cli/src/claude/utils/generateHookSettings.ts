@@ -1,8 +1,13 @@
 /**
  * Generate temporary settings file with Claude hooks for session tracking
- * 
+ *
  * Creates a settings.json file that configures Claude's SessionStart hook
  * to notify our HTTP server when sessions change (new session, resume, compact, etc.)
+ *
+ * Also wires the local-attention hooks (E02 AC-6): Notification signals a
+ * terminal permission prompt; PostToolUse / UserPromptSubmit / Stop signal
+ * that the prompt was answered. All events go through the same forwarder,
+ * which routes them on hook_event_name.
  */
 
 import { join, resolve } from 'node:path';
@@ -29,19 +34,27 @@ export function generateHookSettingsFile(port: number): string {
     const forwarderScript = resolve(projectPath(), 'scripts', 'session_hook_forwarder.cjs');
     const hookCommand = `node "${forwarderScript}" ${port}`;
 
+    const forwarderHook = {
+        matcher: "*",
+        hooks: [
+            {
+                type: "command",
+                command: hookCommand
+            }
+        ]
+    };
+
     const settings = {
         hooks: {
-            SessionStart: [
-                {
-                    matcher: "*",
-                    hooks: [
-                        {
-                            type: "command",
-                            command: hookCommand
-                        }
-                    ]
-                }
-            ]
+            SessionStart: [forwarderHook],
+            // Local-attention events (E02 AC-6). Notification = terminal
+            // permission prompt pending; the other three mean it's answered.
+            // Notification / UserPromptSubmit / Stop take no matcher in
+            // Claude Code, but a "*" matcher entry is accepted everywhere.
+            Notification: [forwarderHook],
+            PostToolUse: [forwarderHook],
+            UserPromptSubmit: [forwarderHook],
+            Stop: [forwarderHook]
         }
     };
 

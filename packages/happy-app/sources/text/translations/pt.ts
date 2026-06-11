@@ -504,6 +504,7 @@ export const pt: TranslationStructure = {
         needsYou: ({ count }: { count: number }) => `Precisa de você (${count})`,
         activeIn: ({ project, count }: { project: string; count: number }) => `${project} (${count} ativas)`,
         earlier: ({ count }: { count: number }) => `Anteriores (${count})`,
+        waitsInTerminal: 'Aguardando no terminal',
         cleanup: {
             action: 'Limpar…',
             confirmTitle: 'Limpar sessões',

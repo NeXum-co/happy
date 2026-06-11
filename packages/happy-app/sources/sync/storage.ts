@@ -30,7 +30,7 @@ import { getCurrentRealtimeSessionId, getVoiceSession } from '@/realtime/Realtim
 import { isMutableTool } from "@/components/tools/knownTools";
 import { DecryptedArtifact } from "./artifactTypes";
 import { FeedItem } from "./feedTypes";
-import { computeFleetLayout } from "./fleetLayout";
+import { computeAgentAttention, computeFleetLayout } from "./fleetLayout";
 
 // Debounce timer for realtimeMode changes
 let realtimeModeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -94,16 +94,20 @@ export interface SessionRowData {
     completedTodosCount: number;
     totalTodosCount: number;
     hasUnread: boolean;
+    // True when the session needs the user ONLY because of a local terminal
+    // permission prompt (agentState.localRequest, AC-6) — the answer must be
+    // given in the terminal, so the needs-you row shows a different subtitle.
+    waitsInTerminal: boolean;
 }
 
 function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): SessionRowData {
     const isOnline = session.presence === "online";
-    const hasPermissions = !!(session.agentState?.requests && Object.keys(session.agentState.requests).length > 0);
+    const attention = computeAgentAttention(session.agentState);
 
     let state: SessionState;
     if (!isOnline) {
         state = 'disconnected';
-    } else if (hasPermissions) {
+    } else if (attention.remote || attention.local) {
         state = 'permission_required';
     } else if (session.thinking) {
         state = 'thinking';
@@ -127,6 +131,7 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
         completedTodosCount: session.todos?.filter(todo => todo.status === 'completed').length ?? 0,
         totalTodosCount: session.todos?.length ?? 0,
         hasUnread: unreadSessionIds?.has(session.id) ?? false,
+        waitsInTerminal: attention.local && !attention.remote,
     };
 }
 
@@ -238,18 +243,21 @@ function buildSessionListViewData(
 ): SessionListViewItem[] {
     // Fleet layout (E02): needs-you band, then active sessions per project
     // group, then inactive sessions (day-grouped below).
-    const layout = computeFleetLayout(Object.values(sessions).map(session => ({
-        id: session.id,
-        active: isSessionActive(session),
-        activeAt: session.activeAt,
-        createdAt: session.createdAt,
-        // Mirrors the 'permission_required' state in buildSessionRowData
-        needsYou: session.presence === 'online'
-            && !!(session.agentState?.requests && Object.keys(session.agentState.requests).length > 0),
-        path: session.metadata?.path ?? null,
-        homeDir: session.metadata?.homeDir ?? null,
-        session,
-    })));
+    const layout = computeFleetLayout(Object.values(sessions).map(session => {
+        // Mirrors the 'permission_required' state in buildSessionRowData:
+        // remote permission requests OR a local terminal prompt (AC-6)
+        const attention = computeAgentAttention(session.agentState);
+        return {
+            id: session.id,
+            active: isSessionActive(session),
+            activeAt: session.activeAt,
+            createdAt: session.createdAt,
+            needsYou: session.presence === 'online' && (attention.remote || attention.local),
+            path: session.metadata?.path ?? null,
+            homeDir: session.metadata?.homeDir ?? null,
+            session,
+        };
+    }));
 
     // Inactive sessions sorted by creation date (newest first) — matches applySessions behavior
     const inactiveSessions = layout.inactive.map(f => f.session);

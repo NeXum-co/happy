@@ -521,6 +521,7 @@ export const ru: TranslationStructure = {
         needsYou: ({ count }: { count: number }) => `Требуется ваше участие (${count})`,
         activeIn: ({ project, count }: { project: string; count: number }) => `${project} (активных: ${count})`,
         earlier: ({ count }: { count: number }) => `Ранее (${count})`,
+        waitsInTerminal: 'Ожидает в терминале',
         cleanup: {
             action: 'Очистить…',
             confirmTitle: 'Очистка сессий',

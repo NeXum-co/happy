@@ -76,6 +76,10 @@ export interface SessionHookData {
 export interface HookServerOptions {
     /** Called when a session hook is received with a valid session ID */
     onSessionHook: (sessionId: string, data: SessionHookData) => void;
+    /** Called for Notification hook events with the notification message (E02 AC-6) */
+    onNotification?: (message: string) => void;
+    /** Called for non-Notification events on /hook/event (PostToolUse, UserPromptSubmit, Stop, …) */
+    onClearSignal?: (eventName: string) => void;
 }
 
 export interface HookServer {
@@ -92,12 +96,13 @@ export interface HookServer {
  * @returns Promise resolving to the server instance with port info
  */
 export async function startHookServer(options: HookServerOptions): Promise<HookServer> {
-    const { onSessionHook } = options;
+    const { onSessionHook, onNotification, onClearSignal } = options;
 
     return new Promise((resolve, reject) => {
         const server: Server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-            // Only handle POST to /hook/session-start
-            if (req.method === 'POST' && req.url === '/hook/session-start') {
+            // Handle POST to /hook/session-start (claudeSessionId capture) and
+            // /hook/event (local-attention events, E02 AC-6)
+            if (req.method === 'POST' && (req.url === '/hook/session-start' || req.url === '/hook/event')) {
                 // Set timeout to prevent hanging if Claude doesn't close stdin
                 const timeout = setTimeout(() => {
                     if (!res.headersSent) {
@@ -112,7 +117,7 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
                         chunks.push(chunk as Buffer);
                     }
                     clearTimeout(timeout);
-                    
+
                     const body = Buffer.concat(chunks).toString('utf-8');
                     logger.debug('[hookServer] Received session hook:', body);
 
@@ -123,13 +128,30 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
                         logger.debug('[hookServer] Failed to parse hook data as JSON:', parseError);
                     }
 
-                    // Support both snake_case (from Claude) and camelCase
-                    const sessionId = data.session_id || data.sessionId;
-                    if (sessionId) {
-                        logger.debug(`[hookServer] Session hook received session ID: ${sessionId}`);
-                        onSessionHook(sessionId, data);
+                    if (req.url === '/hook/event') {
+                        // Local-attention events. Errors in the callbacks are
+                        // caught below and only logged — hook failures must
+                        // never break a session.
+                        const eventName = data.hook_event_name ?? '';
+                        if (eventName === 'Notification') {
+                            const message = typeof data.message === 'string' ? data.message : '';
+                            logger.debug(`[hookServer] Notification hook received: ${message}`);
+                            onNotification?.(message);
+                        } else if (eventName) {
+                            logger.debug(`[hookServer] Hook event received: ${eventName}`);
+                            onClearSignal?.(eventName);
+                        } else {
+                            logger.debug('[hookServer] Hook event received without hook_event_name');
+                        }
                     } else {
-                        logger.debug('[hookServer] Session hook received but no session_id found in data');
+                        // Support both snake_case (from Claude) and camelCase
+                        const sessionId = data.session_id || data.sessionId;
+                        if (sessionId) {
+                            logger.debug(`[hookServer] Session hook received session ID: ${sessionId}`);
+                            onSessionHook(sessionId, data);
+                        } else {
+                            logger.debug('[hookServer] Session hook received but no session_id found in data');
+                        }
                     }
 
                     res.writeHead(200, { 'Content-Type': 'text/plain' }).end('ok');

@@ -519,6 +519,7 @@ export const en: TranslationStructure = {
         needsYou: ({ count }: { count: number }) => `Needs you (${count})`,
         activeIn: ({ project, count }: { project: string; count: number }) => `${project} (${count} active)`,
         earlier: ({ count }: { count: number }) => `Earlier (${count})`,
+        waitsInTerminal: 'Waiting in terminal',
         cleanup: {
             action: 'Clean up…',
             confirmTitle: 'Clean up sessions',

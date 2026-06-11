@@ -40,8 +40,10 @@ type WaybarOutput = {
 
 /**
  * Count sessions that are waiting on the user: sessions whose decrypted
- * agentState has at least one open permission request. Sessions without a
- * persisted key, without agentState, or that fail to decrypt are ignored.
+ * agentState has at least one open permission request — remote-driven
+ * (`requests`) or a local terminal prompt (`localRequest`, E02 AC-6). A
+ * session with both counts once. Sessions without a persisted key, without
+ * agentState, or that fail to decrypt are ignored.
  */
 export function countNeedsAttention(sessions: RawActiveSession[], keys: SessionKeyLookup): number {
     let count = 0
@@ -55,7 +57,8 @@ export function countNeedsAttention(sessions: RawActiveSession[], keys: SessionK
             persisted.encryptionVariant,
             decodeBase64(session.agentState),
         ) as AgentState | null
-        if (agentState?.requests && Object.keys(agentState.requests).length > 0) {
+        const hasRemoteRequests = !!(agentState?.requests && Object.keys(agentState.requests).length > 0)
+        if (hasRemoteRequests || agentState?.localRequest) {
             count++
         }
     }

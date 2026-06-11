@@ -83,4 +83,36 @@ describe('countNeedsAttention', () => {
 
         expect(countNeedsAttention(sessions, keys)).toBe(0)
     })
+
+    it('counts a session with only a local terminal prompt (localRequest, AC-6)', () => {
+        const key = getRandomBytes(32)
+        const localOnly: AgentState = {
+            localRequest: { message: 'Claude needs your permission to use Bash', createdAt: Date.now() },
+        }
+        const sessions = [makeSession('session-a', localOnly, key)]
+        const keys = makeKeys([{ id: 'session-a', key }])
+
+        expect(countNeedsAttention(sessions, keys)).toBe(1)
+    })
+
+    it('counts a session with both remote requests and a localRequest exactly once', () => {
+        const key = getRandomBytes(32)
+        const both: AgentState = {
+            ...pendingRequest,
+            localRequest: { message: 'Permission required', createdAt: Date.now() },
+        }
+        const sessions = [makeSession('session-a', both, key)]
+        const keys = makeKeys([{ id: 'session-a', key }])
+
+        expect(countNeedsAttention(sessions, keys)).toBe(1)
+    })
+
+    it('does not count a cleared (null) localRequest', () => {
+        const key = getRandomBytes(32)
+        const cleared: AgentState = { localRequest: null, requests: {} }
+        const sessions = [makeSession('session-a', cleared, key)]
+        const keys = makeKeys([{ id: 'session-a', key }])
+
+        expect(countNeedsAttention(sessions, keys)).toBe(0)
+    })
 })
