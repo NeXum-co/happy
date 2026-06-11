@@ -499,7 +499,34 @@ describe('tmux argument order (regression: tmux stops option parsing at first no
         const eIndex = newWindowCmd!.indexOf('-e');
         expect(eIndex).toBeGreaterThan(-1);
         expect(eIndex).toBeLessThan(shellCommandIndex);
-        expect(newWindowCmd![eIndex + 1]).toBe('FOO="bar"');
+        expect(newWindowCmd![eIndex + 1]).toBe('FOO=bar');
+    });
+
+    it('spawnInTmux passes environment values verbatim — tmux -e does not strip shell quoting', async () => {
+        // Regression: values were wrapped in double quotes and shell-escaped,
+        // but tmux sets -e values verbatim in the window environment (no shell
+        // parses them). The spawned process then saw HAPPY_HOME_DIR="..." with
+        // literal quotes and could not find its credentials.
+        const utils = new TmuxUtilities('test-session');
+        const calls: string[][] = [];
+        mockRunCommand(utils, calls);
+
+        await utils.spawnInTmux(['echo', 'hi'], {
+            sessionName: 'test-session',
+            windowName: 'my-window'
+        }, {
+            HAPPY_HOME_DIR: '/tmp/happy-e02c',
+            WITH_SPECIALS: 'a"b\\c$d`e'
+        });
+
+        const newWindowCmd = calls.find(argv => argv.includes('new-window'))!;
+        const envValues = newWindowCmd
+            .map((arg, i) => (newWindowCmd[i - 1] === '-e' ? arg : null))
+            .filter((arg): arg is string => arg !== null);
+        expect(envValues).toEqual([
+            'HAPPY_HOME_DIR=/tmp/happy-e02c',
+            'WITH_SPECIALS=a"b\\c$d`e'
+        ]);
     });
 });
 
