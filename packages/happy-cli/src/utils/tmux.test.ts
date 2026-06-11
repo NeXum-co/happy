@@ -5,7 +5,7 @@
  * They do NOT require tmux to be installed on the system.
  * All tests mock environment variables and test string parsing only.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     parseTmuxSessionIdentifier,
     formatTmuxSessionIdentifier,
@@ -417,6 +417,89 @@ describe('TmuxUtilities.detectTmuxEnvironment', () => {
                 socket_path: '/tmp/tmux-1000/default'
             });
         });
+    });
+});
+
+describe('tmux argument order (regression: tmux stops option parsing at first non-option argument)', () => {
+    // Mocks the private runCommand so no tmux binary is needed; these tests
+    // verify the CONSTRUCTED argv only. Regression for the preset-spawn bug
+    // where -P/-F/-t ended up AFTER the shell command, so tmux treated them
+    // as part of the command to execute: the window crashed instantly and
+    // new-window printed no pane PID ("Failed to extract PID from tmux output").
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    const mockRunCommand = (utils: TmuxUtilities, calls: string[][]) => {
+        vi.spyOn(utils as any, 'runCommand').mockImplementation(async (...mockArgs: unknown[]) => {
+            const argv = mockArgs[0] as string[];
+            calls.push(argv);
+            if (argv.includes('new-window')) {
+                // Simulate tmux printing the pane PID via -P -F '#{pane_pid}'
+                return { exitCode: 0, stdout: '12345\n', stderr: '' };
+            }
+            return { exitCode: 0, stdout: '', stderr: '' };
+        });
+    };
+
+    it('executeTmuxCommand inserts -t directly after the subcommand, never after trailing arguments', async () => {
+        const utils = new TmuxUtilities('test-session');
+        const calls: string[][] = [];
+        mockRunCommand(utils, calls);
+
+        await utils.executeTmuxCommand(['new-window', '-n', 'win', 'echo hi; sleep 30']);
+
+        expect(calls).toHaveLength(1);
+        expect(calls[0]).toEqual([
+            'tmux', 'new-window', '-t', 'test-session', '-n', 'win', 'echo hi; sleep 30'
+        ]);
+    });
+
+    it('spawnInTmux places -P, -F and -t before the shell command (shell command is the last argument)', async () => {
+        const utils = new TmuxUtilities('test-session');
+        const calls: string[][] = [];
+        mockRunCommand(utils, calls);
+
+        const result = await utils.spawnInTmux(['node', 'index.mjs', 'claude'], {
+            sessionName: 'test-session',
+            windowName: 'my-window',
+            cwd: '/tmp'
+        }, { FOO: 'bar' });
+
+        expect(result).toEqual({
+            success: true,
+            sessionId: 'test-session:my-window',
+            pid: 12345
+        });
+
+        const newWindowCmd = calls.find(argv => argv.includes('new-window'));
+        expect(newWindowCmd).toBeDefined();
+
+        // The shell command must be the LAST argument: tmux stops option
+        // parsing at the first non-option argument.
+        const shellCommandIndex = newWindowCmd!.indexOf('node index.mjs claude');
+        expect(shellCommandIndex).toBe(newWindowCmd!.length - 1);
+
+        // All flags must come before the shell command.
+        const pIndex = newWindowCmd!.indexOf('-P');
+        expect(pIndex).toBeGreaterThan(-1);
+        expect(pIndex).toBeLessThan(shellCommandIndex);
+
+        const fIndex = newWindowCmd!.indexOf('-F');
+        expect(fIndex).toBeGreaterThan(-1);
+        expect(fIndex).toBeLessThan(shellCommandIndex);
+        expect(newWindowCmd![fIndex + 1]).toBe('#{pane_pid}');
+
+        const tIndex = newWindowCmd!.indexOf('-t');
+        expect(tIndex).toBeGreaterThan(-1);
+        expect(tIndex).toBeLessThan(shellCommandIndex);
+        expect(newWindowCmd![tIndex + 1]).toBe('test-session');
+
+        // Environment flag also stays before the shell command.
+        const eIndex = newWindowCmd!.indexOf('-e');
+        expect(eIndex).toBeGreaterThan(-1);
+        expect(eIndex).toBeLessThan(shellCommandIndex);
+        expect(newWindowCmd![eIndex + 1]).toBe('FOO="bar"');
     });
 });
 

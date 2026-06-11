@@ -445,17 +445,19 @@ export class TmuxUtilities {
             return this.executeCommand(fullCmd);
         } else {
             // Non-send-keys commands
-            const fullCmd = [...baseCmd, ...cmd];
-
-            // Add target specification for commands that support it
+            // Add target specification for commands that support it.
+            // IMPORTANT: -t must come directly after the tmux subcommand. tmux
+            // stops option parsing at the first non-option argument (e.g. the
+            // shell command of new-window), so appending -t at the end would
+            // make it part of the command to execute.
             if (cmd.length > 0 && COMMANDS_SUPPORTING_TARGET.has(cmd[0])) {
                 let target = targetSession;
                 if (window) target += `:${window}`;
                 if (pane) target += `.${pane}`;
-                fullCmd.push('-t', target);
+                return this.executeCommand([...baseCmd, cmd[0], '-t', target, ...cmd.slice(1)]);
             }
 
-            return this.executeCommand(fullCmd);
+            return this.executeCommand([...baseCmd, ...cmd]);
         }
     }
 
@@ -825,12 +827,16 @@ export class TmuxUtilities {
                 logger.debug(`[TMUX] Setting ${Object.keys(env).length} environment variables in tmux window`);
             }
 
-            // Add the command to run in the window (runs immediately when window is created)
-            createWindowArgs.push(fullCommand);
-
-            // Add -P flag to print the pane PID immediately
+            // Add -P flag to print the pane PID immediately.
+            // IMPORTANT: all flags must come before the shell command — tmux
+            // stops option parsing at the first non-option argument, so flags
+            // placed after the command become part of the command itself.
             createWindowArgs.push('-P');
             createWindowArgs.push('-F', '#{pane_pid}');
+
+            // Add the command to run in the window (runs immediately when window
+            // is created). This must be the LAST argument.
+            createWindowArgs.push(fullCommand);
 
             // Create window with command and get PID immediately
             const createResult = await this.executeTmuxCommand(createWindowArgs, sessionName);
