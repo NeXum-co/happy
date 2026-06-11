@@ -16,8 +16,13 @@ export type LocalAttentionEvent =
 
 export type LocalAttentionAction = 'set' | 'clear' | 'none';
 
-/** Hook events that mean the terminal prompt is no longer pending. */
-const CLEARING_HOOK_EVENTS = new Set(['PostToolUse', 'UserPromptSubmit', 'Stop']);
+/**
+ * Hook events that mean the terminal prompt is no longer pending.
+ * PermissionDenied is the only event Claude Code fires on deny/Esc — an
+ * interrupted turn produces no PostToolUse/Stop and no thinking activity
+ * (live-verified against Claude Code 2.1.173, fase G proof).
+ */
+const CLEARING_HOOK_EVENTS = new Set(['PostToolUse', 'UserPromptSubmit', 'Stop', 'PermissionDenied']);
 
 export function resolveLocalAttention(event: LocalAttentionEvent): LocalAttentionAction {
     switch (event.type) {

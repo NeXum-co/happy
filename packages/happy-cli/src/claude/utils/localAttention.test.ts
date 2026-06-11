@@ -46,6 +46,10 @@ describe('resolveLocalAttention', () => {
         expect(resolveLocalAttention({ type: 'hook', eventName: 'Stop' })).toBe('clear')
     })
 
+    it('clears on PermissionDenied (deny/Esc in the TUI fires no other event)', () => {
+        expect(resolveLocalAttention({ type: 'hook', eventName: 'PermissionDenied' })).toBe('clear')
+    })
+
     it('clears when thinking flips to true (covers the deny path)', () => {
         expect(resolveLocalAttention({ type: 'thinking', thinking: true })).toBe('clear')
     })

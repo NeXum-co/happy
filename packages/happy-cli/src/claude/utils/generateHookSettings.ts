@@ -48,13 +48,15 @@ export function generateHookSettingsFile(port: number): string {
         hooks: {
             SessionStart: [forwarderHook],
             // Local-attention events (E02 AC-6). Notification = terminal
-            // permission prompt pending; the other three mean it's answered.
+            // permission prompt pending; the others mean it's answered.
+            // PermissionDenied is the only event fired on deny/Esc.
             // Notification / UserPromptSubmit / Stop take no matcher in
             // Claude Code, but a "*" matcher entry is accepted everywhere.
             Notification: [forwarderHook],
             PostToolUse: [forwarderHook],
             UserPromptSubmit: [forwarderHook],
-            Stop: [forwarderHook]
+            Stop: [forwarderHook],
+            PermissionDenied: [forwarderHook]
         }
     };
 
