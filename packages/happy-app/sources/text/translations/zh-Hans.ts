@@ -278,6 +278,14 @@ export const zhHans: TranslationStructure = {
         title: '开始新会话',
         machineOffline: '设备离线',
         switchMachinesHint: '• 点击上方的设备来切换设备',
+        preset: {
+            tabCustom: '自定义',
+            tabPreset: '预设',
+            chooseProfile: '选择预设',
+            noProfiles: '此设备上没有可用的预设',
+            namePlaceholder: '会话名称（可选）',
+            start: '开始会话',
+        },
     },
 
     sessionHistory: {

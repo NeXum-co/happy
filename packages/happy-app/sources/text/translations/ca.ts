@@ -277,6 +277,14 @@ export const ca: TranslationStructure = {
         title: 'Iniciar nova sessió',
         machineOffline: 'La màquina està fora de línia',
         switchMachinesHint: '• Canvia de màquina fent clic a la màquina de dalt',
+        preset: {
+            tabCustom: 'Personalitzada',
+            tabPreset: 'Preset',
+            chooseProfile: 'Tria un preset',
+            noProfiles: 'No hi ha presets disponibles en aquesta màquina',
+            namePlaceholder: 'Nom de la sessió (opcional)',
+            start: 'Inicia la sessió',
+        },
     },
 
     sessionHistory: {

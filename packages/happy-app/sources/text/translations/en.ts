@@ -291,6 +291,14 @@ export const en: TranslationStructure = {
         title: 'Start New Session',
         machineOffline: 'Machine is offline',
         switchMachinesHint: '• Switch machines by clicking on the machine above',
+        preset: {
+            tabCustom: 'Custom',
+            tabPreset: 'Preset',
+            chooseProfile: 'Choose a preset',
+            noProfiles: 'No presets available on this machine',
+            namePlaceholder: 'Session name (optional)',
+            start: 'Start session',
+        },
     },
 
     sessionHistory: {

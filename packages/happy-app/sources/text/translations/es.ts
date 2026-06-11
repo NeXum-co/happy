@@ -277,6 +277,14 @@ export const es: TranslationStructure = {
         title: 'Iniciar nueva sesión',
         machineOffline: 'La máquina está desconectada',
         switchMachinesHint: '• Cambia de máquina haciendo clic en la máquina de arriba',
+        preset: {
+            tabCustom: 'Personalizada',
+            tabPreset: 'Preset',
+            chooseProfile: 'Elige un preset',
+            noProfiles: 'No hay presets disponibles en esta máquina',
+            namePlaceholder: 'Nombre de la sesión (opcional)',
+            start: 'Comenzar sesión',
+        },
     },
 
     sessionHistory: {

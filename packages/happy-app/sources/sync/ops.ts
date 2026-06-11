@@ -136,7 +136,12 @@ export type SpawnSessionResult =
 // Options for spawning a session
 export interface SpawnSessionOptions {
     machineId: string;
-    directory: string;
+    /** Working directory. Required unless `profile` is set (the profile supplies it). */
+    directory?: string;
+    /** Name of a spawn profile on the machine (from machine metadata `profiles`). */
+    profile?: string;
+    /** Free-form session name; the daemon uses it (sanitized) as the tmux window name. */
+    sessionName?: string;
     approvedNewDirectoryCreation?: boolean;
     token?: string;
     agent?: 'codex' | 'claude' | 'gemini' | 'openclaw';
@@ -187,12 +192,14 @@ export interface ResumeSessionOptions {
  */
 export async function machineSpawnNewSession(options: SpawnSessionOptions): Promise<SpawnSessionResult> {
 
-    const { machineId, directory, approvedNewDirectoryCreation = false, token, agent, resumeClaudeSessionId, parentSessionId, forkedFromMessageId } = options;
+    const { machineId, directory, profile, sessionName, approvedNewDirectoryCreation = false, token, agent, resumeClaudeSessionId, parentSessionId, forkedFromMessageId } = options;
 
     try {
         const result = await apiSocket.machineRPC<SpawnSessionResult, {
             type: 'spawn-in-directory'
-            directory: string
+            directory?: string,
+            profile?: string,
+            sessionName?: string,
             approvedNewDirectoryCreation?: boolean,
             token?: string,
             agent?: 'codex' | 'claude' | 'gemini' | 'openclaw',
@@ -202,7 +209,7 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
         }>(
             machineId,
             'spawn-happy-session',
-            { type: 'spawn-in-directory', directory, approvedNewDirectoryCreation, token, agent, resumeClaudeSessionId, parentSessionId, forkedFromMessageId }
+            { type: 'spawn-in-directory', directory, profile, sessionName, approvedNewDirectoryCreation, token, agent, resumeClaudeSessionId, parentSessionId, forkedFromMessageId }
         );
         return result;
     } catch (error) {

@@ -560,6 +560,12 @@ function NewSessionScreen() {
     // Config collapse — auto-collapses when typing, expands when empty
     const [isConfigExpanded, setIsConfigExpanded] = React.useState(true);
 
+    // Preset spawn (E02-C): tab switch + chosen profile + optional session name.
+    // The custom tab is the default and keeps the existing free flow untouched.
+    const [activeTab, setActiveTab] = React.useState<'custom' | 'preset'>('custom');
+    const [presetProfile, setPresetProfile] = React.useState<string | null>(null);
+    const [presetName, setPresetName] = React.useState('');
+
     // Auto-select first machine when none selected (first-ever use, no draft)
     React.useEffect(() => {
         if (selectedMachineId) return;
@@ -573,6 +579,19 @@ function NewSessionScreen() {
         [allMachines, selectedMachineId],
     );
     const selectedHomeDir = selectedMachine?.metadata?.homeDir;
+
+    // Spawn profiles advertised by the selected machine (daemon profiles.json)
+    const machineProfiles = React.useMemo(
+        () => selectedMachine?.metadata?.profiles ?? [],
+        [selectedMachine],
+    );
+
+    // Drop a chosen profile that no longer exists (e.g. after machine switch)
+    React.useEffect(() => {
+        if (presetProfile && !machineProfiles.includes(presetProfile)) {
+            setPresetProfile(null);
+        }
+    }, [machineProfiles, presetProfile]);
 
     // Build machine picker items: online first, then offline
     const machineItems = React.useMemo<PickerItem[]>(() => {
@@ -940,6 +959,60 @@ function NewSessionScreen() {
 
     const canSend = selectedMachineId && selectedMachine && isMachineOnline(selectedMachine) && !isSpawning;
 
+    // Preset spawn handler — the daemon resolves the profile to directory,
+    // claude args and tmux session; sessionName becomes the tmux window name.
+    const handlePresetStart = React.useCallback(async (approvedNewDirectoryCreation: boolean = false) => {
+        if (!selectedMachineId || !selectedMachine || !presetProfile) {
+            return;
+        }
+        if (!isMachineOnline(selectedMachine)) {
+            Modal.alert(t('common.error'), t('newSession.machineOffline'));
+            return;
+        }
+
+        setIsSpawning(true);
+        try {
+            const result = await machineSpawnNewSession({
+                machineId: selectedMachineId,
+                profile: presetProfile,
+                sessionName: presetName.trim() || undefined,
+                approvedNewDirectoryCreation,
+            });
+
+            switch (result.type) {
+                case 'success':
+                    await sync.refreshSessions();
+                    setPresetName('');
+                    router.back();
+                    navigateToSession(result.sessionId);
+                    break;
+                case 'requestToApproveDirectoryCreation': {
+                    const approved = await Modal.confirm(
+                        'Create Directory?',
+                        `The directory '${result.directory}' does not exist. Would you like to create it?`,
+                        { cancelText: t('common.cancel'), confirmText: t('common.create') },
+                    );
+                    if (approved) {
+                        await handlePresetStart(true);
+                    }
+                    break;
+                }
+                case 'error':
+                    Modal.alert(t('common.error'), result.errorMessage);
+                    break;
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error
+                ? error.message
+                : 'Failed to start session';
+            Modal.alert(t('common.error'), errorMessage);
+        } finally {
+            setIsSpawning(false);
+        }
+    }, [selectedMachineId, selectedMachine, presetProfile, presetName, router, navigateToSession]);
+
+    const canStartPreset = !!(selectedMachineId && selectedMachine && isMachineOnline(selectedMachine) && presetProfile && !isSpawning);
+
     // Handle Enter/Cmd+Enter to send on web
     const handleKeyPress = React.useCallback((event: KeyPressEvent): boolean => {
         if (Platform.OS === 'web' && event.key === 'Enter' && !event.shiftKey && agentInputEnterToSend) {
@@ -969,7 +1042,28 @@ function NewSessionScreen() {
             <View style={styles.inner}>
                 <View style={{ maxWidth: layout.maxWidth, width: '100%', alignSelf: 'center', paddingHorizontal: 12, gap: 8, paddingTop: 12 }}>
 
+                    {/* Tab toggle: custom (free flow, default) vs preset spawn */}
+                    <View style={styles.tabRow}>
+                        <Pressable
+                            onPress={() => setActiveTab('custom')}
+                            style={[styles.tabButton, activeTab === 'custom' && styles.tabButtonActive]}
+                        >
+                            <Text style={[styles.tabLabel, { color: activeTab === 'custom' ? theme.colors.text : theme.colors.textSecondary }]}>
+                                {t('newSession.preset.tabCustom')}
+                            </Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={() => setActiveTab('preset')}
+                            style={[styles.tabButton, activeTab === 'preset' && styles.tabButtonActive]}
+                        >
+                            <Text style={[styles.tabLabel, { color: activeTab === 'preset' ? theme.colors.text : theme.colors.textSecondary }]}>
+                                {t('newSession.preset.tabPreset')}
+                            </Text>
+                        </Pressable>
+                    </View>
+
                     {/* Config box */}
+                    {activeTab === 'custom' && (
                     <View style={styles.configBox}>
                         {isConfigExpanded ? (
                             <>
@@ -1185,6 +1279,99 @@ function NewSessionScreen() {
                             </>
                         )}
                     </View>
+                    )}
+
+                    {/* Preset spawn panel: profile choice + optional name + start */}
+                    {activeTab === 'preset' && (
+                        <View style={styles.configBox}>
+                            {/* Machine row */}
+                            <Pressable
+                                style={(p) => [styles.configRow, p.pressed && styles.configRowPressed]}
+                                onPress={() => togglePicker('machine')}
+                            >
+                                <Ionicons name="desktop-outline" size={15} color={theme.colors.textSecondary} />
+                                <Text style={styles.configLabel} numberOfLines={1}>
+                                    {machineName}
+                                </Text>
+                            </Pressable>
+
+                            {isOffline && (
+                                <View style={styles.offlineHelp}>
+                                    <Ionicons name="cloud-offline-outline" size={14} color={theme.colors.status.disconnected} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.offlineHelpTitle, { color: theme.colors.status.disconnected }]}>
+                                            {t('newSession.machineOffline')}
+                                        </Text>
+                                        <Text style={[styles.offlineHelpText, { color: theme.colors.textSecondary }]}>
+                                            {t('machine.offlineHelp')}
+                                            {'\n'}{t('newSession.switchMachinesHint')}
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            <View style={{ opacity: isOffline ? 0.4 : 1 }} pointerEvents={isOffline ? 'none' : 'auto'}>
+                                <Text style={[styles.presetSectionLabel, { color: theme.colors.textSecondary }]}>
+                                    {t('newSession.preset.chooseProfile')}
+                                </Text>
+
+                                {machineProfiles.length === 0 && (
+                                    <Text style={[styles.presetEmptyText, { color: theme.colors.textSecondary }]}>
+                                        {t('newSession.preset.noProfiles')}
+                                    </Text>
+                                )}
+
+                                {machineProfiles.map((name) => (
+                                    <Pressable
+                                        key={name}
+                                        style={(p) => [styles.configRow, p.pressed && styles.configRowPressed]}
+                                        onPress={() => setPresetProfile(name)}
+                                    >
+                                        <Octicons
+                                            name={presetProfile === name ? 'check-circle-fill' : 'circle'}
+                                            size={16}
+                                            color={presetProfile === name ? theme.colors.button.primary.background : theme.colors.textSecondary}
+                                        />
+                                        <Text style={styles.configLabel} numberOfLines={1}>
+                                            {name}
+                                        </Text>
+                                    </Pressable>
+                                ))}
+
+                                {/* Optional session name — becomes the tmux window name */}
+                                <View style={styles.presetNameRow}>
+                                    <Ionicons name="pricetag-outline" size={15} color={theme.colors.textSecondary} />
+                                    <TextInput
+                                        value={presetName}
+                                        onChangeText={setPresetName}
+                                        placeholder={t('newSession.preset.namePlaceholder')}
+                                        placeholderTextColor={theme.colors.textSecondary}
+                                        style={[styles.presetNameInput, { color: theme.colors.text }]}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                    />
+                                </View>
+
+                                <Pressable
+                                    disabled={!canStartPreset}
+                                    onPress={() => handlePresetStart()}
+                                    style={(p) => [
+                                        styles.presetStartButton,
+                                        !canStartPreset && styles.presetStartButtonDisabled,
+                                        p.pressed && { opacity: 0.8 },
+                                    ]}
+                                >
+                                    {isSpawning ? (
+                                        <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
+                                    ) : (
+                                        <Text style={[styles.presetStartLabel, { color: theme.colors.button.primary.tint }]}>
+                                            {t('newSession.preset.start')}
+                                        </Text>
+                                    )}
+                                </Pressable>
+                            </View>
+                        </View>
+                    )}
 
                     {/* Flash label — centered below config box, hidden when picker is open */}
                     {flashText !== '' && !activePicker && (
@@ -1223,6 +1410,7 @@ function NewSessionScreen() {
                 {/* Spacer */}
                 <View style={{ flex: 1 }} />
 
+                {activeTab === 'custom' && (
                 <View style={{ maxWidth: layout.maxWidth, width: '100%', alignSelf: 'center', paddingHorizontal: 12, gap: 8 }}>
                     {/* Input box */}
                     <View style={styles.inputBox}>
@@ -1267,6 +1455,7 @@ function NewSessionScreen() {
                         </View>
                     </View>
                 </View>
+                )}
 
                 <View style={{ height: Math.max(16, safeArea.bottom) }} />
             </View>
@@ -1314,6 +1503,71 @@ const styles = StyleSheet.create((theme) => ({
         paddingVertical: 4,
         paddingHorizontal: 4,
         overflow: 'hidden',
+    },
+    tabRow: {
+        flexDirection: 'row',
+        gap: 4,
+        alignSelf: 'flex-start',
+        backgroundColor: theme.colors.input.background,
+        borderRadius: 10,
+        padding: 3,
+    },
+    tabButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    tabButtonActive: {
+        backgroundColor: theme.colors.header.background,
+    },
+    tabLabel: {
+        fontSize: 13,
+        ...Typography.default('semiBold'),
+        ...Platform.select({ web: { userSelect: 'none' } as any, default: {} }),
+    },
+    presetSectionLabel: {
+        fontSize: 13,
+        paddingHorizontal: 12,
+        paddingTop: 8,
+        paddingBottom: 4,
+        ...Typography.default('semiBold'),
+    },
+    presetEmptyText: {
+        fontSize: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        ...Typography.default(),
+    },
+    presetNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
+    presetNameInput: {
+        flex: 1,
+        fontSize: 14,
+        paddingVertical: 4,
+        ...Typography.default(),
+        ...Platform.select({ web: { outlineStyle: 'none' } as any, default: {} }),
+    },
+    presetStartButton: {
+        backgroundColor: theme.colors.button.primary.background,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        marginHorizontal: 8,
+        marginTop: 6,
+        marginBottom: 8,
+    },
+    presetStartButtonDisabled: {
+        backgroundColor: theme.colors.button.primary.disabled,
+    },
+    presetStartLabel: {
+        fontSize: 14,
+        ...Typography.default('semiBold'),
     },
     popover: {
         borderRadius: 12,

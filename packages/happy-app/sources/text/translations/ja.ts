@@ -278,6 +278,14 @@ export const ja: TranslationStructure = {
         title: '新しいセッションを開始',
         machineOffline: 'マシンがオフラインです',
         switchMachinesHint: '• 上のマシンをクリックしてマシンを切り替えてください',
+        preset: {
+            tabCustom: 'カスタム',
+            tabPreset: 'プリセット',
+            chooseProfile: 'プリセットを選択',
+            noProfiles: 'このマシンには利用可能なプリセットがありません',
+            namePlaceholder: 'セッション名（任意）',
+            start: 'セッションを開始',
+        },
     },
 
     sessionHistory: {

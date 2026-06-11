@@ -170,6 +170,8 @@ export const MachineMetadataSchema = z.object({
         happyAgentAuthenticated: z.boolean(),
         detectedAt: z.number(),
     }).optional(),
+    // Names of spawn profiles available on the machine (daemon profiles.json)
+    profiles: z.array(z.string()).optional(),
 });
 
 export type MachineMetadata = z.infer<typeof MachineMetadataSchema>;

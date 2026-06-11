@@ -276,6 +276,14 @@ export const pt: TranslationStructure = {
         title: 'Iniciar nova sessão',
         machineOffline: 'A máquina está offline',
         switchMachinesHint: '• Troque de máquina clicando na máquina acima',
+        preset: {
+            tabCustom: 'Personalizada',
+            tabPreset: 'Preset',
+            chooseProfile: 'Escolha um preset',
+            noProfiles: 'Nenhum preset disponível nesta máquina',
+            namePlaceholder: 'Nome da sessão (opcional)',
+            start: 'Iniciar sessão',
+        },
     },
 
     sessionHistory: {

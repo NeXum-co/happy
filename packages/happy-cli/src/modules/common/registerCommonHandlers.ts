@@ -117,7 +117,15 @@ interface DifftasticResponse {
 
 export interface SpawnSessionOptions {
     machineId?: string;
-    directory: string;
+    /** Working directory. Required unless `profile` is set (the profile supplies it). */
+    directory?: string;
+    /**
+     * Name of a spawn profile in `<happy-home>/profiles.json` (see daemon/profiles.ts).
+     * Resolves to a working directory, extra claude args and a tmux session name.
+     */
+    profile?: string;
+    /** Free-form session name; used (sanitized) as the tmux window name. */
+    sessionName?: string;
     sessionId?: string;
     approvedNewDirectoryCreation?: boolean;
     agent?: 'claude' | 'codex' | 'gemini' | 'openclaw';

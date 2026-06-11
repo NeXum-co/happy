@@ -19,6 +19,7 @@ import type { PersistedSession } from '@/persistence';
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stopDaemon } from './controlClient';
 import { runReaperOnce } from './reaper';
+import { loadProfiles, sanitizeWindowName } from './profiles';
 import { startDaemonControlServer } from './controlServer';
 import { statSync } from 'fs';
 import { join } from 'path';
@@ -248,8 +249,34 @@ export async function startDaemon(): Promise<void> {
     const spawnSession = async (options: SpawnSessionOptions): Promise<SpawnSessionResult> => {
       logger.debugLargeJson('[DAEMON RUN] Spawning session', options);
 
-      const { directory, sessionId, machineId, approvedNewDirectoryCreation = true } = options;
+      const { sessionId, machineId, approvedNewDirectoryCreation = true } = options;
       let directoryCreated = false;
+
+      // Profile resolution (preset spawn): a named profile from
+      // <happy-home>/profiles.json supplies directory, extra claude args and
+      // the target tmux session. No git logic here by design (D-E02-8).
+      let directory = options.directory;
+      let profileClaudeArgs: string[] = [];
+      let profileTmuxSession: string | undefined;
+      if (options.profile) {
+        const profile = loadProfiles().find(p => p.name === options.profile);
+        if (!profile) {
+          return {
+            type: 'error',
+            errorMessage: `Unknown profile '${options.profile}'. Profiles are defined in ${join(configuration.happyHomeDir, 'profiles.json')}.`
+          };
+        }
+        directory = profile.directory;
+        profileClaudeArgs = profile.claudeArgs;
+        profileTmuxSession = profile.tmuxSession;
+        logger.debug(`[DAEMON RUN] Resolved profile '${profile.name}': directory=${directory}, tmuxSession=${profileTmuxSession ?? '(none)'}, claudeArgs=${JSON.stringify(profileClaudeArgs)}`);
+      }
+      if (!directory) {
+        return {
+          type: 'error',
+          errorMessage: 'Directory is required when no profile is specified'
+        };
+      }
 
       try {
         await fs.access(directory);
@@ -373,6 +400,12 @@ export async function startDaemon(): Promise<void> {
           };
         }
 
+        // Profile-provided tmux session. Explicitly passed environment
+        // variables still win so callers can override the profile.
+        if (profileTmuxSession !== undefined && extraEnv.TMUX_SESSION_NAME === undefined) {
+          extraEnv.TMUX_SESSION_NAME = profileTmuxSession;
+        }
+
         // Check if tmux is available and should be used
         const tmuxAvailable = await isTmuxAvailable();
         let useTmux = tmuxAvailable;
@@ -406,14 +439,20 @@ export async function startDaemon(): Promise<void> {
           const resumeFragment = options.resumeClaudeSessionId && agent === 'claude'
             ? ` --resume ${shellescape(options.resumeClaudeSessionId)}`
             : '';
-          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeFragment}`;
+          // Extra claude args from the profile are passed through happy's
+          // pass-through arg handling (claude only, like --resume above).
+          const profileArgsFragment = agent === 'claude' && profileClaudeArgs.length > 0
+            ? ' ' + profileClaudeArgs.map(shellescape).join(' ')
+            : '';
+          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeFragment}${profileArgsFragment}`;
 
           // Spawn in tmux with environment variables
           // IMPORTANT: Pass complete environment (process.env + extraEnv) because:
           // 1. tmux sessions need daemon's expanded auth variables (e.g., ANTHROPIC_AUTH_TOKEN)
           // 2. Regular spawn uses env: { ...process.env, ...extraEnv }
           // 3. tmux needs explicit environment via -e flags to ensure all variables are available
-          const windowName = `happy-${Date.now()}-${agent}`;
+          const requestedWindowName = options.sessionName ? sanitizeWindowName(options.sessionName) : '';
+          const windowName = requestedWindowName || `happy-${Date.now()}-${agent}`;
           const tmuxEnv: Record<string, string> = {};
 
           // Add all daemon environment variables (filtering out undefined)
@@ -521,6 +560,11 @@ export async function startDaemon(): Promise<void> {
           // it through `--resume <id>` as Happy's existing pass-through to claude.
           if (options.resumeClaudeSessionId && agentCommand === 'claude') {
             args.push('--resume', options.resumeClaudeSessionId);
+          }
+
+          // Extra claude args from the profile (claude only, pass-through).
+          if (agentCommand === 'claude' && profileClaudeArgs.length > 0) {
+            args.push(...profileClaudeArgs);
           }
 
           // TODO: In future, sessionId could be used with --resume to continue existing sessions
@@ -812,10 +856,15 @@ export async function startDaemon(): Promise<void> {
     // Create API client
     const api = await ApiClient.create(credentials);
 
+    // Available spawn profiles go into machine metadata so the app can
+    // offer preset spawn. Read once at daemon start.
+    const profileNames = loadProfiles().map(p => p.name);
+    logger.debug(`[DAEMON RUN] Loaded ${profileNames.length} spawn profiles: ${profileNames.join(', ') || '(none)'}`);
+
     // Get or create machine
     const machine = await api.getOrCreateMachine({
       machineId,
-      metadata: initialMachineMetadata,
+      metadata: { ...initialMachineMetadata, profiles: profileNames },
       daemonState: initialDaemonState
     });
     logger.debug(`[DAEMON RUN] Machine registered: ${machine.id}`);
@@ -833,6 +882,16 @@ export async function startDaemon(): Promise<void> {
 
     // Connect to server
     apiMachine.connect();
+
+    // Publish the current profile list. getOrCreateMachine only sets
+    // metadata for brand-new machines; existing machines keep stale
+    // metadata server-side until we push an update here.
+    apiMachine.updateMachineMetadata((metadata) => ({
+      ...(metadata ?? initialMachineMetadata),
+      profiles: profileNames,
+    })).catch((error) => {
+      logger.debug('[DAEMON RUN] Failed to publish spawn profiles in machine metadata:', error);
+    });
 
     // Lifecycle reaper: archive server-active sessions whose host process on
     // this machine is dead (kill -9, closed terminal, crash). Once at start

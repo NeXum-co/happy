@@ -263,6 +263,14 @@ export const ru: TranslationStructure = {
         title: 'Начать новую сессию',
         machineOffline: 'Машина недоступна',
         switchMachinesHint: '• Переключите машину, нажав на неё выше',
+        preset: {
+            tabCustom: 'Своя',
+            tabPreset: 'Пресет',
+            chooseProfile: 'Выберите пресет',
+            noProfiles: 'На этой машине нет доступных пресетов',
+            namePlaceholder: 'Название сессии (необязательно)',
+            start: 'Запустить сессию',
+        },
     },
 
     sessionHistory: {

@@ -277,6 +277,14 @@ export const zhHant: TranslationStructure = {
         title: '開始新工作階段',
         machineOffline: '裝置離線',
         switchMachinesHint: '• 點擊上方的裝置來切換裝置',
+        preset: {
+            tabCustom: '自訂',
+            tabPreset: '預設',
+            chooseProfile: '選擇預設',
+            noProfiles: '此裝置上沒有可用的預設',
+            namePlaceholder: '工作階段名稱（選填）',
+            start: '開始工作階段',
+        },
     },
 
     sessionHistory: {
