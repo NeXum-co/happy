@@ -35,6 +35,8 @@ export interface AgentAttention {
  * A localRequest older than this is ignored (D-E02-13): an interactive deny
  * in the Claude TUI fires no hook event, so the CLI cannot always clear the
  * signal — without a TTL such a session would stay "needs you" forever.
+ * Keep in sync with happy-cli localAttention.ts (can't be shared: separate
+ * packages, fork-diff).
  */
 export const LOCAL_REQUEST_TTL_MS = 30 * 60 * 1000;
 

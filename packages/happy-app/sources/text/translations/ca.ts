@@ -277,11 +277,13 @@ export const ca: TranslationStructure = {
         title: 'Iniciar nova sessió',
         machineOffline: 'La màquina està fora de línia',
         switchMachinesHint: '• Canvia de màquina fent clic a la màquina de dalt',
+        createDirectoryTitle: 'Vols crear el directori?',
+        createDirectoryBody: ({ directory }: { directory: string }) => `El directori '${directory}' no existeix. Vols crear-lo?`,
         preset: {
             tabCustom: 'Personalitzada',
             tabPreset: 'Preset',
             chooseProfile: 'Tria un preset',
-            noProfiles: 'No hi ha presets disponibles en aquesta màquina',
+            noProfiles: 'No hi ha presets en aquesta màquina. Defineix-los a ~/.happy/profiles.json a l\'amfitrió (consulta la documentació del dimoni).',
             namePlaceholder: 'Nom de la sessió (opcional)',
             start: 'Inicia la sessió',
         },
@@ -515,6 +517,9 @@ export const ca: TranslationStructure = {
             done: ({ count }: { count: number }) => count === 1
                 ? 'S\'ha arxivat 1 sessió'
                 : `S\'han arxivat ${count} sessions`,
+            doneTitle: 'Neteja completada',
+            nothingTitle: 'Res per netejar',
+            nothingBody: 'No hi ha sessions inactives de més de 7 dies.',
         },
     },
 

@@ -86,6 +86,9 @@ export const AgentStateSchema = z.object({
         reason: z.string().nullish(),
         mode: z.string().nullish(),
         allowedTools: z.array(z.string()).nullish(),
+        // The CLI writes `allowTools` (upstream field-name mismatch, audit
+        // ARCH-008) — accept both; the reducer normalizes on read.
+        allowTools: z.array(z.string()).nullish(),
         decision: z.enum(['approved', 'approved_for_session', 'denied', 'abort']).nullish()
     })).nullish()
 });

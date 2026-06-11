@@ -443,6 +443,45 @@ describe('reducer', () => {
             }
         });
 
+        it('accepts the CLI field name allowTools on completed requests (ARCH-008)', () => {
+            const state = createReducer();
+
+            // Pending permission first
+            const agentState1: AgentState = {
+                requests: {
+                    'tool-1': {
+                        tool: 'Bash',
+                        arguments: { command: 'ls -la' },
+                        createdAt: 1000
+                    }
+                }
+            };
+            reducer(state, [], agentState1);
+
+            // The CLI writes `allowTools` (not `allowedTools`) — the tool list
+            // must still reach the permission on the message.
+            const agentState2: AgentState = {
+                completedRequests: {
+                    'tool-1': {
+                        tool: 'Bash',
+                        arguments: { command: 'ls -la' },
+                        createdAt: 1000,
+                        completedAt: 2000,
+                        status: 'approved',
+                        decision: 'approved_for_session',
+                        allowTools: ['Bash(ls:*)']
+                    }
+                }
+            };
+
+            const result2 = reducer(state, [], agentState2);
+            expect(result2.messages).toHaveLength(1);
+            expect(result2.messages[0].kind).toBe('tool-call');
+            if (result2.messages[0].kind === 'tool-call') {
+                expect(result2.messages[0].tool.permission?.allowedTools).toEqual(['Bash(ls:*)']);
+            }
+        });
+
         it('should match incoming tool calls to approved permission messages', () => {
             const state = createReducer();
             

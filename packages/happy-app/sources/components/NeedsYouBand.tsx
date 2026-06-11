@@ -49,6 +49,7 @@ const NeedsYouRow = React.memo(({ session, selected, showBorder }: {
     showBorder: boolean;
 }) => {
     const styles = stylesheet;
+    const { theme } = useUnistyles();
     const navigateToSession = useNavigateToSession();
 
     const projectKey = session.path
@@ -61,11 +62,23 @@ const NeedsYouRow = React.memo(({ session, selected, showBorder }: {
 
     return (
         <Pressable
-            style={[styles.row, showBorder && styles.rowWithBorder, selected && styles.rowSelected]}
+            // Terminal-only prompts can't be answered here (UX-008): swap the
+            // pulsing dot for a terminal icon and dim the row. It stays
+            // pressable — viewing the session context is still legitimate.
+            style={[
+                styles.row,
+                showBorder && styles.rowWithBorder,
+                selected && styles.rowSelected,
+                session.waitsInTerminal && styles.rowTerminal,
+            ]}
             onPress={handlePress}
         >
             <View style={styles.rowDot}>
-                <StatusDot color="#FF9500" isPulsing={true} />
+                {session.waitsInTerminal ? (
+                    <Ionicons name="terminal-outline" size={14} color={theme.colors.box.warning.text} />
+                ) : (
+                    <StatusDot color="#FF9500" isPulsing={true} />
+                )}
             </View>
             <View style={styles.rowContent}>
                 <Text style={styles.rowTitle} numberOfLines={1}>
@@ -117,6 +130,9 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
     rowSelected: {
         backgroundColor: theme.colors.surfaceSelected,
+    },
+    rowTerminal: {
+        opacity: 0.6,
     },
     rowDot: {
         width: 16,

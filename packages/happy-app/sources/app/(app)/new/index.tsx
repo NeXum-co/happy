@@ -934,8 +934,8 @@ function NewSessionScreen() {
                     break;
                 case 'requestToApproveDirectoryCreation': {
                     const approved = await Modal.confirm(
-                        'Create Directory?',
-                        `The directory '${result.directory}' does not exist. Would you like to create it?`,
+                        t('newSession.createDirectoryTitle'),
+                        t('newSession.createDirectoryBody', { directory: result.directory }),
                         { cancelText: t('common.cancel'), confirmText: t('common.create') },
                     );
                     if (approved) {
@@ -988,8 +988,8 @@ function NewSessionScreen() {
                     break;
                 case 'requestToApproveDirectoryCreation': {
                     const approved = await Modal.confirm(
-                        'Create Directory?',
-                        `The directory '${result.directory}' does not exist. Would you like to create it?`,
+                        t('newSession.createDirectoryTitle'),
+                        t('newSession.createDirectoryBody', { directory: result.directory }),
                         { cancelText: t('common.cancel'), confirmText: t('common.create') },
                     );
                     if (approved) {
@@ -1024,14 +1024,18 @@ function NewSessionScreen() {
         return false;
     }, [agentInputEnterToSend, canSend, handleSend]);
 
-    // Auto-focus the text input when the composer mounts
+    // Auto-focus the text input when the composer mounts and when the user
+    // switches back to the Custom tab (the composer remounts then, UX-010).
     const composerInputRef = React.useRef<import('@/components/MultiTextInput').MultiTextInputHandle>(null);
     React.useEffect(() => {
+        if (activeTab !== 'custom') {
+            return;
+        }
         const timeout = setTimeout(() => {
             composerInputRef.current?.focus();
         }, 100);
         return () => clearTimeout(timeout);
-    }, []);
+    }, [activeTab]);
 
     return (
         <KeyboardAvoidingView

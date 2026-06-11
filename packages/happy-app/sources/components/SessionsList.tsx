@@ -212,6 +212,11 @@ export function SessionsList() {
         const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
         const stale = Object.values(storage.getState().sessions)
             .filter(session => !session.active && session.activeAt < cutoff);
+        // Nothing to archive — say so instead of asking to archive 0 sessions (UX-003/004)
+        if (stale.length === 0) {
+            Modal.alert(t('fleet.cleanup.nothingTitle'), t('fleet.cleanup.nothingBody'));
+            return;
+        }
         const confirmed = await Modal.confirm(
             t('fleet.cleanup.confirmTitle'),
             t('fleet.cleanup.confirmBody', { count: stale.length }),
@@ -223,7 +228,7 @@ export function SessionsList() {
         for (const session of stale) {
             await sessionArchive(session.id);
         }
-        Modal.alert(t('fleet.cleanup.confirmTitle'), t('fleet.cleanup.done', { count: stale.length }));
+        Modal.alert(t('fleet.cleanup.doneTitle'), t('fleet.cleanup.done', { count: stale.length }));
     }, []));
     // Selection is derived once from pathname so the data array stays stable
     // across navigations. This keeps FlatList virtualization intact: only
@@ -318,7 +323,9 @@ export function SessionsList() {
                 const prevItem = index > 0 ? data[index - 1] : null;
                 const nextItem = index < data.length - 1 ? data[index + 1] : null;
 
-                const isFirst = prevItem?.type === 'header' || prevItem?.type === 'project-group';
+                const isFirst = prevItem?.type === 'header'
+                    || prevItem?.type === 'project-group'
+                    || prevItem?.type === 'needs-you';
                 const isLast = nextItem == null
                     || nextItem.type === 'header'
                     || nextItem.type === 'project-group'

@@ -275,11 +275,13 @@ export const it: TranslationStructure = {
         title: 'Avvia nuova sessione',
         machineOffline: 'La macchina è offline',
         switchMachinesHint: '• Cambia macchina cliccando sulla macchina sopra',
+        createDirectoryTitle: 'Creare la directory?',
+        createDirectoryBody: ({ directory }: { directory: string }) => `La directory '${directory}' non esiste. Vuoi crearla?`,
         preset: {
             tabCustom: 'Personalizzata',
             tabPreset: 'Preset',
             chooseProfile: 'Scegli un preset',
-            noProfiles: 'Nessun preset disponibile su questa macchina',
+            noProfiles: 'Nessun preset su questa macchina. Definiscili in ~/.happy/profiles.json sull\'host (vedi la documentazione del daemon).',
             namePlaceholder: 'Nome della sessione (opzionale)',
             start: 'Avvia sessione',
         },
@@ -513,6 +515,9 @@ export const it: TranslationStructure = {
             done: ({ count }: { count: number }) => count === 1
                 ? '1 sessione archiviata'
                 : `${count} sessioni archiviate`,
+            doneTitle: 'Pulizia completata',
+            nothingTitle: 'Niente da pulire',
+            nothingBody: 'Non ci sono sessioni inattive più vecchie di 7 giorni.',
         },
     },
 

@@ -291,11 +291,13 @@ export const en: TranslationStructure = {
         title: 'Start New Session',
         machineOffline: 'Machine is offline',
         switchMachinesHint: '• Switch machines by clicking on the machine above',
+        createDirectoryTitle: 'Create Directory?',
+        createDirectoryBody: ({ directory }: { directory: string }) => `The directory '${directory}' does not exist. Would you like to create it?`,
         preset: {
             tabCustom: 'Custom',
             tabPreset: 'Preset',
             chooseProfile: 'Choose a preset',
-            noProfiles: 'No presets available on this machine',
+            noProfiles: 'No presets on this machine. Define them in ~/.happy/profiles.json on the host (see daemon docs).',
             namePlaceholder: 'Session name (optional)',
             start: 'Start session',
         },
@@ -529,6 +531,9 @@ export const en: TranslationStructure = {
             done: ({ count }: { count: number }) => count === 1
                 ? 'Archived 1 session'
                 : `Archived ${count} sessions`,
+            doneTitle: 'Cleanup complete',
+            nothingTitle: 'Nothing to clean up',
+            nothingBody: 'There are no inactive sessions older than 7 days.',
         },
     },
 
