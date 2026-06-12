@@ -135,6 +135,30 @@ User interface components.
 - Validation: Zod
 - Testing: Vitest 
 
+## Fork additions (NeXum, E02 fleet-dashboard)
+
+Fork-only modules on top of upstream — upstream docs do not know them.
+
+### `src/fleet/fleetStatus.ts` — `happy fleet --waybar`
+- Prints exactly ONE line of waybar JSON and ALWAYS exits 0 — waybar must never get a hanging or failing module. Errors become `class: 'error'` output, never a non-zero exit.
+- `FLEET_ICON` is always present in the text, also when idle (ISS-001): waybar dims/highlights via the CSS classes `idle` / `needs-attention` / `error`. Never emit empty text to "hide" the module.
+- Counts only sessions with a persisted key in `~/.happy/sessions.json` — the CLI credential cannot decrypt other sessions, which is fine for the single-PC fleet. Don't "fix" this scoping.
+
+### `src/claude/utils/localAttention.ts` — terminal permission prompts (AC-6)
+- Single pure decision point for set/clear of `agentState.localRequest`; wiring lives in runClaude.ts.
+- An interactive deny in Claude's TUI fires NO hook event at all (live-verified on 2.1.173, D-E02-13/14). The only layer that catches deny-then-silence is the read-side TTL `LOCAL_REQUEST_TTL_MS` (30 min): consumers ignore older localRequests. Don't expect a clear-signal on the deny path.
+- Keep `LOCAL_REQUEST_TTL_MS` in sync with happy-app `sources/sync/fleetLayout.ts` — separate packages, the constant cannot be shared.
+
+### `src/daemon/reaper.ts` — lifecycle reaper
+- Per heartbeat (and at daemon start): persisted sessions → server state → PID-check → `POST /v1/sessions/:id/archive`. Archive just sets `active: false`; there is NO separate archived state.
+- PID liveness via `process.kill(pid, 0)`: only ESRCH means dead — EPERM means alive (owned by someone else). No `hostPid` in metadata → never guess, skip.
+- `runReaperOnce` never throws; a failed pass retries on the next heartbeat.
+
+### `src/daemon/profiles.ts` — preset spawn (E02-C)
+- `<happy-home>/profiles.json` defines named presets: directory (~-expanded), claudeArgs, tmuxSession. A profile spawn runs in that tmux session with the profile's claudeArgs; an explicitly passed `TMUX_SESSION_NAME` env var still wins over the profile.
+- A broken profiles.json (missing / invalid JSON / schema mismatch) never crashes the daemon: warn + behave as if no profiles exist.
+- `tmuxSession` is schema-restricted to `[a-zA-Z0-9_-]` (SEC-003: a crafted name with `:` could retarget tmux windows/panes). Don't loosen the regex.
+
 
 # Running the Daemon
 

@@ -411,3 +411,9 @@ const MyComponent = () => {
 - Always wrap pages in memo
 - For hotkeys use "useGlobalKeyboard", do not change it, it works only on Web
 - Use "AsyncLock" class for exclusive async locks
+
+## Fork additions (NeXum, E02 fleet-UX)
+
+- `sources/hooks/useVisibleSessionListViewData.ts` — fleet list ordering: needs-you band, project groups and active sessions on top; inactive sessions collapsed under an "Earlier (N)" archive-toggle driven by the `hideInactiveSessions` setting. "Archived" just means `session.active === false` — there is no separate archived state.
+- `sources/sync/fleetLayout.ts` — needs-you predicate: remote `agentState.requests` OR a fresh `localRequest`. A localRequest older than `LOCAL_REQUEST_TTL_MS` (30 min) is ignored — an interactive deny in the Claude TUI fires no clearing signal (D-E02-13). Keep the constant in sync with happy-cli `src/claude/utils/localAttention.ts`; separate packages, it cannot be shared.
+- Archive confirm (12/6): `sources/app/(app)/session/[id]/info.tsx` archives only after a `Modal.alert` confirm with `t('sessionInfo.archiveSessionConfirm')` (destructive style). Keep this confirm — archiving kills the CLI process (`sessionKill`, with `sessionArchive` as force-fallback when the process is already dead).
