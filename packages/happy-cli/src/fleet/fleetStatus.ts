@@ -41,6 +41,13 @@ type WaybarOutput = {
 }
 
 /**
+ * Nerd-font robot glyph (nf-md-robot). Always present in the text so the
+ * module stays visible (and clickable) when idle; CSS dims it via `.idle`
+ * and lights it up via `.needs-attention` (ISS-001, UAT 2026-06-12).
+ */
+const FLEET_ICON = '\u{F06A9}'
+
+/**
  * Count sessions that are waiting on the user: sessions whose decrypted
  * agentState has at least one open permission request — remote-driven
  * (`requests`) or a local terminal prompt (`localRequest`, E02 AC-6). A
@@ -82,7 +89,7 @@ export function countNeedsAttention(sessions: RawActiveSession[], keys: SessionK
 async function buildWaybarOutput(): Promise<WaybarOutput> {
     const credentials = await readCredentials()
     if (!credentials) {
-        return { text: '!', class: 'error', tooltip: 'Fleet: not authenticated — run `happy auth login`' }
+        return { text: `${FLEET_ICON} !`, class: 'error', tooltip: 'Fleet: not authenticated — run `happy auth login`' }
     }
 
     const response = await axios.get(`${configuration.serverUrl}/v2/sessions/active`, {
@@ -97,12 +104,12 @@ async function buildWaybarOutput(): Promise<WaybarOutput> {
 
     if (count > 0) {
         return {
-            text: String(count),
+            text: `${FLEET_ICON} ${count}`,
             class: 'needs-attention',
             tooltip: count === 1 ? '1 session waiting for you' : `${count} sessions waiting for you`,
         }
     }
-    return { text: '', class: 'idle', tooltip: 'Fleet OK' }
+    return { text: FLEET_ICON, class: 'idle', tooltip: 'Fleet OK' }
 }
 
 /**
@@ -129,7 +136,7 @@ Usage:
         if (!reason && error && typeof error === 'object' && 'code' in error) {
             reason = String((error as { code?: string }).code ?? '')
         }
-        output = { text: '!', class: 'error', tooltip: `Fleet: ${reason || 'relay unreachable'}` }
+        output = { text: `${FLEET_ICON} !`, class: 'error', tooltip: `Fleet: ${reason || 'relay unreachable'}` }
     }
 
     // Flush before exiting — process.exit() can drop buffered stdout on pipes.
