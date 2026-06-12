@@ -170,17 +170,29 @@ export async function syncCurrentPushToken(credentials: AuthCredentials): Promis
         }
     }
 
-    const projectId = getExpoProjectId();
-    if (!projectId) {
-        return {
-            registered: false,
-            token: loadRegisteredPushToken(),
-            permission,
-        };
-    }
+    // Fork (E07, Route B): on Android we register the raw FCM device token instead of an
+    // Expo push token. getDevicePushTokenAsync needs no EAS projectId (removed from the fork
+    // config in fase A), so the projectId guard below only applies to the iOS/Expo path.
+    // The token string carries an `fcm:` prefix: the relay splits FCM vs Expo tokens on this
+    // prefix, so the existing POST /v1/push-tokens API and AccountPushToken table stay
+    // unchanged — no DB migration or extra token-type column needed.
+    let currentToken: string;
+    if (Platform.OS === 'android') {
+        const tokenData = await Notifications.getDevicePushTokenAsync();
+        currentToken = `fcm:${tokenData.data}`;
+    } else {
+        const projectId = getExpoProjectId();
+        if (!projectId) {
+            return {
+                registered: false,
+                token: loadRegisteredPushToken(),
+                permission,
+            };
+        }
 
-    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-    const currentToken = tokenData.data;
+        const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+        currentToken = tokenData.data;
+    }
     const previousToken = loadRegisteredPushToken();
 
     await registerPushToken(credentials, currentToken);
