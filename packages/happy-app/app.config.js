@@ -1,15 +1,17 @@
 const { execFileSync } = require('node:child_process');
 
 const variant = process.env.APP_ENV || 'development';
+// Fork (E07): production-variant draagt de NeXum-identiteit (com.nexum.happy,
+// eigen Firebase-project, geen EAS/OTA). Dev/preview blijven upstream voor mergebaarheid.
 const name = {
     development: "Happy (dev)",
     preview: "Happy (preview)",
-    production: "Happy"
+    production: "Happy (NeXum)"
 }[variant];
 const bundleId = {
     development: "com.slopus.happy.dev",
     preview: "com.slopus.happy.preview",
-    production: "com.ex3ndr.happy"
+    production: "com.nexum.happy"
 }[variant];
 // const stagingElevenLabsAgentId = 'agent_7801k2c0r5hjfraa1kdbytpvs6yt';
 const productionElevenLabsAgentId = 'agent_6701k211syvvegba4kt7m68nxjmw';
@@ -87,7 +89,8 @@ export default {
                     ? { NSAllowsLocalNetworking: true }
                     : { NSAllowsLocalNetworking: true, NSAllowsArbitraryLoads: true }
             },
-            associatedDomains: variant === 'production' ? ["applinks:app.happy.engineering"] : []
+            // Fork (E07): geen upstream-domeinkoppeling (app.happy.engineering) voor de fork.
+            associatedDomains: []
         },
         android: {
             adaptiveIcon: {
@@ -111,20 +114,8 @@ export default {
             ],
             package: bundleId,
             googleServicesFile: "./google-services.json",
-            intentFilters: variant === 'production' ? [
-                {
-                    "action": "VIEW",
-                    "autoVerify": true,
-                    "data": [
-                        {
-                            "scheme": "https",
-                            "host": "app.happy.engineering",
-                            "pathPrefix": "/"
-                        }
-                    ],
-                    "category": ["BROWSABLE", "DEFAULT"]
-                }
-            ] : []
+            // Fork (E07): geen upstream-applinks (app.happy.engineering); scheme `happy` blijft.
+            intentFilters: []
         },
         web: {
             bundler: "metro",
@@ -139,7 +130,6 @@ export default {
                     root: "./sources/app"
                 }
             ],
-            "expo-updates",
             "expo-asset",
             "expo-localization",
             "expo-mail-composer",
@@ -205,21 +195,15 @@ export default {
                 }
             ]
         ],
-        updates: {
-            url: "https://u.expo.dev/4558dd3d-cd5a-47cd-bad9-e591a241cc06",
-            requestHeaders: {
-                "expo-channel-name": "production"
-            }
-        },
+        // Fork (E07): updates-block verwijderd — anders OTA't de APK van upstream's
+        // u.expo.dev en overschrijft fork-code (D-E07-4: OTA buiten scope).
         experiments: {
             typedRoutes: true
         },
+        // Fork (E07): owner + extra.eas.projectId verwijderd — we bouwen zonder EAS-account.
         extra: {
             router: {
                 root: "./sources/app"
-            },
-            eas: {
-                projectId: "4558dd3d-cd5a-47cd-bad9-e591a241cc06"
             },
             app: {
                 postHogKey: process.env.EXPO_PUBLIC_POSTHOG_API_KEY,
@@ -231,7 +215,6 @@ export default {
                 buildCommitSha: buildMetadata.commitSha,
                 buildCommitTimestamp: buildMetadata.commitTimestamp,
             }
-        },
-        owner: "bulkacorp"
+        }
     }
 };
