@@ -400,6 +400,15 @@ export async function startDaemon(): Promise<void> {
           };
         }
 
+        // Autonomous-job seed prompt: added AFTER expansion + unresolved-${VAR}
+        // validation, because the prompt is free text that may legitimately
+        // contain `$` or `${...}` and must travel through verbatim, not be
+        // expanded or rejected. Both spawn branches below read `extraEnv`
+        // (tmux: Object.assign(tmuxEnv, extraEnv); non-tmux: {...process.env, ...extraEnv}).
+        if (options.initialPrompt) {
+          extraEnv.HAPPY_INITIAL_PROMPT = options.initialPrompt;
+        }
+
         // Profile-provided tmux session. Explicitly passed environment
         // variables still win so callers can override the profile.
         if (profileTmuxSession !== undefined && extraEnv.TMUX_SESSION_NAME === undefined) {

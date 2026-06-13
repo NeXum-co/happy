@@ -16,6 +16,7 @@ import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 import { getToolName } from "./utils/getToolName";
 import { getAskUserQuestionToolCallIds } from "./utils/questionNotification";
 import { cleanupStdinAfterInk } from "@/utils/terminalStdinCleanup";
+import { seedFirstMessage } from "@/claude/seedPrompt";
 import type { MessageParam, ContentBlockParam } from '@anthropic-ai/sdk/resources';
 
 interface PermissionsField {
@@ -280,6 +281,11 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
             mode: EnhancedMode;
         } | null = null;
 
+        // Autonomous-job seed: fires once for the whole session lifetime, so it
+        // lives at the same scope as `pending` (outside the while loop) rather
+        // than the per-iteration mode scope.
+        let seeded = false;
+
         // Track session ID to detect when it actually changes
         // This prevents context loss when mode changes (permission mode, model, etc.)
         // without starting a new session. Only reset parent chain when session ID
@@ -321,6 +327,19 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                         return permissionHandler.isAborted(toolCallId);
                     },
                     nextMessage: async () => {
+                        // Autonomous start: on the very first call, inject the
+                        // job's seed prompt instead of waiting for app input.
+                        // `mode` is still null at this point (it is set from the
+                        // first app message below), so seed with the default
+                        // permission mode and apply it like the normal path does.
+                        const seed = seedFirstMessage(process.env.HAPPY_INITIAL_PROMPT, seeded);
+                        if (seed !== null) {
+                            seeded = true;
+                            const seedMode: EnhancedMode = mode ?? { permissionMode: 'default' };
+                            permissionHandler.handleModeChange(seedMode.permissionMode);
+                            return { message: seed, mode: seedMode };
+                        }
+
                         if (pending) {
                             let p = pending;
                             pending = null;

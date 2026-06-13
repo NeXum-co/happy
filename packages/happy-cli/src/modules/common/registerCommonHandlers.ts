@@ -143,6 +143,8 @@ export interface SpawnSessionOptions {
     parentSessionId?: string;
     /** Happy message id used as the rewind point (only set for "duplicate"). */
     forkedFromMessageId?: string;
+    /** Autonomous-job seed prompt; injected as the first user message at spawn (D-E04-11). */
+    initialPrompt?: string;
 }
 
 export type SpawnSessionResult =
