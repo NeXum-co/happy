@@ -1012,6 +1012,24 @@ export const ca: TranslationStructure = {
         notSupportedMessage: 'Aquest agent no admet imatges adjuntes. Només s\'ha enviat el text.',
     },
 
+    activity: {
+        title: 'Activitat',
+        today: 'Avui',
+        last7days: 'Últims 7 dies',
+        last30days: 'Últims 30 dies',
+        sessions: ({ count }: { count: number }) => count === 1 ? '1 sessió' : `${count} sessions`,
+        duration: 'Durada',
+        durationMinutes: ({ count }: { count: number }) => `${count} min`,
+        durationHours: ({ count }: { count: number }) => `${count} h`,
+        durationHoursMinutes: ({ hours, minutes }: { hours: number; minutes: number }) => `${hours} h ${minutes} min`,
+        cost: 'Cost',
+        tokens: 'Tokens',
+        noActivity: 'Encara no hi ha activitat',
+        perProject: 'Per projecte',
+        perDay: 'Per dia',
+        unknownProject: 'Projecte desconegut',
+    },
+
     feed: {
         // Feed notifications for friend requests and acceptances
         friendRequestFrom: ({ name }: { name: string }) => `${name} t'ha enviat una sol·licitud d'amistat`,

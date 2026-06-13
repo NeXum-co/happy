@@ -1009,6 +1009,24 @@ export const zhHans: TranslationStructure = {
         notSupportedMessage: '该代理不支持图片附件。仅发送了文本。',
     },
 
+    activity: {
+        title: '活动',
+        today: '今天',
+        last7days: '最近 7 天',
+        last30days: '最近 30 天',
+        sessions: ({ count }: { count: number }) => `${count} 个会话`,
+        duration: '时长',
+        durationMinutes: ({ count }: { count: number }) => `${count} 分钟`,
+        durationHours: ({ count }: { count: number }) => `${count} 小时`,
+        durationHoursMinutes: ({ hours, minutes }: { hours: number; minutes: number }) => `${hours} 小时 ${minutes} 分钟`,
+        cost: '费用',
+        tokens: 'Tokens',
+        noActivity: '暂无活动',
+        perProject: '按项目',
+        perDay: '按天',
+        unknownProject: '未知项目',
+    },
+
     feed: {
         // Feed notifications for friend requests and acceptances
         friendRequestFrom: ({ name }: { name: string }) => `${name} 向您发送了好友请求`,

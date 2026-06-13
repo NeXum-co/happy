@@ -1038,6 +1038,24 @@ export const pl: TranslationStructure = {
         notSupportedMessage: 'Ten agent nie obsługuje załączników obrazów. Wysłano tylko tekst.',
     },
 
+    activity: {
+        title: 'Aktywność',
+        today: 'Dzisiaj',
+        last7days: 'Ostatnie 7 dni',
+        last30days: 'Ostatnie 30 dni',
+        sessions: ({ count }: { count: number }) => count === 1 ? '1 sesja' : `${count} sesji`,
+        duration: 'Czas trwania',
+        durationMinutes: ({ count }: { count: number }) => `${count} min`,
+        durationHours: ({ count }: { count: number }) => `${count} godz`,
+        durationHoursMinutes: ({ hours, minutes }: { hours: number; minutes: number }) => `${hours} godz ${minutes} min`,
+        cost: 'Koszt',
+        tokens: 'Tokeny',
+        noActivity: 'Brak aktywności',
+        perProject: 'Według projektu',
+        perDay: 'Według dnia',
+        unknownProject: 'Nieznany projekt',
+    },
+
     feed: {
         // Feed notifications for friend requests and acceptances
         friendRequestFrom: ({ name }: { name: string }) => `${name} wysłał Ci zaproszenie do znajomych`,

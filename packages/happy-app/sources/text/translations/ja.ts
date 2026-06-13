@@ -1010,6 +1010,24 @@ export const ja: TranslationStructure = {
         notSupportedMessage: 'このエージェントは画像の添付に対応していません。テキストのみが送信されました。',
     },
 
+    activity: {
+        title: 'アクティビティ',
+        today: '今日',
+        last7days: '過去7日間',
+        last30days: '過去30日間',
+        sessions: ({ count }: { count: number }) => `${count}セッション`,
+        duration: '時間',
+        durationMinutes: ({ count }: { count: number }) => `${count}分`,
+        durationHours: ({ count }: { count: number }) => `${count}時間`,
+        durationHoursMinutes: ({ hours, minutes }: { hours: number; minutes: number }) => `${hours}時間${minutes}分`,
+        cost: 'コスト',
+        tokens: 'トークン',
+        noActivity: 'まだアクティビティがありません',
+        perProject: 'プロジェクト別',
+        perDay: '日別',
+        unknownProject: '不明なプロジェクト',
+    },
+
     feed: {
         // Feed notifications for friend requests and acceptances
         friendRequestFrom: ({ name }: { name: string }) => `${name}さんから友達リクエストが届きました`,

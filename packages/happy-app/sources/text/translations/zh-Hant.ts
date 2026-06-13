@@ -1008,6 +1008,24 @@ export const zhHant: TranslationStructure = {
         notSupportedMessage: '此代理不支援圖片附件。僅傳送了文字。',
     },
 
+    activity: {
+        title: '活動',
+        today: '今天',
+        last7days: '最近 7 天',
+        last30days: '最近 30 天',
+        sessions: ({ count }: { count: number }) => `${count} 個工作階段`,
+        duration: '時長',
+        durationMinutes: ({ count }: { count: number }) => `${count} 分鐘`,
+        durationHours: ({ count }: { count: number }) => `${count} 小時`,
+        durationHoursMinutes: ({ hours, minutes }: { hours: number; minutes: number }) => `${hours} 小時 ${minutes} 分鐘`,
+        cost: '費用',
+        tokens: 'Tokens',
+        noActivity: '尚無活動',
+        perProject: '依專案',
+        perDay: '依日期',
+        unknownProject: '未知專案',
+    },
+
     feed: {
         // Feed notifications for friend requests and acceptances
         friendRequestFrom: ({ name }: { name: string }) => `${name} 向您傳送了好友請求`,

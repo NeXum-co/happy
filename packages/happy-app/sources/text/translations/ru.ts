@@ -1037,6 +1037,24 @@ export const ru: TranslationStructure = {
         notSupportedMessage: 'Этот агент не поддерживает изображения. Отправлен только текст.',
     },
 
+    activity: {
+        title: 'Активность',
+        today: 'Сегодня',
+        last7days: 'Последние 7 дней',
+        last30days: 'Последние 30 дней',
+        sessions: ({ count }: { count: number }) => count === 1 ? '1 сессия' : `${count} сессий`,
+        duration: 'Длительность',
+        durationMinutes: ({ count }: { count: number }) => `${count} мин`,
+        durationHours: ({ count }: { count: number }) => `${count} ч`,
+        durationHoursMinutes: ({ hours, minutes }: { hours: number; minutes: number }) => `${hours} ч ${minutes} мин`,
+        cost: 'Стоимость',
+        tokens: 'Токены',
+        noActivity: 'Пока нет активности',
+        perProject: 'По проектам',
+        perDay: 'По дням',
+        unknownProject: 'Неизвестный проект',
+    },
+
     feed: {
         // Feed notifications for friend requests and acceptances
         friendRequestFrom: ({ name }: { name: string }) => `${name} отправил вам запрос в друзья`,

@@ -19,6 +19,10 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    headerRightGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     iconButton: {
         color: theme.colors.header.tint,
     },
@@ -120,13 +124,22 @@ function HeaderRight() {
     const { theme } = useUnistyles();
 
     return (
-        <Pressable
-            onPress={() => router.navigate('/new')}
-            hitSlop={15}
-            style={styles.headerButton}
-        >
-            <Ionicons name="add-outline" size={28} color={theme.colors.header.tint} />
-        </Pressable>
+        <View style={styles.headerRightGroup}>
+            <Pressable
+                onPress={() => router.push('/activity')}
+                hitSlop={15}
+                style={styles.headerButton}
+            >
+                <Ionicons name="stats-chart-outline" size={24} color={theme.colors.header.tint} />
+            </Pressable>
+            <Pressable
+                onPress={() => router.navigate('/new')}
+                hitSlop={15}
+                style={styles.headerButton}
+            >
+                <Ionicons name="add-outline" size={28} color={theme.colors.header.tint} />
+            </Pressable>
+        </View>
     );
 }
 

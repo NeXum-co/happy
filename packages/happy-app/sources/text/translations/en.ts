@@ -1027,6 +1027,24 @@ export const en: TranslationStructure = {
         notSupportedMessage: 'This agent does not support image attachments. Only the text was sent.',
     },
 
+    activity: {
+        title: 'Activity',
+        today: 'Today',
+        last7days: 'Last 7 days',
+        last30days: 'Last 30 days',
+        sessions: ({ count }: { count: number }) => count === 1 ? '1 session' : `${count} sessions`,
+        duration: 'Duration',
+        durationMinutes: ({ count }: { count: number }) => `${count}m`,
+        durationHours: ({ count }: { count: number }) => `${count}h`,
+        durationHoursMinutes: ({ hours, minutes }: { hours: number; minutes: number }) => `${hours}h ${minutes}m`,
+        cost: 'Cost',
+        tokens: 'Tokens',
+        noActivity: 'No activity yet',
+        perProject: 'Per project',
+        perDay: 'Per day',
+        unknownProject: 'Unknown project',
+    },
+
     feed: {
         // Feed notifications for friend requests and acceptances
         friendRequestFrom: ({ name }: { name: string }) => `${name} sent you a friend request`,

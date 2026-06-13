@@ -295,6 +295,14 @@ export default function RootLayout() {
                 }}
             />
             <Stack.Screen
+                name="activity/index"
+                options={{
+                    headerShown: true,
+                    headerTitle: t('activity.title'),
+                    headerBackTitle: t('common.back'),
+                }}
+            />
+            <Stack.Screen
                 name="settings/connect/claude"
                 options={{
                     headerShown: true,
