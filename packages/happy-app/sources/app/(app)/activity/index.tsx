@@ -54,7 +54,6 @@ export default React.memo(function ActivityScreen() {
     const [period, setPeriod] = React.useState<Period>('7days');
     const [totals, setTotals] = React.useState<{ totalTokens: number; totalCost: number }>({ totalTokens: 0, totalCost: 0 });
     const [usageBySession, setUsageBySession] = React.useState<Map<string, number>>(new Map());
-    const [loaded, setLoaded] = React.useState(false);
 
     const [loading, loadData] = useHappyAction(React.useCallback(async () => {
         const credentials = auth.credentials;
@@ -80,12 +79,16 @@ export default React.memo(function ActivityScreen() {
 
         setTotals({ totalTokens: periodTotals.totalTokens, totalCost: periodTotals.totalCost });
         setUsageBySession(new Map(perSession));
-        setLoaded(true);
     }, [auth.credentials, period, sessions]));
 
+    // Re-run when the period changes or the set of sessions changes. The session store hydrates
+    // asynchronously, so on a fresh load `sessions` is initially empty; keying the effect on the
+    // session ids (not the array identity, which churns on every metadata tick) makes the
+    // per-session usage load once the sessions arrive, while avoiding a refetch storm.
+    const sessionIdsKey = React.useMemo(() => sessions.map((s) => s.id).join(','), [sessions]);
     React.useEffect(() => {
         loadData();
-    }, [period]);
+    }, [period, sessionIdsKey]);
 
     const titleById = React.useMemo(() => {
         const map = new Map<string, string>();
@@ -110,17 +113,18 @@ export default React.memo(function ActivityScreen() {
         '30days': t('activity.last30days'),
     };
 
-    if (!loaded && loading) {
-        return (
-            <View style={styles.shimmerContainer}>
-                <ShimmerView style={styles.shimmerBlock}>
-                    <View style={styles.shimmerInner} />
-                </ShimmerView>
-            </View>
-        );
-    }
-
     if (sessions.length === 0) {
+        // While the session store is still hydrating, `loading` is true — show the shimmer
+        // instead of the empty state so a page refresh doesn't flash "no activity".
+        if (loading) {
+            return (
+                <View style={styles.shimmerContainer}>
+                    <ShimmerView style={styles.shimmerBlock}>
+                        <View style={styles.shimmerInner} />
+                    </ShimmerView>
+                </View>
+            );
+        }
         return <EmptyMainScreen />;
     }
 

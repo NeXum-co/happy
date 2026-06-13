@@ -91,7 +91,14 @@ export const SidebarView = React.memo(() => {
             {/* Sessions list */}
             <MainView variant="sidebar" />
 
-            {/* Settings at bottom */}
+            {/* Activity + Settings at bottom */}
+            <Pressable
+                onPress={() => router.push('/activity')}
+                style={styles.settingsRow}
+            >
+                <Ionicons name="stats-chart-outline" size={18} color={stylesheet.settingsText.color} />
+                <Text style={styles.settingsText}>{t('activity.title')}</Text>
+            </Pressable>
             <Pressable
                 onPress={() => router.push('/settings')}
                 style={styles.settingsRow}

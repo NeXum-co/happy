@@ -109,20 +109,30 @@ export function calculateTotals(usage: UsageDataPoint[]): {
         costByModel: {} as Record<string, number>
     };
     
+    // `tokens`/`cost` are keyed by category (input, output, cache_read, cache_creation, total),
+    // where `total` is the authoritative sum of the components. Use `total` directly for the
+    // grand totals so we don't double-count (total + its own components). The breakdown maps
+    // exclude `total` for the same reason.
+    const sumComponents = (byCategory: Record<string, number>) =>
+        Object.entries(byCategory).reduce((sum, [category, value]) =>
+            category !== 'total' && typeof value === 'number' ? sum + value : sum, 0);
+
     for (const dataPoint of usage) {
-        // Sum tokens
-        for (const [model, tokens] of Object.entries(dataPoint.tokens)) {
-            if (typeof tokens === 'number') {
-                result.totalTokens += tokens;
-                result.tokensByModel[model] = (result.tokensByModel[model] || 0) + tokens;
+        result.totalTokens += typeof dataPoint.tokens?.total === 'number'
+            ? dataPoint.tokens.total
+            : sumComponents(dataPoint.tokens);
+        for (const [category, tokens] of Object.entries(dataPoint.tokens)) {
+            if (category !== 'total' && typeof tokens === 'number') {
+                result.tokensByModel[category] = (result.tokensByModel[category] || 0) + tokens;
             }
         }
-        
-        // Sum costs
-        for (const [model, cost] of Object.entries(dataPoint.cost)) {
-            if (typeof cost === 'number') {
-                result.totalCost += cost;
-                result.costByModel[model] = (result.costByModel[model] || 0) + cost;
+
+        result.totalCost += typeof dataPoint.cost?.total === 'number'
+            ? dataPoint.cost.total
+            : sumComponents(dataPoint.cost);
+        for (const [category, cost] of Object.entries(dataPoint.cost)) {
+            if (category !== 'total' && typeof cost === 'number') {
+                result.costByModel[category] = (result.costByModel[category] || 0) + cost;
             }
         }
     }
