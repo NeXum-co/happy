@@ -50,6 +50,12 @@ export interface QueryOptions {
      * applies on each turn ('low' | 'medium' | 'high' | 'max').
      */
     effort?: 'low' | 'medium' | 'high' | 'max'
+    /**
+     * Hard spending cap in USD. The query stops and returns error_max_budget_usd
+     * once cumulative cost exceeds this value. Maps directly to the SDK's
+     * maxBudgetUsd option (sdk.d.ts:1201).
+     */
+    maxBudgetUsd?: number
 }
 
 /**

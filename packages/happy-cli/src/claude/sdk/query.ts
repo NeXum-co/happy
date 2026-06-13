@@ -35,6 +35,7 @@ export function query(params: { prompt: QueryPrompt; options?: QueryOptions }): 
         model: opts?.model,
         fallbackModel: opts?.fallbackModel,
         maxTurns: opts?.maxTurns,
+        maxBudgetUsd: opts?.maxBudgetUsd,
         permissionMode: opts?.permissionMode,
         allowedTools: opts?.allowedTools,
         disallowedTools: opts?.disallowedTools,
