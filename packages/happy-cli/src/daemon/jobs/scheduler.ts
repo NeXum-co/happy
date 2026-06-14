@@ -93,6 +93,10 @@ export class JobScheduler {
     }
     if (job.maxBudgetUsd !== undefined) env.HAPPY_JOB_MAX_BUDGET_USD = String(job.maxBudgetUsd)
     if (job.maxTurns !== undefined) env.HAPPY_JOB_MAX_TURNS = String(job.maxTurns)
+    // Cost reporting is only meaningful for cloud presets (a real Claude model
+    // with known pricing). Local jobs cost nothing and would be mis-priced by the
+    // pricing fallback, so only cloud jobs are told to report their cost (IMP-4).
+    if (!this.isLocal(job)) env.HAPPY_JOB_REPORT_COST = '1'
     Object.assign(env, LOCAL_PRESET_ENV[job.preset] ?? {})
     return env
   }

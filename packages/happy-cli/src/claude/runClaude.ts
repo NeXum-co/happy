@@ -13,7 +13,7 @@ import { hashObject } from '@/utils/deterministicJson';
 import { parseSpecialCommand } from '@/parsers/specialCommands';
 import { getEnvironmentInfo } from '@/ui/doctor';
 import { configuration } from '@/configuration';
-import { notifyDaemonSessionStarted } from '@/daemon/controlClient';
+import { notifyDaemonSessionStarted, reportDaemonJobCost } from '@/daemon/controlClient';
 import { initialMachineMetadata } from '@/daemon/run';
 import { startHappyServer } from '@/claude/utils/startHappyServer';
 import { startHookServer } from '@/claude/utils/startHookServer';
@@ -884,6 +884,14 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     // Cleanup session resources (intervals, callbacks) - prevents memory leak
     // Note: currentSession is set by onSessionReady callback during loop()
     (currentSession as Session | null)?.cleanup();
+
+    // Autonomous-job cost report (D-E04). The scheduler sets HAPPY_JOB_REPORT_COST
+    // only for cloud-preset jobs — local jobs cost nothing and the pricing table
+    // would otherwise mis-price the local model. Fire-and-forget; reached on a
+    // clean loop() return (not the SIGTERM kill path, which exits earlier).
+    if (process.env.HAPPY_JOB_REPORT_COST === '1') {
+        await reportDaemonJobCost(session.sessionId, session.totalCostUsd);
+    }
 
     // Send session death message
     session.sendSessionDeath();

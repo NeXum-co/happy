@@ -23,6 +23,7 @@ export function startDaemonControlServer({
   stopJob,
   listJobs,
   getJob,
+  patchJobCost,
   requestShutdown,
   onHappySessionWebhook
 }: {
@@ -33,6 +34,7 @@ export function startDaemonControlServer({
   stopJob: (sessionId: string) => boolean;
   listJobs: (filter?: { status?: JobStatus }) => JobRecordView[];
   getJob: (id: string) => JobRecordView | null;
+  patchJobCost: (sessionId: string, costUsd: number) => boolean;
   requestShutdown: () => void;
   onHappySessionWebhook: (sessionId: string, metadata: Metadata, encryption?: SessionEncryptionData) => void;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
@@ -285,6 +287,27 @@ export function startDaemonControlServer({
       const { id } = request.params as { id: string };
       logger.debug(`[CONTROL SERVER] Get job request: id=${id}`);
       return { job: getJob(id) };
+    });
+
+    // Record an autonomous job's final cost (E04). Reported by a cloud-preset
+    // job session on clean exit, keyed by its sessionId. No-op (ok:false) for a
+    // sessionId that maps to no job.
+    typed.post('/job-cost', {
+      schema: {
+        body: z.object({
+          sessionId: z.string(),
+          costUsd: z.number()
+        }),
+        response: {
+          200: z.object({
+            ok: z.boolean()
+          })
+        }
+      }
+    }, async (request) => {
+      const { sessionId, costUsd } = request.body;
+      logger.debug(`[CONTROL SERVER] Job cost report: session=${sessionId} cost=${costUsd}`);
+      return { ok: patchJobCost(sessionId, costUsd) };
     });
 
     // Stop daemon

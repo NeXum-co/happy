@@ -90,6 +90,16 @@ export async function notifyDaemonSessionStarted(
   }
 }
 
+/**
+ * Report an autonomous job's final cost to the daemon (cloud presets only;
+ * the scheduler gates this via HAPPY_JOB_REPORT_COST). Fire-and-forget — a
+ * missing daemon just means the cost is not recorded, never an error to the
+ * exiting session.
+ */
+export async function reportDaemonJobCost(sessionId: string, costUsd: number): Promise<void> {
+  await daemonPost('/job-cost', { sessionId, costUsd });
+}
+
 export async function listDaemonSessions(): Promise<any[]> {
   const result = await daemonPost('/list');
   return result.children || [];

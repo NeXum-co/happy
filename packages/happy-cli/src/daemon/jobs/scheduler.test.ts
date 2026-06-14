@@ -344,6 +344,7 @@ describe('JobScheduler.tierEnv local routing', () => {
     expect(env.ANTHROPIC_BASE_URL).toBe('http://localhost:11434')
     expect(env.HAPPY_JOB_MODEL).toBe('qwen-moe')
     expect(env.ANTHROPIC_MODEL).toBe('qwen-moe')
+    expect(env.HAPPY_JOB_REPORT_COST).toBeUndefined() // local jobs cost nothing
   })
 
   it('tolerates corrupt triggerMetadata without throwing out of tierEnv', () => {
@@ -359,5 +360,6 @@ describe('JobScheduler.tierEnv local routing', () => {
     expect(env.ANTHROPIC_BASE_URL).toBeUndefined()
     expect(env.HAPPY_JOB_MODEL).toBeUndefined()
     expect(env.HAPPY_JOB_PERMISSION_MODE).toBe('bypassPermissions')
+    expect(env.HAPPY_JOB_REPORT_COST).toBe('1') // cloud jobs report their real cost
   })
 })

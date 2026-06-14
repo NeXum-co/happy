@@ -94,6 +94,8 @@ export class ApiSessionClient extends EventEmitter {
      */
     private pendingDownloads: Promise<{ data: Uint8Array; mimeType: string; name: string } | null>[] = [];
     readonly rpcHandlerManager: RpcHandlerManager;
+    /** Cumulative USD cost across this session's usage reports (autonomous-job cost capture, D-E04). */
+    totalCostUsd = 0;
     private agentStateLock = new AsyncLock();
     private metadataLock = new AsyncLock();
     private encryptionKey: Uint8Array;
@@ -647,6 +649,7 @@ export class ApiSessionClient extends EventEmitter {
         const totalTokens = usage.input_tokens + usage.output_tokens + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0);
 
         const costs = calculateCost(usage, model);
+        this.totalCostUsd += costs.total;
 
         // Transform Claude usage format to backend expected format
         const usageReport = {

@@ -919,6 +919,13 @@ export async function startDaemon(): Promise<void> {
       return j ? toJobRecordView(j) : null;
     };
 
+    const patchJobCost = (sessionId: string, costUsd: number): boolean => {
+      const job = jobStore.findBySessionId(sessionId);
+      if (!job) return false;
+      jobStore.patch(job.id, { costUsd });
+      return true;
+    };
+
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
       getChildren: getCurrentChildren,
@@ -928,6 +935,7 @@ export async function startDaemon(): Promise<void> {
       stopJob,
       listJobs,
       getJob,
+      patchJobCost,
       requestShutdown: () => requestShutdown('happy-cli'),
       onHappySessionWebhook
     });
