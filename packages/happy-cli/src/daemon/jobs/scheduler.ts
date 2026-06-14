@@ -18,10 +18,11 @@
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { logger } from '@/ui/logger'
 import type { JobStore } from './jobStore'
 import type { Semaphore } from './semaphore'
 import type { JobRecord } from './jobTypes'
-import { classifyFailure, shouldRetry } from './retry'
+import { classifyFailure, shouldRetry, backoffMs } from './retry'
 import { captureGitState } from './audit'
 import type { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers'
 
@@ -32,6 +33,7 @@ interface SchedulerDeps {
   killSession?: (sessionId: string) => void
   intervalMs?: number
   now?: () => number
+  backoff?: (attempt: number) => number
 }
 
 interface TriggerMetadata {
@@ -64,6 +66,7 @@ export class JobScheduler {
   private readonly killSession?: (sessionId: string) => void
   private readonly intervalMs: number
   private readonly now: () => number
+  private readonly backoff: (attempt: number) => number
   private timer: NodeJS.Timeout | null = null
   private running = false
 
@@ -74,6 +77,7 @@ export class JobScheduler {
     this.killSession = deps.killSession
     this.intervalMs = deps.intervalMs ?? 1000
     this.now = deps.now ?? Date.now
+    this.backoff = deps.backoff ?? (attempt => backoffMs(attempt))
   }
 
   /** Build the SHARED ENV CONTRACT for a job's tier. */
@@ -82,7 +86,7 @@ export class JobScheduler {
       HAPPY_JOB_PERMISSION_MODE: job.tier === 'trusted' ? 'bypassPermissions' : 'default',
     }
     if (job.tier === 'supervised') {
-      const meta = JSON.parse(job.triggerMetadata) as TriggerMetadata
+      const meta = this.parseTriggerMetadata(job)
       if (Array.isArray(meta.allowedTools) && meta.allowedTools.length > 0) {
         env.HAPPY_JOB_ALLOWED_TOOLS = meta.allowedTools.join(',')
       }
@@ -91,6 +95,20 @@ export class JobScheduler {
     if (job.maxTurns !== undefined) env.HAPPY_JOB_MAX_TURNS = String(job.maxTurns)
     Object.assign(env, LOCAL_PRESET_ENV[job.preset] ?? {})
     return env
+  }
+
+  /**
+   * Parse a job's triggerMetadata, tolerating a corrupt row. A malformed value
+   * must not throw out of tick() (which would crash the daemon), so a parse
+   * failure degrades to empty metadata with a logged warning.
+   */
+  private parseTriggerMetadata(job: JobRecord): TriggerMetadata {
+    try {
+      return JSON.parse(job.triggerMetadata) as TriggerMetadata
+    } catch (error) {
+      logger.debug(`[JOB SCHEDULER] Corrupt triggerMetadata for job ${job.id}, treating as empty:`, error)
+      return {}
+    }
   }
 
   /**
@@ -206,7 +224,9 @@ export class JobScheduler {
 
     if (shouldRetry(nextAttempt, job.maxAttempts, cls)) {
       this.store.transition(job.id, 'failed', { attempts: nextAttempt, exitReason })
-      this.store.transition(job.id, 'pending')
+      // Defer the retry by an exponential backoff so a persistently failing job
+      // (e.g. a downed local model) is not re-claimed on the very next tick.
+      this.store.transition(job.id, 'pending', { scheduledAt: this.now() + this.backoff(nextAttempt) })
     } else {
       this.store.transition(job.id, 'failed', { attempts: nextAttempt, exitReason })
       this.store.transition(job.id, 'dead', { finishedAt: this.now() })
@@ -223,7 +243,12 @@ export class JobScheduler {
     this.timer = setInterval(() => {
       if (this.running) return
       this.running = true
-      this.tick().finally(() => { this.running = false })
+      // A throw inside a tick (e.g. an unexpected store error) must not become
+      // an unhandled rejection — that would trip the daemon's unhandledRejection
+      // handler and shut the whole daemon down for one bad tick. Log and continue.
+      this.tick()
+        .catch(error => { logger.debug('[JOB SCHEDULER] tick failed, continuing:', error) })
+        .finally(() => { this.running = false })
     }, this.intervalMs)
   }
 

@@ -119,6 +119,38 @@ describe('JobScheduler', () => {
     expect(loaded.attempts).toBe(1)
   })
 
+  it('defers a retried transient failure by a backoff and does not re-claim it before scheduledAt', async () => {
+    store.create(makeJob({ id: 'retry', directory: dir }))
+
+    let t = 1000
+    const spawn = async (): Promise<SpawnSessionResult> => {
+      throw { status: 429, message: 'rate limited' }
+    }
+    const scheduler = new JobScheduler({
+      store,
+      localSemaphore: new Semaphore(1),
+      spawn,
+      now: () => t,
+      backoff: () => 5000,
+    })
+
+    await scheduler.tick()
+    let loaded = store.get('retry')!
+    expect(loaded.status).toBe('pending')
+    expect(loaded.attempts).toBe(1)
+    expect(loaded.scheduledAt).toBe(6000) // now(1000) + backoff(5000)
+
+    // A tick before scheduledAt must not re-claim the deferred job.
+    t = 5000
+    await scheduler.tick()
+    expect(store.get('retry')!.attempts).toBe(1)
+
+    // A tick at/after scheduledAt re-claims and re-runs it (fails again → attempts 2).
+    t = 7000
+    await scheduler.tick()
+    expect(store.get('retry')!.attempts).toBe(2)
+  })
+
   it('marks a permanent (400) failure as dead', async () => {
     store.create(makeJob({ id: 'perm', directory: dir }))
 
@@ -312,6 +344,13 @@ describe('JobScheduler.tierEnv local routing', () => {
     expect(env.ANTHROPIC_BASE_URL).toBe('http://localhost:11434')
     expect(env.HAPPY_JOB_MODEL).toBe('qwen-moe')
     expect(env.ANTHROPIC_MODEL).toBe('qwen-moe')
+  })
+
+  it('tolerates corrupt triggerMetadata without throwing out of tierEnv', () => {
+    const scheduler = new JobScheduler({ store: {} as JobStore, localSemaphore: new Semaphore(1), spawn: noopSpawn })
+    const env = scheduler.tierEnv(makeJob({ tier: 'supervised', triggerMetadata: '{not valid json' }))
+    expect(env.HAPPY_JOB_ALLOWED_TOOLS).toBeUndefined()
+    expect(env.HAPPY_JOB_PERMISSION_MODE).toBe('default')
   })
 
   it('does not inject local routing for a cloud preset', () => {
