@@ -25,6 +25,8 @@ import { JobStore } from './jobs/jobStore';
 import { Semaphore } from './jobs/semaphore';
 import { JobScheduler, buildJobFromSubmit } from './jobs/scheduler';
 import type { SubmitJobParams } from '@/api/apiMachine';
+import type { JobStatus } from './jobs/jobTypes';
+import { toJobRecordView } from './jobs/jobView';
 import { randomUUID } from 'crypto';
 import { statSync } from 'fs';
 import { join } from 'path';
@@ -908,6 +910,14 @@ export async function startDaemon(): Promise<void> {
       return job.id;
     };
 
+    const listJobs = (filter?: { status?: JobStatus }) =>
+      jobStore.list(filter).map(toJobRecordView);
+
+    const getJob = (id: string) => {
+      const j = jobStore.get(id);
+      return j ? toJobRecordView(j) : null;
+    };
+
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
       getChildren: getCurrentChildren,
@@ -915,6 +925,8 @@ export async function startDaemon(): Promise<void> {
       spawnSession,
       submitJob,
       stopJob,
+      listJobs,
+      getJob,
       requestShutdown: () => requestShutdown('happy-cli'),
       onHappySessionWebhook
     });
@@ -980,7 +992,9 @@ export async function startDaemon(): Promise<void> {
       stopSession,
       requestShutdown: () => requestShutdown('happy-app'),
       submitJob,
-      stopJob
+      stopJob,
+      listJobs,
+      getJob
     });
 
     // Connect to server

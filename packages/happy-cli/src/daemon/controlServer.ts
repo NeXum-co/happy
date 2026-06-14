@@ -12,6 +12,8 @@ import { decodeBase64 } from '@/api/encryption';
 import { TrackedSession, SessionEncryptionData } from './types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
 import type { SubmitJobParams } from '@/api/apiMachine';
+import type { JobStatus } from './jobs/jobTypes';
+import type { JobRecordView } from './jobs/jobView';
 
 export function startDaemonControlServer({
   getChildren,
@@ -19,6 +21,8 @@ export function startDaemonControlServer({
   spawnSession,
   submitJob,
   stopJob,
+  listJobs,
+  getJob,
   requestShutdown,
   onHappySessionWebhook
 }: {
@@ -27,6 +31,8 @@ export function startDaemonControlServer({
   spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
   submitJob: (params: SubmitJobParams) => string;
   stopJob: (sessionId: string) => boolean;
+  listJobs: (filter?: { status?: JobStatus }) => JobRecordView[];
+  getJob: (id: string) => JobRecordView | null;
   requestShutdown: () => void;
   onHappySessionWebhook: (sessionId: string, metadata: Metadata, encryption?: SessionEncryptionData) => void;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
@@ -240,6 +246,45 @@ export function startDaemonControlServer({
       logger.debug(`[CONTROL SERVER] Stop job request: ${sessionId}`);
       const stopped = stopJob(sessionId);
       return { stopped };
+    });
+
+    // List autonomous jobs (E04). GET /jobs?status=<status> returns all jobs
+    // (or filtered by status) as JobRecordView projections for the dashboard.
+    typed.get('/jobs', {
+      schema: {
+        querystring: z.object({
+          status: z.string().optional()
+        }),
+        response: {
+          200: z.object({
+            jobs: z.array(z.record(z.string(), z.unknown()))
+          })
+        }
+      }
+    }, async (request) => {
+      const { status } = request.query as { status?: string };
+      const filter = status ? { status: status as JobStatus } : undefined;
+      logger.debug(`[CONTROL SERVER] List jobs request: status=${status ?? 'all'}`);
+      return { jobs: listJobs(filter) };
+    });
+
+    // Get a single autonomous job by id (E04). Returns the JobRecordView or
+    // null when no job with the given id exists.
+    typed.get('/jobs/:id', {
+      schema: {
+        params: z.object({
+          id: z.string()
+        }),
+        response: {
+          200: z.object({
+            job: z.record(z.string(), z.unknown()).nullable()
+          })
+        }
+      }
+    }, async (request) => {
+      const { id } = request.params as { id: string };
+      logger.debug(`[CONTROL SERVER] Get job request: id=${id}`);
+      return { job: getJob(id) };
     });
 
     // Stop daemon

@@ -22,6 +22,8 @@ import {
     ForkTruncateUuidNotFoundError,
     ForkSourceMissingError,
 } from '@/claude/utils/claudeSessionFork';
+import type { JobStatus } from '@/daemon/jobs/jobTypes';
+import type { JobRecordView } from '@/daemon/jobs/jobView';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -91,6 +93,10 @@ type MachineRpcHandlers = {
     submitJob?: (params: SubmitJobParams) => string;
     /** Targeted kill of an autonomous job's session; returns whether one was found. */
     stopJob?: (sessionId: string) => boolean;
+    /** List durable jobs, optionally filtered by status. Returns JobRecordView[] without triggerMetadata. */
+    listJobs?: (filter?: { status?: JobStatus }) => JobRecordView[];
+    /** Get a single durable job by id. Returns JobRecordView or null if not found. */
+    getJob?: (id: string) => JobRecordView | null;
 }
 
 /** Params accepted by the submit-job RPC / HTTP endpoint (autonomous jobs, E04). */
@@ -135,7 +141,9 @@ export class ApiMachineClient {
         stopSession,
         requestShutdown,
         submitJob,
-        stopJob
+        stopJob,
+        listJobs,
+        getJob
     }: MachineRpcHandlers) {
         this.resumeSessionHandler = resumeSession ?? null;
 
@@ -167,6 +175,25 @@ export class ApiMachineClient {
                 const stopped = stopJob(sessionId);
                 logger.debug(`[API MACHINE] Stop job ${sessionId}: ${stopped}`);
                 return { stopped };
+            });
+        }
+
+        // Register list-jobs handler (autonomous jobs, E04). Returns all jobs
+        // (or filtered by status) as JobRecordView projections for the dashboard.
+        if (listJobs) {
+            this.rpcHandlerManager.registerHandler('list-jobs', async (params: any) => {
+                const status = params?.status;
+                return { jobs: listJobs(status ? { status } : undefined) };
+            });
+        }
+
+        // Register get-job handler (autonomous jobs, E04). Fetches a single
+        // job by id as a JobRecordView; returns null when not found.
+        if (getJob) {
+            this.rpcHandlerManager.registerHandler('get-job', async (params: any) => {
+                const { id } = params || {};
+                if (typeof id !== 'string' || id.length === 0) throw new Error('id is required');
+                return { job: getJob(id) };
             });
         }
 
