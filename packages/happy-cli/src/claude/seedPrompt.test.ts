@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { seedFirstMessage, resolveSeedMode } from './seedPrompt'
+import { seedFirstMessage, resolveSeedMode, shouldExitAutonomous } from './seedPrompt'
 
 describe('seedFirstMessage', () => {
   it('returns the prompt on first injection', () => {
@@ -53,5 +53,23 @@ describe('resolveSeedMode', () => {
     expect(
       resolveSeedMode({ HAPPY_JOB_PERMISSION_MODE: 'default', HAPPY_JOB_ALLOWED_TOOLS: ' Read , , Grep ,' })
     ).toEqual({ permissionMode: 'default', allowedTools: ['Read', 'Grep'] })
+  })
+})
+
+describe('shouldExitAutonomous', () => {
+  it('exits once an autonomous session has seeded with nothing pending', () => {
+    expect(shouldExitAutonomous(true, true, false)).toBe(true)
+  })
+
+  it('does not exit an autonomous session that has not yet seeded', () => {
+    expect(shouldExitAutonomous(true, false, false)).toBe(false)
+  })
+
+  it('does not exit while a pending message is queued', () => {
+    expect(shouldExitAutonomous(true, true, true)).toBe(false)
+  })
+
+  it('never exits an interactive (non-autonomous) session', () => {
+    expect(shouldExitAutonomous(false, true, false)).toBe(false)
   })
 })

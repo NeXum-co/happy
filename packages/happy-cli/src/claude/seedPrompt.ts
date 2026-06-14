@@ -18,6 +18,18 @@ export function seedFirstMessage(envValue: string | undefined, alreadySeeded: bo
 }
 
 /**
+ * Decides whether an autonomous (seeded) remote session should end after its
+ * single seeded turn. A normal remote session sits idle waiting for the next app
+ * message; an autonomous job has no app behind it, so once it has run its one
+ * seeded turn (and nothing is pending) it must return null from nextMessage so
+ * the process exits with code 0 and the job can transition running -> succeeded.
+ * Interactive sessions (isAutonomous false) are never affected.
+ */
+export function shouldExitAutonomous(isAutonomous: boolean, seeded: boolean, hasPending: boolean): boolean {
+    return isAutonomous && seeded && !hasPending;
+}
+
+/**
  * Resolves the seed-time permission mode for an autonomous remote session from
  * the shared job env contract (set by the spawning phase, P6b):
  *

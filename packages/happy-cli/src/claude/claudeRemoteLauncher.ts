@@ -16,7 +16,7 @@ import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 import { getToolName } from "./utils/getToolName";
 import { getAskUserQuestionToolCallIds } from "./utils/questionNotification";
 import { cleanupStdinAfterInk } from "@/utils/terminalStdinCleanup";
-import { seedFirstMessage, resolveSeedMode } from "@/claude/seedPrompt";
+import { seedFirstMessage, resolveSeedMode, shouldExitAutonomous } from "@/claude/seedPrompt";
 import type { MessageParam, ContentBlockParam } from '@anthropic-ai/sdk/resources';
 
 interface PermissionsField {
@@ -339,6 +339,12 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                             permissionHandler.handleModeChange(seedMode.permissionMode);
                             return { message: seed, mode: seedMode };
                         }
+
+                        // Autonomous one-shot: once a seeded session has run its
+                        // single turn with nothing pending, end the process (code
+                        // 0) instead of blocking on app input. The exit drives the
+                        // job's running -> succeeded transition (P7).
+                        if (shouldExitAutonomous(!!process.env.HAPPY_INITIAL_PROMPT, seeded, pending !== null)) return null;
 
                         if (pending) {
                             let p = pending;

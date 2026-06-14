@@ -139,6 +139,11 @@ export class JobStore {
     return row ? rowToRecord(row) : undefined
   }
 
+  findBySessionId(sessionId: string): JobRecord | undefined {
+    const row = this.db.prepare('SELECT * FROM jobs WHERE sessionId = ?').get(sessionId) as JobRow | undefined
+    return row ? rowToRecord(row) : undefined
+  }
+
   list(filter?: { status?: JobStatus }): JobRecord[] {
     const rows = filter?.status
       ? this.db.prepare('SELECT * FROM jobs WHERE status = ? ORDER BY createdAt ASC').all(filter.status) as JobRow[]

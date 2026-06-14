@@ -28,6 +28,7 @@ interface SchedulerDeps {
   store: JobStore
   localSemaphore: Semaphore
   spawn: (opts: SpawnSessionOptions) => Promise<SpawnSessionResult>
+  killSession?: (sessionId: string) => void
   intervalMs?: number
   now?: () => number
 }
@@ -40,6 +41,7 @@ export class JobScheduler {
   private readonly store: JobStore
   private readonly localSemaphore: Semaphore
   private readonly spawn: (opts: SpawnSessionOptions) => Promise<SpawnSessionResult>
+  private readonly killSession?: (sessionId: string) => void
   private readonly intervalMs: number
   private readonly now: () => number
   private timer: NodeJS.Timeout | null = null
@@ -49,6 +51,7 @@ export class JobScheduler {
     this.store = deps.store
     this.localSemaphore = deps.localSemaphore
     this.spawn = deps.spawn
+    this.killSession = deps.killSession
     this.intervalMs = deps.intervalMs ?? 1000
     this.now = deps.now ?? Date.now
   }
@@ -81,6 +84,8 @@ export class JobScheduler {
   }
 
   async tick(): Promise<void> {
+    this.enforceTimeouts()
+
     const job = this.store.claimNext(this.now())
     if (!job) return
 
@@ -126,6 +131,42 @@ export class JobScheduler {
       this.handleFailure(job, { message: result.errorMessage })
     } finally {
       release?.()
+    }
+  }
+
+  /**
+   * Bind a spawned session's process exit to its job's terminal transition.
+   * Non-job sessions (no matching sessionId) and already-terminal jobs are
+   * ignored. success -> succeeded; killed -> needs-attention (operator parked
+   * it); crashed -> the normal retry-or-dead failure path.
+   */
+  onSessionExit(sessionId: string, outcome: 'success' | 'killed' | 'crashed'): void {
+    const job = this.store.findBySessionId(sessionId)
+    if (!job || job.status !== 'running') return
+
+    if (outcome === 'success') {
+      this.store.transition(job.id, 'succeeded', { finishedAt: this.now() })
+      return
+    }
+    if (outcome === 'killed') {
+      this.store.transition(job.id, 'needs-attention', { exitReason: 'killed', finishedAt: this.now() })
+      return
+    }
+    this.handleFailure(job, { message: 'session crashed' })
+  }
+
+  /**
+   * Wall-clock enforcement: any running job past its timeoutAt is killed and
+   * driven to dead with exitReason 'wall-clock-timeout'. Runs at the start of
+   * every tick so a stuck session cannot outlive its budget.
+   */
+  private enforceTimeouts(): void {
+    const now = this.now()
+    for (const job of this.store.list({ status: 'running' })) {
+      if (job.timeoutAt === undefined || job.timeoutAt >= now || job.sessionId === undefined) continue
+      this.killSession?.(job.sessionId)
+      this.store.transition(job.id, 'failed', { exitReason: 'wall-clock-timeout' })
+      this.store.transition(job.id, 'dead', { finishedAt: this.now() })
     }
   }
 

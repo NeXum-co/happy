@@ -141,6 +141,94 @@ describe('JobScheduler', () => {
     rmSync(worktree, { recursive: true, force: true })
   })
 
+  it('onSessionExit success drives a running job to succeeded', () => {
+    store.create(makeJob({ id: 'ok', status: 'running', sessionId: 'sess-ok', claimedAt: 1000 }))
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn: async () => ({ type: 'success', sessionId: 's' }), now: () => 5000 })
+
+    scheduler.onSessionExit('sess-ok', 'success')
+
+    const loaded = store.get('ok')!
+    expect(loaded.status).toBe('succeeded')
+    expect(loaded.finishedAt).toBe(5000)
+  })
+
+  it('onSessionExit killed parks a running job in needs-attention', () => {
+    store.create(makeJob({ id: 'kill', status: 'running', sessionId: 'sess-kill', claimedAt: 1000 }))
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn: async () => ({ type: 'success', sessionId: 's' }), now: () => 6000 })
+
+    scheduler.onSessionExit('sess-kill', 'killed')
+
+    const loaded = store.get('kill')!
+    expect(loaded.status).toBe('needs-attention')
+    expect(loaded.exitReason).toBe('killed')
+    expect(loaded.finishedAt).toBe(6000)
+  })
+
+  it('onSessionExit crashed runs the retry-or-dead failure path', () => {
+    store.create(makeJob({ id: 'crash', status: 'running', sessionId: 'sess-crash', attempts: 0, maxAttempts: 5, claimedAt: 1000 }))
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn: async () => ({ type: 'success', sessionId: 's' }) })
+
+    scheduler.onSessionExit('sess-crash', 'crashed')
+
+    const loaded = store.get('crash')!
+    expect(loaded.status).toBe('pending') // requeued (transient, attempts < max)
+    expect(loaded.attempts).toBe(1)
+    expect(loaded.exitReason).toBe('session crashed')
+  })
+
+  it('onSessionExit ignores an unknown session and an already-terminal job', () => {
+    store.create(makeJob({ id: 'done', status: 'running', sessionId: 'sess-done', claimedAt: 1000 }))
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn: async () => ({ type: 'success', sessionId: 's' }), now: () => 7000 })
+
+    // Unknown sessionId — no-op (no throw).
+    scheduler.onSessionExit('nope', 'success')
+
+    // Drive it terminal, then a second exit must not transition again.
+    scheduler.onSessionExit('sess-done', 'success')
+    expect(store.get('done')!.status).toBe('succeeded')
+    scheduler.onSessionExit('sess-done', 'killed')
+    expect(store.get('done')!.status).toBe('succeeded')
+  })
+
+  it('enforceTimeouts kills and kills a past-timeout running job (tick)', async () => {
+    store.create(makeJob({ id: 'late', status: 'running', sessionId: 'sess-late', timeoutAt: 1000, claimedAt: 500 }))
+
+    const killed: string[] = []
+    const scheduler = new JobScheduler({
+      store,
+      localSemaphore: new Semaphore(1),
+      spawn: async () => ({ type: 'success', sessionId: 's' }),
+      killSession: (sid) => { killed.push(sid) },
+      now: () => 9000,
+    })
+
+    await scheduler.tick()
+
+    expect(killed).toEqual(['sess-late'])
+    const loaded = store.get('late')!
+    expect(loaded.status).toBe('dead')
+    expect(loaded.exitReason).toBe('wall-clock-timeout')
+    expect(loaded.finishedAt).toBe(9000)
+  })
+
+  it('enforceTimeouts leaves a future-timeout running job untouched', async () => {
+    store.create(makeJob({ id: 'early', status: 'running', sessionId: 'sess-early', timeoutAt: 20000, claimedAt: 500 }))
+
+    const killed: string[] = []
+    const scheduler = new JobScheduler({
+      store,
+      localSemaphore: new Semaphore(1),
+      spawn: async () => ({ type: 'success', sessionId: 's' }),
+      killSession: (sid) => { killed.push(sid) },
+      now: () => 9000,
+    })
+
+    await scheduler.tick()
+
+    expect(killed).toEqual([])
+    expect(store.get('early')!.status).toBe('running')
+  })
+
   it('serializes local jobs through a Semaphore(1)', async () => {
     store.create(makeJob({ id: 'a', createdAt: 1000, directory: dir }))
     store.create(makeJob({ id: 'b', createdAt: 2000, directory: dir }))

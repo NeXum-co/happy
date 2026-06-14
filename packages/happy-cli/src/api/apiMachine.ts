@@ -89,6 +89,8 @@ type MachineRpcHandlers = {
     requestShutdown: () => void;
     /** Create a durable autonomous job from submit-job params; returns its id. */
     submitJob?: (params: SubmitJobParams) => string;
+    /** Targeted kill of an autonomous job's session; returns whether one was found. */
+    stopJob?: (sessionId: string) => boolean;
 }
 
 /** Params accepted by the submit-job RPC / HTTP endpoint (autonomous jobs, E04). */
@@ -132,7 +134,8 @@ export class ApiMachineClient {
         resumeSession,
         stopSession,
         requestShutdown,
-        submitJob
+        submitJob,
+        stopJob
     }: MachineRpcHandlers) {
         this.resumeSessionHandler = resumeSession ?? null;
 
@@ -150,6 +153,20 @@ export class ApiMachineClient {
                 const jobId = submitJob({ directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools });
                 logger.debug(`[API MACHINE] Submitted job ${jobId}`);
                 return { jobId };
+            });
+        }
+
+        // Register stop-job handler (autonomous jobs, E04). Targeted kill of a
+        // running job's session; returns whether a session was found.
+        if (stopJob) {
+            this.rpcHandlerManager.registerHandler('stop-job', async (params: any) => {
+                const { sessionId } = params || {};
+                if (typeof sessionId !== 'string' || sessionId.length === 0) {
+                    throw new Error('sessionId is required');
+                }
+                const stopped = stopJob(sessionId);
+                logger.debug(`[API MACHINE] Stop job ${sessionId}: ${stopped}`);
+                return { stopped };
             });
         }
 

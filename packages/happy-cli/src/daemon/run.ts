@@ -18,7 +18,7 @@ import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquire
 import type { PersistedSession } from '@/persistence';
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stopDaemon } from './controlClient';
-import { runReaperOnce } from './reaper';
+import { runReaperOnce, isPidAlive } from './reaper';
 import { loadProfiles, sanitizeWindowName } from './profiles';
 import { startDaemonControlServer } from './controlServer';
 import { JobStore } from './jobs/jobStore';
@@ -663,6 +663,13 @@ export async function startDaemon(): Promise<void> {
       happyProcess.on('exit', (code, signal) => {
         logger.debug(`[DAEMON RUN] Child PID ${happyProcess.pid} exited with code ${code}, signal ${signal}`);
         if (happyProcess.pid) {
+          // Bind the process exit to the autonomous job lifecycle (P7). Read the
+          // sessionId before onChildExited untracks the pid. findBySessionId is a
+          // no-op for non-job sessions, so this is safe for normal sessions.
+          const exited = pidToTrackedSession.get(happyProcess.pid);
+          if (exited?.happySessionId) {
+            jobScheduler.onSessionExit(exited.happySessionId, code === 0 ? 'success' : 'crashed');
+          }
           onChildExited(happyProcess.pid);
         }
       });
@@ -842,11 +849,57 @@ export async function startDaemon(): Promise<void> {
     jobStore.init();
     const recoveredJobs = jobStore.recoverOnStartup();
     logger.debug(`[DAEMON RUN] Job store ready; recovered ${recoveredJobs} timed-out job(s)`);
+    // killSession is wired below to stopJob. The cycle (scheduler needs stopJob
+    // for wall-clock kills; stopJob needs the scheduler to mark the job
+    // needs-attention) is broken with a thunk: the scheduler holds an arrow that
+    // calls stopJob, which is declared right after and only invoked at runtime.
     const jobScheduler = new JobScheduler({
       store: jobStore,
       localSemaphore: new Semaphore(1),
-      spawn: spawnSession
+      spawn: spawnSession,
+      killSession: (sessionId: string) => { stopJob(sessionId); }
     });
+
+    // Targeted kill of an autonomous job's session: SIGTERM, then SIGKILL after
+    // 5s if still alive, then mark the job needs-attention via the scheduler.
+    // Returns whether a tracked session was found (mirrors stopSession's lookup).
+    const stopJob = (sessionId: string): boolean => {
+      let targetPid: number | undefined;
+      for (const [pid, session] of pidToTrackedSession.entries()) {
+        if (session.happySessionId === sessionId ||
+          (sessionId.startsWith('PID-') && pid === parseInt(sessionId.replace('PID-', '')))) {
+          targetPid = pid;
+          break;
+        }
+      }
+      if (targetPid === undefined) {
+        logger.debug(`[DAEMON RUN] stopJob: session ${sessionId} not found`);
+        return false;
+      }
+
+      try {
+        process.kill(targetPid, 'SIGTERM');
+        logger.debug(`[DAEMON RUN] stopJob: sent SIGTERM to PID ${targetPid} (session ${sessionId})`);
+      } catch (error) {
+        logger.debug(`[DAEMON RUN] stopJob: SIGTERM failed for PID ${targetPid}:`, error);
+      }
+
+      const pidToKill = targetPid;
+      setTimeout(() => {
+        if (isPidAlive(pidToKill)) {
+          try {
+            process.kill(pidToKill, 'SIGKILL');
+            logger.debug(`[DAEMON RUN] stopJob: escalated to SIGKILL for PID ${pidToKill} (session ${sessionId})`);
+          } catch (error) {
+            logger.debug(`[DAEMON RUN] stopJob: SIGKILL failed for PID ${pidToKill}:`, error);
+          }
+        }
+      }, 5_000);
+
+      jobScheduler.onSessionExit(sessionId, 'killed');
+      return true;
+    };
+
     jobScheduler.start();
     const submitJob = (params: SubmitJobParams): string => {
       const job = buildJobFromSubmit(params, Date.now(), randomUUID());
@@ -861,6 +914,7 @@ export async function startDaemon(): Promise<void> {
       stopSession,
       spawnSession,
       submitJob,
+      stopJob,
       requestShutdown: () => requestShutdown('happy-cli'),
       onHappySessionWebhook
     });
@@ -925,7 +979,8 @@ export async function startDaemon(): Promise<void> {
       resumeSession,
       stopSession,
       requestShutdown: () => requestShutdown('happy-app'),
-      submitJob
+      submitJob,
+      stopJob
     });
 
     // Connect to server

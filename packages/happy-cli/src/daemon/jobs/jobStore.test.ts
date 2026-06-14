@@ -94,6 +94,17 @@ describe('JobStore', () => {
     expect(store.get('nope')).toBeUndefined()
   })
 
+  it('findBySessionId round-trips the job carrying that sessionId', () => {
+    store.create(makeJob({ id: 'job-sess', status: 'running', sessionId: 'sess-77' }))
+
+    const found = store.findBySessionId('sess-77')
+    expect(found).toBeDefined()
+    expect(found!.id).toBe('job-sess')
+    expect(found!.sessionId).toBe('sess-77')
+
+    expect(store.findBySessionId('no-such-session')).toBeUndefined()
+  })
+
   it('claimNext hands out the oldest pending job, then the next, then undefined', () => {
     store.create(makeJob({ id: 'older', createdAt: 1000 }))
     store.create(makeJob({ id: 'newer', createdAt: 2000 }))

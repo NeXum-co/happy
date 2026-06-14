@@ -18,6 +18,7 @@ export function startDaemonControlServer({
   stopSession,
   spawnSession,
   submitJob,
+  stopJob,
   requestShutdown,
   onHappySessionWebhook
 }: {
@@ -25,6 +26,7 @@ export function startDaemonControlServer({
   stopSession: (sessionId: string) => boolean;
   spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
   submitJob: (params: SubmitJobParams) => string;
+  stopJob: (sessionId: string) => boolean;
   requestShutdown: () => void;
   onHappySessionWebhook: (sessionId: string, metadata: Metadata, encryption?: SessionEncryptionData) => void;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
@@ -217,6 +219,27 @@ export function startDaemonControlServer({
       const jobId = submitJob(request.body);
       logger.debug(`[CONTROL SERVER] Submitted job ${jobId}`);
       return { jobId };
+    });
+
+    // Targeted kill of an autonomous job's session (E04). SIGTERM + SIGKILL
+    // escalation, then mark the job needs-attention. Returns whether a session
+    // was found.
+    typed.post('/stop-job', {
+      schema: {
+        body: z.object({
+          sessionId: z.string()
+        }),
+        response: {
+          200: z.object({
+            stopped: z.boolean()
+          })
+        }
+      }
+    }, async (request) => {
+      const { sessionId } = request.body;
+      logger.debug(`[CONTROL SERVER] Stop job request: ${sessionId}`);
+      const stopped = stopJob(sessionId);
+      return { stopped };
     });
 
     // Stop daemon
