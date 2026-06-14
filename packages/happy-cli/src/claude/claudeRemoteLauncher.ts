@@ -342,9 +342,16 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
 
                         // Autonomous one-shot: once a seeded session has run its
                         // single turn with nothing pending, end the process (code
-                        // 0) instead of blocking on app input. The exit drives the
-                        // job's running -> succeeded transition (P7).
-                        if (shouldExitAutonomous(!!process.env.HAPPY_INITIAL_PROMPT, seeded, pending !== null)) return null;
+                        // 0) instead of blocking on app input. Returning null ends
+                        // the SDK query, but the launcher's `while (!exitReason)`
+                        // loop would immediately start another query — so we also
+                        // set exitReason='exit' to break the loop and let the
+                        // process terminate. The exit drives the job's
+                        // running -> succeeded transition (P7).
+                        if (shouldExitAutonomous(!!process.env.HAPPY_INITIAL_PROMPT, seeded, pending !== null)) {
+                            exitReason = 'exit';
+                            return null;
+                        }
 
                         if (pending) {
                             let p = pending;
