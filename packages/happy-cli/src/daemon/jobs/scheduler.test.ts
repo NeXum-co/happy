@@ -267,3 +267,23 @@ describe('JobScheduler', () => {
     expect(store.get('b')!.sessionId).toBe('job-b')
   })
 })
+
+describe('JobScheduler.tierEnv local routing', () => {
+  const noopSpawn = async (): Promise<SpawnSessionResult> => ({ type: 'success', sessionId: 's' })
+
+  it('injects local-qwen model routing for the local-qwen preset', () => {
+    const scheduler = new JobScheduler({ store: {} as JobStore, localSemaphore: new Semaphore(1), spawn: noopSpawn })
+    const env = scheduler.tierEnv(makeJob({ preset: 'local-qwen', tier: 'supervised' }))
+    expect(env.ANTHROPIC_BASE_URL).toBe('http://localhost:11434')
+    expect(env.HAPPY_JOB_MODEL).toBe('qwen-moe')
+    expect(env.ANTHROPIC_MODEL).toBe('qwen-moe')
+  })
+
+  it('does not inject local routing for a cloud preset', () => {
+    const scheduler = new JobScheduler({ store: {} as JobStore, localSemaphore: new Semaphore(1), spawn: noopSpawn })
+    const env = scheduler.tierEnv(makeJob({ preset: 'cloud-opus', tier: 'trusted' }))
+    expect(env.ANTHROPIC_BASE_URL).toBeUndefined()
+    expect(env.HAPPY_JOB_MODEL).toBeUndefined()
+    expect(env.HAPPY_JOB_PERMISSION_MODE).toBe('bypassPermissions')
+  })
+})

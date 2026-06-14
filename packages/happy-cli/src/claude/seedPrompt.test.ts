@@ -73,3 +73,16 @@ describe('shouldExitAutonomous', () => {
     expect(shouldExitAutonomous(false, true, false)).toBe(false)
   })
 })
+
+describe('resolveSeedMode model pin', () => {
+  it('pins the model from HAPPY_JOB_MODEL when set', () => {
+    expect(
+      resolveSeedMode({ HAPPY_JOB_PERMISSION_MODE: 'default', HAPPY_JOB_MODEL: 'qwen-moe' })
+    ).toEqual({ permissionMode: 'default', model: 'qwen-moe' })
+  })
+
+  it('omits model when HAPPY_JOB_MODEL is absent', () => {
+    expect(resolveSeedMode({ HAPPY_JOB_PERMISSION_MODE: 'bypassPermissions' }))
+      .toEqual({ permissionMode: 'bypassPermissions' })
+  })
+})

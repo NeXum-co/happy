@@ -37,6 +37,25 @@ interface TriggerMetadata {
   allowedTools?: string[]
 }
 
+/**
+ * Model-routing env per local preset (D-E04-5 local-default). Applied verbatim
+ * to the spawned session's process env so the SDK reaches llama-swap instead of
+ * the cloud. HAPPY_JOB_MODEL pins the seed model (remote mode ignores
+ * ANTHROPIC_MODEL, so the explicit pin is what actually routes — see
+ * resolveSeedMode). A cloud preset is absent here and keeps the daemon default.
+ */
+const LOCAL_PRESET_ENV: Record<string, Record<string, string>> = {
+  'local-qwen': {
+    ANTHROPIC_BASE_URL: 'http://localhost:11434',
+    ANTHROPIC_AUTH_TOKEN: 'local',
+    ANTHROPIC_MODEL: 'qwen-moe',
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: 'qwen-moe',
+    HAPPY_JOB_MODEL: 'qwen-moe',
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+    API_TIMEOUT_MS: '900000',
+  },
+}
+
 export class JobScheduler {
   private readonly store: JobStore
   private readonly localSemaphore: Semaphore
@@ -69,6 +88,7 @@ export class JobScheduler {
     }
     if (job.maxBudgetUsd !== undefined) env.HAPPY_JOB_MAX_BUDGET_USD = String(job.maxBudgetUsd)
     if (job.maxTurns !== undefined) env.HAPPY_JOB_MAX_TURNS = String(job.maxTurns)
+    Object.assign(env, LOCAL_PRESET_ENV[job.preset] ?? {})
     return env
   }
 

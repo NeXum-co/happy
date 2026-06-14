@@ -37,6 +37,10 @@ export function shouldExitAutonomous(isAutonomous: boolean, seeded: boolean, has
  * - HAPPY_JOB_PERMISSION_MODE = 'default' (SUPERVISED) -> default mode, with the
  *   optional HAPPY_JOB_ALLOWED_TOOLS CSV narrowing the allowed tool set.
  * - Env absent -> normal app-driven default mode (no override).
+ *
+ * HAPPY_JOB_MODEL, when set, pins the model on the seed mode. Remote mode
+ * otherwise defaults the model (ignoring ANTHROPIC_MODEL), so a local-preset
+ * job must pin its model explicitly (e.g. 'qwen-moe') to reach llama-swap.
  */
 export function resolveSeedMode(env: NodeJS.ProcessEnv): EnhancedMode {
     const permission = env.HAPPY_JOB_PERMISSION_MODE;
@@ -45,13 +49,10 @@ export function resolveSeedMode(env: NodeJS.ProcessEnv): EnhancedMode {
         .map((t) => t.trim())
         .filter(Boolean);
 
-    if (permission === 'bypassPermissions') {
-        return allowedTools.length > 0
-            ? { permissionMode: 'bypassPermissions', allowedTools }
-            : { permissionMode: 'bypassPermissions' };
-    }
-
-    return allowedTools.length > 0
-        ? { permissionMode: 'default', allowedTools }
-        : { permissionMode: 'default' };
+    const mode: EnhancedMode = {
+        permissionMode: permission === 'bypassPermissions' ? 'bypassPermissions' : 'default',
+    };
+    if (allowedTools.length > 0) mode.allowedTools = allowedTools;
+    if (env.HAPPY_JOB_MODEL) mode.model = env.HAPPY_JOB_MODEL;
+    return mode;
 }
