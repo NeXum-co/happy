@@ -12,7 +12,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { join, resolve } from 'node:path';
-import { writeFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, unlinkSync, existsSync, chmodSync } from 'node:fs';
 import { configuration } from '@/configuration';
 import { logger } from '@/ui/logger';
 import { projectPath } from '@/projectPath';
@@ -42,7 +42,16 @@ export function generateHookSettingsFile(port: number, secret: string): string {
 
     // Path to the hook forwarder script
     const forwarderScript = resolve(projectPath(), 'scripts', 'session_hook_forwarder.cjs');
-    const hookCommand = `node "${forwarderScript}" ${port} ${secret}`;
+
+    // SEC: the secret must NOT travel as a command argument — argv is visible
+    // to any same-user process via /proc/<pid>/cmdline (and ps), and inlining it
+    // as an env assignment would still surface it in the spawning shell's
+    // cmdline. Write it to a sibling 0600 file and pass only that file's path
+    // (non-sensitive) to the forwarder, which reads the secret from disk.
+    const secretPath = filepath.replace(/\.json$/, '.secret');
+    writeFileSync(secretPath, secret, { mode: 0o600 });
+    chmodSync(secretPath, 0o600); // enforce 0600 regardless of umask
+    const hookCommand = `node "${forwarderScript}" ${port} "${secretPath}"`;
 
     const forwarderHook = {
         matcher: "*",
@@ -86,6 +95,11 @@ export function cleanupHookSettingsFile(filepath: string): void {
         if (existsSync(filepath)) {
             unlinkSync(filepath);
             logger.debug(`[generateHookSettings] Cleaned up hook settings file: ${filepath}`);
+        }
+        const secretPath = filepath.replace(/\.json$/, '.secret');
+        if (existsSync(secretPath)) {
+            unlinkSync(secretPath);
+            logger.debug(`[generateHookSettings] Cleaned up hook secret file: ${secretPath}`);
         }
     } catch (error) {
         logger.debug(`[generateHookSettings] Failed to cleanup hook settings file: ${error}`);

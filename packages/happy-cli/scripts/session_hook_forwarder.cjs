@@ -11,15 +11,23 @@
  * Fire-and-forget: errors are swallowed and the exit code stays 0 so a
  * broken forwarder can never break a Claude session.
  *
- * Usage: echo '{"session_id":"...","hook_event_name":"..."}' | node session_hook_forwarder.cjs <port> <secret>
+ * Usage: echo '{"session_id":"...","hook_event_name":"..."}' | node session_hook_forwarder.cjs <port> <secretFilePath>
  */
 
 const http = require('http');
+const fs = require('fs');
 
 const port = parseInt(process.argv[2], 10);
-// Per-session shared secret (SEC-001); the hook server rejects requests
-// that don't echo it back in the X-Hook-Secret header.
-const secret = process.argv[3] || '';
+// Per-session shared secret (SEC-001); the hook server rejects requests that
+// don't echo it back in the X-Hook-Secret header. The secret is read from a
+// 0600 file whose path is argv[3] — never passed as an argument itself, so it
+// stays out of /proc/<pid>/cmdline and ps for same-user processes.
+let secret = '';
+try {
+    secret = fs.readFileSync(process.argv[3], 'utf-8').trim();
+} catch (e) {
+    // No readable secret file — leave empty; the hook server will 401.
+}
 
 if (!port || isNaN(port)) {
     process.exit(0);
