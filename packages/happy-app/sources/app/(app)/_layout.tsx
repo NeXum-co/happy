@@ -62,6 +62,30 @@ export default function RootLayout() {
                 }}
             />
             <Stack.Screen
+                name="runs/index"
+                options={{
+                    headerShown: true,
+                    headerTitle: t('run.title'),
+                    headerBackTitle: t('common.home')
+                }}
+            />
+            <Stack.Screen
+                name="runs/new"
+                options={{
+                    headerShown: true,
+                    headerTitle: t('run.submitTitle'),
+                    headerBackTitle: t('run.title')
+                }}
+            />
+            <Stack.Screen
+                name="runs/[jobId]"
+                options={{
+                    headerShown: true,
+                    headerTitle: t('run.title'),
+                    headerBackTitle: t('run.title')
+                }}
+            />
+            <Stack.Screen
                 name="session/[id]"
                 options={{
                     headerShown: false

@@ -69,7 +69,7 @@ function RunsScreen() {
                 <Item
                     title={t('run.submit')}
                     icon={<Ionicons name="add-circle-outline" size={29} color={theme.colors.button.primary.background} />}
-                    onPress={() => router.push('/runs/new')}
+                    onPress={() => router.push('/runs/new' as any)}
                     disabled={!machineId}
                 />
             </ItemGroup>
@@ -104,7 +104,7 @@ function RunsScreen() {
                             subtitle={`${statusLabel(job.status)} · ${tierLabel(job.tier)}`}
                             detail={t('run.costLine', { usd: (job.costUsd ?? 0).toFixed(2) })}
                             icon={<Ionicons name="hardware-chip-outline" size={29} color={theme.colors.textSecondary} />}
-                            onPress={() => router.push(`/runs/${job.id}`)}
+                            onPress={() => router.push(`/runs/${job.id}` as any)}
                         />
                     ))}
                 </ItemGroup>
