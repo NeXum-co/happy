@@ -1062,5 +1062,8 @@ export const ja: TranslationStructure = {
         exitReason: ({ reason }: { reason: string }) => `終了理由: ${reason}`,
         openSession: 'セッションを開く',
         escalation: 'このジョブには承認が必要です',
+        promptPlaceholder: 'エージェントに何をしてほしいか説明してください…',
+        cancel: 'ジョブをキャンセル',
+        cancelConfirm: 'この保留中のジョブをキャンセルしますか？',
     },
 } as const;

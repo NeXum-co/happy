@@ -1090,6 +1090,9 @@ export const pl: TranslationStructure = {
         exitReason: ({ reason }: { reason: string }) => `Zakończenie: ${reason}`,
         openSession: 'Otwórz sesję',
         escalation: 'To zadanie wymaga twojej zgody',
+        promptPlaceholder: 'Opisz co chcesz, żeby agent zrobił…',
+        cancel: 'Anuluj zadanie',
+        cancelConfirm: 'Anulować to oczekujące zadanie?',
     },
 
 } as const;

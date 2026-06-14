@@ -1,5 +1,9 @@
 import { apiSocket } from './apiSocket';
 
+/**
+ * Mirror of the JobRecordView type from the daemon's job store.
+ * Source of truth: packages/happy-cli/src/daemon/jobs/jobView.ts
+ */
 export interface JobRecordView {
     id: string;
     triggerType: 'manual' | 'cron' | 'event';
@@ -11,6 +15,8 @@ export interface JobRecordView {
     attempts: number;
     maxAttempts: number;
     sessionId?: string;
+    /** PID of the Claude process inside the session. Source of truth: packages/happy-cli/src/daemon/jobs/jobView.ts */
+    sessionPid?: number;
     scheduledAt?: number;
     claimedAt?: number;
     timeoutAt?: number;
@@ -47,6 +53,16 @@ export async function machineStopJob(machineId: string, sessionId: string): Prom
         machineId,
         'stop-job',
         { sessionId }
+    );
+    return result;
+}
+
+/** Cancels a pending (non-running) job. Mirrors the stop-job RPC pattern. */
+export async function machineCancelJob(machineId: string, jobId: string): Promise<{ cancelled: boolean }> {
+    const result = await apiSocket.machineRPC<{ cancelled: boolean }, { jobId: string }>(
+        machineId,
+        'cancel-job',
+        { jobId }
     );
     return result;
 }

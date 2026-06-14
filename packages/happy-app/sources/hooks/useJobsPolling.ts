@@ -18,14 +18,6 @@ const POLL_INTERVAL_MS = 2000;
 export function useJobsPolling(machineId: string | null) {
     const [jobs, setJobs] = React.useState<JobRecordView[]>([]);
 
-    const refresh = React.useCallback(async () => {
-        if (!machineId) {
-            setJobs([]);
-            return;
-        }
-        setJobs(await machineListJobs(machineId));
-    }, [machineId]);
-
     useFocusEffect(
         React.useCallback(() => {
             if (!machineId) {
@@ -48,5 +40,5 @@ export function useJobsPolling(machineId: string | null) {
         }, [machineId]),
     );
 
-    return { jobs, refresh };
+    return { jobs };
 }

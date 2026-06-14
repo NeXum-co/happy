@@ -1089,6 +1089,9 @@ export const ru: TranslationStructure = {
         exitReason: ({ reason }: { reason: string }) => `Выход: ${reason}`,
         openSession: 'Открыть сессию',
         escalation: 'Эта задача требует вашего подтверждения',
+        promptPlaceholder: 'Опишите, что вы хотите, чтобы агент сделал…',
+        cancel: 'Отменить задачу',
+        cancelConfirm: 'Отменить эту ожидающую задачу?',
     },
 
 } as const;

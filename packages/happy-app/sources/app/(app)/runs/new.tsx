@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Text, TextInput, ScrollView, Pressable } from 'react-native';
+import { View, Text, TextInput, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { layout } from '@/components/layout';
@@ -77,6 +77,7 @@ function NewRunScreen() {
                     value={prompt}
                     onChangeText={setPrompt}
                     multiline
+                    placeholder={t('run.promptPlaceholder')}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
 
@@ -148,7 +149,11 @@ function NewRunScreen() {
                     disabled={!canSubmit}
                     onPress={submit}
                 >
-                    <Text style={styles.submitText}>{t('run.submit')}</Text>
+                    {submitting ? (
+                        <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
+                    ) : (
+                        <Text style={styles.submitText}>{t('run.submit')}</Text>
+                    )}
                 </Pressable>
             </View>
         </ScrollView>

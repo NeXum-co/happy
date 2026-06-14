@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { View } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useUnistyles } from 'react-native-unistyles';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +8,7 @@ import { ItemList } from '@/components/ItemList';
 import { useAllMachines } from '@/sync/storage';
 import { isMachineOnline } from '@/utils/machineUtils';
 import { useHappyAction } from '@/hooks/useHappyAction';
-import { machineGetJob, machineStopJob, type JobRecordView } from '@/sync/runOps';
+import { machineGetJob, machineStopJob, machineCancelJob, type JobRecordView } from '@/sync/runOps';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 
@@ -92,8 +91,31 @@ function JobDetailScreen() {
         }
     });
 
+    const [, cancel] = useHappyAction(async () => {
+        if (!machineId || !job?.id) {
+            return;
+        }
+        const approved = await Modal.confirm(t('run.cancel'), t('run.cancelConfirm'), {
+            cancelText: t('common.cancel'),
+            confirmText: t('run.cancel'),
+        });
+        if (approved) {
+            await machineCancelJob(machineId, job.id);
+        }
+    });
+
     if (!job) {
-        return <View style={{ flex: 1 }} />;
+        return (
+            <ItemList>
+                <ItemGroup>
+                    <Item
+                        title={t('common.loading')}
+                        showChevron={false}
+                        titleStyle={{ color: theme.colors.textSecondary }}
+                    />
+                </ItemGroup>
+            </ItemList>
+        );
     }
 
     return (
@@ -134,7 +156,7 @@ function JobDetailScreen() {
                 />
             </ItemGroup>
 
-            {(job.sessionId || job.status === 'running') && (
+            {job.sessionId && (
                 <ItemGroup>
                     {job.sessionId && (
                         <Item
@@ -152,6 +174,18 @@ function JobDetailScreen() {
                             showChevron={false}
                         />
                     )}
+                </ItemGroup>
+            )}
+
+            {job.status === 'pending' && (
+                <ItemGroup>
+                    <Item
+                        title={t('run.cancel')}
+                        destructive
+                        icon={<Ionicons name="close-circle-outline" size={29} color={theme.colors.textDestructive} />}
+                        onPress={cancel}
+                        showChevron={false}
+                    />
                 </ItemGroup>
             )}
         </ItemList>

@@ -1066,6 +1066,9 @@ export const en = {
         exitReason: ({ reason }: { reason: string }) => `Exit: ${reason}`,
         openSession: 'Open session',
         escalation: 'This job needs your approval',
+        promptPlaceholder: 'Describe what you want the agent to do…',
+        cancel: 'Cancel job',
+        cancelConfirm: 'Cancel this pending job?',
     },
 
 } as const;

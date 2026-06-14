@@ -1061,5 +1061,8 @@ export const zhHans: TranslationStructure = {
         exitReason: ({ reason }: { reason: string }) => `退出: ${reason}`,
         openSession: '打开会话',
         escalation: '此任务需要您的批准',
+        promptPlaceholder: '描述您希望代理执行的操作…',
+        cancel: '取消任务',
+        cancelConfirm: '取消此待处理任务？',
     },
 } as const;

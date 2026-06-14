@@ -1064,6 +1064,9 @@ export const ca: TranslationStructure = {
         exitReason: ({ reason }: { reason: string }) => `Sortida: ${reason}`,
         openSession: 'Obrir sessió',
         escalation: 'Aquesta tasca necessita la teva aprovació',
+        promptPlaceholder: 'Descriu el que vols que faci l’agent…',
+        cancel: 'Cancel·la la tasca',
+        cancelConfirm: 'Cancel·lar aquesta tasca en espà?',
     },
 } as const;
 
