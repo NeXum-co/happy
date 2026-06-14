@@ -1061,6 +1061,36 @@ export const pl: TranslationStructure = {
         friendAcceptedGeneric: 'Zaproszenie do znajomych zaakceptowane',
     },
 
+    run: {
+        title: 'Uruchomienia',
+        empty: 'Brak autonomicznych uruchomień',
+        submit: 'Wyślij zadanie',
+        submitTitle: 'Nowe zadanie autonomiczne',
+        fieldDirectory: 'Katalog',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Poziom',
+        fieldPreset: 'Preset',
+        fieldBudget: 'Maksymalny budżet (USD)',
+        fieldTurns: 'Maksymalna liczba kroków',
+        fieldTimeout: 'Limit czasu (minuty)',
+        tierTrusted: 'Zaufany (autonomiczny)',
+        tierSupervised: 'Nadzorowany (pyta)',
+        stop: 'Zatrzymaj',
+        stopConfirm: 'Zatrzymać to zadanie? Proces otrzyma SIGTERM, a następnie SIGKILL po 5s.',
+        statusPending: 'Oczekuje',
+        statusRunning: 'Działa',
+        statusSucceeded: 'Ukończono',
+        statusFailed: 'Błąd',
+        statusDead: 'Martwy',
+        statusNeedsAttention: 'Potrzebuje ciebie',
+        attempts: ({ n, max }: { n: number; max: number }) => `Próba ${n}/${max}`,
+        costLine: ({ usd }: { usd: string }) => `Koszt: $${usd}`,
+        budgetLine: ({ usd }: { usd: string }) => `Budżet: $${usd}`,
+        exitReason: ({ reason }: { reason: string }) => `Zakończenie: ${reason}`,
+        openSession: 'Otwórz sesję',
+        escalation: 'To zadanie wymaga twojej zgody',
+    },
+
 } as const;
 
 export type TranslationsPl = typeof pl;

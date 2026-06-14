@@ -1037,6 +1037,36 @@ export const en = {
         friendAcceptedGeneric: 'Friend request accepted',
     },
 
+    run: {
+        title: 'Runs',
+        empty: 'No autonomous runs yet',
+        submit: 'Submit job',
+        submitTitle: 'New autonomous job',
+        fieldDirectory: 'Directory',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Tier',
+        fieldPreset: 'Preset',
+        fieldBudget: 'Max budget (USD)',
+        fieldTurns: 'Max turns',
+        fieldTimeout: 'Timeout (minutes)',
+        tierTrusted: 'Trusted (autonomous)',
+        tierSupervised: 'Supervised (asks)',
+        stop: 'Stop',
+        stopConfirm: 'Stop this running job? The process gets SIGTERM, then SIGKILL after 5s.',
+        statusPending: 'Pending',
+        statusRunning: 'Running',
+        statusSucceeded: 'Succeeded',
+        statusFailed: 'Failed',
+        statusDead: 'Dead',
+        statusNeedsAttention: 'Needs you',
+        attempts: ({ n, max }: { n: number; max: number }) => `Attempt ${n}/${max}`,
+        costLine: ({ usd }: { usd: string }) => `Cost: $${usd}`,
+        budgetLine: ({ usd }: { usd: string }) => `Budget: $${usd}`,
+        exitReason: ({ reason }: { reason: string }) => `Exit: ${reason}`,
+        openSession: 'Open session',
+        escalation: 'This job needs your approval',
+    },
+
 } as const;
 
 export type Translations = typeof en;

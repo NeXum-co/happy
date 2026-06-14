@@ -1060,6 +1060,36 @@ export const ru: TranslationStructure = {
         friendAcceptedGeneric: 'Запрос в друзья принят',
     },
 
+    run: {
+        title: 'Запуски',
+        empty: 'Автономных запусков пока нет',
+        submit: 'Отправить задачу',
+        submitTitle: 'Новая автономная задача',
+        fieldDirectory: 'Директория',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Уровень',
+        fieldPreset: 'Preset',
+        fieldBudget: 'Максимальный бюджет (USD)',
+        fieldTurns: 'Максимум шагов',
+        fieldTimeout: 'Таймаут (минуты)',
+        tierTrusted: 'Доверенный (автономный)',
+        tierSupervised: 'Под наблюдением (спрашивает)',
+        stop: 'Остановить',
+        stopConfirm: 'Остановить эту задачу? Процесс получит SIGTERM, затем SIGKILL через 5с.',
+        statusPending: 'Ожидает',
+        statusRunning: 'Выполняется',
+        statusSucceeded: 'Завершено',
+        statusFailed: 'Ошибка',
+        statusDead: 'Мёртв',
+        statusNeedsAttention: 'Нужна помощь',
+        attempts: ({ n, max }: { n: number; max: number }) => `Попытка ${n}/${max}`,
+        costLine: ({ usd }: { usd: string }) => `Стоимость: $${usd}`,
+        budgetLine: ({ usd }: { usd: string }) => `Бюджет: $${usd}`,
+        exitReason: ({ reason }: { reason: string }) => `Выход: ${reason}`,
+        openSession: 'Открыть сессию',
+        escalation: 'Эта задача требует вашего подтверждения',
+    },
+
 } as const;
 
 export type TranslationsRu = typeof ru;

@@ -1032,7 +1032,37 @@ export const pt: TranslationStructure = {
         friendRequestGeneric: 'Novo pedido de amizade',
         friendAccepted: ({ name }: { name: string }) => `Agora você é amigo de ${name}`,
         friendAcceptedGeneric: 'Pedido de amizade aceito',
-    }
+    },
+
+    run: {
+        title: 'Execuções',
+        empty: 'Nenhuma execução autônoma ainda',
+        submit: 'Enviar tarefa',
+        submitTitle: 'Nova tarefa autônoma',
+        fieldDirectory: 'Diretório',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Nível',
+        fieldPreset: 'Preset',
+        fieldBudget: 'Orçamento máximo (USD)',
+        fieldTurns: 'Máximo de turnos',
+        fieldTimeout: 'Tempo limite (minutos)',
+        tierTrusted: 'Confiável (autônomo)',
+        tierSupervised: 'Supervisionado (pergunta)',
+        stop: 'Parar',
+        stopConfirm: 'Parar esta tarefa em execução? O processo recebe SIGTERM e, após 5s, SIGKILL.',
+        statusPending: 'Pendente',
+        statusRunning: 'Em execução',
+        statusSucceeded: 'Concluído',
+        statusFailed: 'Falhou',
+        statusDead: 'Morto',
+        statusNeedsAttention: 'Precisa de você',
+        attempts: ({ n, max }: { n: number; max: number }) => `Tentativa ${n}/${max}`,
+        costLine: ({ usd }: { usd: string }) => `Custo: $${usd}`,
+        budgetLine: ({ usd }: { usd: string }) => `Orçamento: $${usd}`,
+        exitReason: ({ reason }: { reason: string }) => `Saída: ${reason}`,
+        openSession: 'Abrir sessão',
+        escalation: 'Esta tarefa precisa da sua aprovação',
+    },
 } as const;
 
 export type TranslationsPt = typeof pt;

@@ -1032,7 +1032,37 @@ export const it: TranslationStructure = {
         friendRequestGeneric: 'Nuova richiesta di amicizia',
         friendAccepted: ({ name }: { name: string }) => `Ora sei amico di ${name}`,
         friendAcceptedGeneric: 'Richiesta di amicizia accettata',
-    }
+    },
+
+    run: {
+        title: 'Esecuzioni',
+        empty: 'Nessuna esecuzione autonoma ancora',
+        submit: 'Invia lavoro',
+        submitTitle: 'Nuovo lavoro autonomo',
+        fieldDirectory: 'Directory',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Livello',
+        fieldPreset: 'Preset',
+        fieldBudget: 'Budget massimo (USD)',
+        fieldTurns: 'Turni massimi',
+        fieldTimeout: 'Timeout (minuti)',
+        tierTrusted: 'Attendibile (autonomo)',
+        tierSupervised: 'Supervisionato (chiede conferma)',
+        stop: 'Ferma',
+        stopConfirm: 'Fermare questo lavoro in esecuzione? Il processo riceve SIGTERM, poi SIGKILL dopo 5s.',
+        statusPending: 'In attesa',
+        statusRunning: 'In esecuzione',
+        statusSucceeded: 'Completato',
+        statusFailed: 'Fallito',
+        statusDead: 'Morto',
+        statusNeedsAttention: 'Richiede attenzione',
+        attempts: ({ n, max }: { n: number; max: number }) => `Tentativo ${n}/${max}`,
+        costLine: ({ usd }: { usd: string }) => `Costo: $${usd}`,
+        budgetLine: ({ usd }: { usd: string }) => `Budget: $${usd}`,
+        exitReason: ({ reason }: { reason: string }) => `Uscita: ${reason}`,
+        openSession: 'Apri sessione',
+        escalation: 'Questo lavoro richiede la tua approvazione',
+    },
 } as const;
 
 export type TranslationsIt = typeof it;

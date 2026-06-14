@@ -1033,7 +1033,37 @@ export const ca: TranslationStructure = {
         friendRequestGeneric: 'Nova sol·licitud d\'amistat',
         friendAccepted: ({ name }: { name: string }) => `Ara ets amic de ${name}`,
         friendAcceptedGeneric: 'Sol·licitud d\'amistat acceptada',
-    }
+    },
+
+    run: {
+        title: 'Execucions',
+        empty: 'Encara no hi ha execucions autònomes',
+        submit: 'Enviar tasca',
+        submitTitle: 'Nova tasca autònoma',
+        fieldDirectory: 'Directori',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Nivell',
+        fieldPreset: 'Preset',
+        fieldBudget: 'Pressupost màxim (USD)',
+        fieldTurns: 'Torns màxims',
+        fieldTimeout: 'Temps límit (minuts)',
+        tierTrusted: 'De confiança (autònom)',
+        tierSupervised: 'Supervisat (pregunta)',
+        stop: 'Atura',
+        stopConfirm: 'Aturar aquesta tasca en execució? El procés rebrà SIGTERM, i SIGKILL després de 5s.',
+        statusPending: 'Pendent',
+        statusRunning: 'En execució',
+        statusSucceeded: 'Completat',
+        statusFailed: 'Fallat',
+        statusDead: 'Mort',
+        statusNeedsAttention: 'Et necessita',
+        attempts: ({ n, max }: { n: number; max: number }) => `Intent ${n}/${max}`,
+        costLine: ({ usd }: { usd: string }) => `Cost: $${usd}`,
+        budgetLine: ({ usd }: { usd: string }) => `Pressupost: $${usd}`,
+        exitReason: ({ reason }: { reason: string }) => `Sortida: ${reason}`,
+        openSession: 'Obrir sessió',
+        escalation: 'Aquesta tasca necessita la teva aprovació',
+    },
 } as const;
 
 export type TranslationsCa = typeof ca;

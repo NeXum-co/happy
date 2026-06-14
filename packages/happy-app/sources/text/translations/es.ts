@@ -1036,6 +1036,36 @@ export const es: TranslationStructure = {
         friendAcceptedGeneric: 'Solicitud de amistad aceptada',
     },
 
+    run: {
+        title: 'Ejecuciones',
+        empty: 'Aún no hay ejecuciones autónomas',
+        submit: 'Enviar tarea',
+        submitTitle: 'Nueva tarea autónoma',
+        fieldDirectory: 'Directorio',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Nivel',
+        fieldPreset: 'Preset',
+        fieldBudget: 'Presupuesto máximo (USD)',
+        fieldTurns: 'Turnos máximos',
+        fieldTimeout: 'Tiempo límite (minutos)',
+        tierTrusted: 'Confiado (autónomo)',
+        tierSupervised: 'Supervisado (pregunta)',
+        stop: 'Detener',
+        stopConfirm: '¿Detener esta tarea en ejecución? El proceso recibe SIGTERM, luego SIGKILL después de 5s.',
+        statusPending: 'Pendiente',
+        statusRunning: 'En ejecución',
+        statusSucceeded: 'Completado',
+        statusFailed: 'Fallido',
+        statusDead: 'Muerto',
+        statusNeedsAttention: 'Te necesita',
+        attempts: ({ n, max }: { n: number; max: number }) => `Intento ${n}/${max}`,
+        costLine: ({ usd }: { usd: string }) => `Costo: $${usd}`,
+        budgetLine: ({ usd }: { usd: string }) => `Presupuesto: $${usd}`,
+        exitReason: ({ reason }: { reason: string }) => `Salida: ${reason}`,
+        openSession: 'Abrir sesión',
+        escalation: 'Esta tarea necesita tu aprobación',
+    },
+
 } as const;
 
 export type TranslationsEs = typeof es;
