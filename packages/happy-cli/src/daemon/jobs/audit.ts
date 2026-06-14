@@ -27,6 +27,8 @@ export function captureGitState(dir: string): GitState {
   }
 }
 
+// TODO(E04 review endpoint): wire diffSince — forward infra for the diff-review
+// endpoint; exported + tested but not yet called from production.
 export function diffSince(dir: string, beforeHead: string): string {
   try {
     return execFileSync('git', ['diff', beforeHead, '--', '.'], { cwd: dir, encoding: 'utf8' })

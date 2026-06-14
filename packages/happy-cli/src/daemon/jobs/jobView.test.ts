@@ -1,3 +1,12 @@
+/**
+ * Unit tests for the JobRecordView projection.
+ *
+ * toJobRecordView strips the internal triggerMetadata field and passes every
+ * other JobRecord field through unchanged. A full record proves each field
+ * survives; a minimal record proves absent optionals stay absent (not coerced
+ * to null/undefined keys) so the dashboard sees the same shape it would over RPC.
+ */
+
 import { describe, it, expect } from 'vitest'
 import type { JobRecord } from './jobTypes'
 import { toJobRecordView, type JobRecordView } from './jobView'

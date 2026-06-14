@@ -9,7 +9,10 @@
 import type { JobStatus } from './jobTypes'
 
 const TRANSITIONS: Record<JobStatus, JobStatus[]> = {
-  pending: ['running'],
+  // 'pending -> failed' is the cancel edge: a queued job cancelled before it ever
+  // ran goes failed (exitReason 'cancelled') then dead, the same terminal path a
+  // failed/retrying job takes. It never ran, so there is no session to stop.
+  pending: ['running', 'failed'],
   running: ['succeeded', 'failed', 'needs-attention'],
   failed: ['pending', 'dead'],
   'needs-attention': ['running', 'failed'],

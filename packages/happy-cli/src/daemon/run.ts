@@ -926,6 +926,35 @@ export async function startDaemon(): Promise<void> {
       return true;
     };
 
+    // Cancel a non-running autonomous job (E04). A pending/retrying job has no
+    // live session, so /stop-job (keyed by sessionId) cannot reach it; this drives
+    // it to a terminal 'dead' state with exitReason 'cancelled'. A running job is
+    // refused here — /stop-job owns killing live sessions. Returns whether a job
+    // was cancelled.
+    const cancelJob = (jobId: string): boolean => {
+      const job = jobStore.get(jobId);
+      if (!job) {
+        logger.debug(`[DAEMON RUN] cancelJob: job ${jobId} not found`);
+        return false;
+      }
+      if (job.status === 'running') {
+        logger.debug(`[DAEMON RUN] cancelJob: job ${jobId} is running; use stop-job`);
+        return false;
+      }
+      if (job.status === 'succeeded' || job.status === 'dead') {
+        logger.debug(`[DAEMON RUN] cancelJob: job ${jobId} already terminal (${job.status})`);
+        return false;
+      }
+      // pending / needs-attention -> failed -> dead; a job already 'failed'
+      // (momentarily retrying) goes straight failed -> dead.
+      if (job.status !== 'failed') {
+        jobStore.transition(jobId, 'failed', { exitReason: 'cancelled' });
+      }
+      jobStore.transition(jobId, 'dead', { finishedAt: Date.now() });
+      logger.debug(`[DAEMON RUN] cancelJob: job ${jobId} cancelled (was ${job.status})`);
+      return true;
+    };
+
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
       getChildren: getCurrentChildren,
@@ -933,6 +962,7 @@ export async function startDaemon(): Promise<void> {
       spawnSession,
       submitJob,
       stopJob,
+      cancelJob,
       listJobs,
       getJob,
       patchJobCost,

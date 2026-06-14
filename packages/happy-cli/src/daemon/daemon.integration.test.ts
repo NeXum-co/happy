@@ -9,7 +9,8 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execSync, spawn } from 'child_process';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
 import path from 'path';
 import type { Metadata } from '@/api/types';
 import { getIntegrationEnv } from '@/testing/currentIntegrationEnv';
@@ -224,6 +225,60 @@ describe('Daemon Integration Tests', { timeout: 180_000 }, () => {
 
     // Clean up
     await stopDaemonSession(spawnResponse.sessionId);
+  });
+
+  it('cancels a non-running job via HTTP /cancel-job (E04)', async () => {
+    const state = await readDaemonState();
+    if (!state?.httpPort) throw new Error('Daemon httpPort unavailable');
+    const base = `http://127.0.0.1:${state.httpPort}`;
+
+    const post = async (path: string, body: unknown) => {
+      const r = await fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return { ok: r.ok, status: r.status, json: await r.json().catch(() => null) as any };
+    };
+    const getJob = async (id: string) => {
+      const r = await fetch(`${base}/jobs/${id}`);
+      return await r.json() as { job: any };
+    };
+
+    // A 'trusted' job in a non-git directory is parked 'needs-attention' by the
+    // scheduler's containment guard and never spawns — a deterministic
+    // non-running job to cancel (no claim/spawn race).
+    const nonGitDir = mkdtempSync(path.join(tmpdir(), 'happy-cancel-nongit-'));
+    const submit = await post('/submit-job', {
+      directory: nonGitDir,
+      prompt: 'never runs',
+      tier: 'trusted',
+    });
+    expect(submit.ok).toBe(true);
+    const jobId = submit.json.jobId as string;
+    expect(jobId).toBeTruthy();
+
+    // Wait for the scheduler tick to park it (status leaves 'pending').
+    await waitFor(async () => {
+      const { job } = await getJob(jobId);
+      return job !== null && job.status !== 'pending';
+    }, 8_000, 250);
+
+    const beforeCancel = (await getJob(jobId)).job;
+    expect(beforeCancel.status).not.toBe('running');
+
+    const cancel = await post('/cancel-job', { jobId });
+    expect(cancel.ok).toBe(true);
+    expect(cancel.json.cancelled).toBe(true);
+
+    const afterCancel = (await getJob(jobId)).job;
+    expect(afterCancel.status).toBe('dead');
+    expect(afterCancel.exitReason).toBe('cancelled');
+
+    // Cancelling an unknown id is a no-op (cancelled:false).
+    const unknown = await post('/cancel-job', { jobId: 'no-such-job' });
+    expect(unknown.ok).toBe(true);
+    expect(unknown.json.cancelled).toBe(false);
   });
 
   it('should not allow starting a second daemon', async () => {

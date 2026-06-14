@@ -196,6 +196,7 @@ export class JobScheduler {
     if (outcome === 'success') {
       // Audit trail (D-E04-7): capture the git HEAD after the job finished so a
       // reviewer can compare gitHeadBefore/gitHeadAfter or diffSince the before.
+      // TODO(E04 review endpoint): wire diffSince into the diff-review endpoint.
       const after = captureGitState(job.directory).head
       this.store.transition(job.id, 'succeeded', { finishedAt: this.now(), gitHeadAfter: after })
       return

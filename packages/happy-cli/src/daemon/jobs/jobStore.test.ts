@@ -8,6 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -33,11 +34,13 @@ function makeJob(overrides: Partial<JobRecord> = {}): JobRecord {
 
 describe('JobStore', () => {
   let dir: string
+  let dbPath: string
   let store: JobStore
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'happy-jobstore-test-'))
-    store = new JobStore(join(dir, 'jobs.db'))
+    dbPath = join(dir, 'jobs.db')
+    store = new JobStore(dbPath)
     store.init()
   })
 
@@ -179,5 +182,14 @@ describe('JobStore', () => {
   it('transition rejects an illegal edge', () => {
     store.create(makeJob({ id: 'j', status: 'running' }))
     expect(() => store.transition('j', 'dead')).toThrow()
+  })
+
+  it('init creates the status / sessionId / status+createdAt indexes', () => {
+    const probe = new Database(dbPath, { readonly: true })
+    const names = (probe.prepare('PRAGMA index_list(jobs)').all() as { name: string }[]).map(r => r.name)
+    probe.close()
+    expect(names).toContain('idx_jobs_status')
+    expect(names).toContain('idx_jobs_session_id')
+    expect(names).toContain('idx_jobs_status_created')
   })
 })

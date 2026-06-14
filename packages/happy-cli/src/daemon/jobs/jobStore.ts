@@ -111,6 +111,13 @@ export class JobStore {
     if (!cols.some(c => c.name === 'sessionPid')) {
       this.db.exec(`ALTER TABLE jobs ADD COLUMN sessionPid INTEGER`)
     }
+    // Indexes for the hot query paths: status filters (list), sessionId lookups
+    // (findBySessionId / cost reporting), and the claim ordering (status + createdAt).
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs (status);
+      CREATE INDEX IF NOT EXISTS idx_jobs_session_id ON jobs (sessionId);
+      CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs (status, createdAt);
+    `)
   }
 
   create(job: JobRecord): void {
@@ -220,7 +227,7 @@ export class JobStore {
    * keep the job in its current status (e.g. attaching a sessionId to an
    * already-running job — running -> running is not a legal state edge).
    */
-  patch(id: string, partial: Partial<JobRecord>): void {
+  patch(id: string, partial: Omit<Partial<JobRecord>, 'status'>): void {
     this.applyUpdate(id, partial)
   }
 

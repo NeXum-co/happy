@@ -21,4 +21,9 @@ describe('stateMachine', () => {
   it('throws on the illegal running -> dead transition', () => {
     expect(() => assertTransition('running', 'dead')).toThrow()
   })
+
+  it('allows pending -> failed (cancel of a never-run job)', () => {
+    expect(canTransition('pending', 'failed')).toBe(true)
+    expect(canTransition('failed', 'dead')).toBe(true)
+  })
 })

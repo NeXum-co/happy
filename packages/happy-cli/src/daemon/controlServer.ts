@@ -13,7 +13,7 @@ import { TrackedSession, SessionEncryptionData } from './types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
 import type { SubmitJobParams } from '@/api/apiMachine';
 import type { JobStatus } from './jobs/jobTypes';
-import type { JobRecordView } from './jobs/jobView';
+import { jobRecordViewSchema, type JobRecordView } from './jobs/jobView';
 
 export function startDaemonControlServer({
   getChildren,
@@ -21,6 +21,7 @@ export function startDaemonControlServer({
   spawnSession,
   submitJob,
   stopJob,
+  cancelJob,
   listJobs,
   getJob,
   patchJobCost,
@@ -32,6 +33,7 @@ export function startDaemonControlServer({
   spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
   submitJob: (params: SubmitJobParams) => string;
   stopJob: (sessionId: string) => boolean;
+  cancelJob: (jobId: string) => boolean;
   listJobs: (filter?: { status?: JobStatus }) => JobRecordView[];
   getJob: (id: string) => JobRecordView | null;
   patchJobCost: (sessionId: string, costUsd: number) => boolean;
@@ -250,22 +252,43 @@ export function startDaemonControlServer({
       return { stopped };
     });
 
+    // Cancel a non-running autonomous job (E04). For a pending/retrying job (no
+    // live session) this drives it to a terminal 'dead' state. A running job is
+    // refused (cancelled:false) — /stop-job kills live sessions.
+    typed.post('/cancel-job', {
+      schema: {
+        body: z.object({
+          jobId: z.string()
+        }),
+        response: {
+          200: z.object({
+            cancelled: z.boolean()
+          })
+        }
+      }
+    }, async (request) => {
+      const { jobId } = request.body;
+      logger.debug(`[CONTROL SERVER] Cancel job request: ${jobId}`);
+      const cancelled = cancelJob(jobId);
+      return { cancelled };
+    });
+
     // List autonomous jobs (E04). GET /jobs?status=<status> returns all jobs
     // (or filtered by status) as JobRecordView projections for the dashboard.
     typed.get('/jobs', {
       schema: {
         querystring: z.object({
-          status: z.string().optional()
+          status: z.enum(['pending', 'running', 'succeeded', 'failed', 'dead', 'needs-attention']).optional()
         }),
         response: {
           200: z.object({
-            jobs: z.array(z.record(z.string(), z.unknown()))
+            jobs: z.array(jobRecordViewSchema)
           })
         }
       }
     }, async (request) => {
-      const { status } = request.query as { status?: string };
-      const filter = status ? { status: status as JobStatus } : undefined;
+      const { status } = request.query as { status?: JobStatus };
+      const filter = status ? { status } : undefined;
       logger.debug(`[CONTROL SERVER] List jobs request: status=${status ?? 'all'}`);
       return { jobs: listJobs(filter) };
     });
@@ -279,7 +302,7 @@ export function startDaemonControlServer({
         }),
         response: {
           200: z.object({
-            job: z.record(z.string(), z.unknown()).nullable()
+            job: jobRecordViewSchema.nullable()
           })
         }
       }
