@@ -87,6 +87,20 @@ type MachineRpcHandlers = {
     resumeSession?: (sessionId: string, options?: { model?: string; permissionMode?: string }) => Promise<SpawnSessionResult>;
     stopSession: (sessionId: string) => boolean;
     requestShutdown: () => void;
+    /** Create a durable autonomous job from submit-job params; returns its id. */
+    submitJob?: (params: SubmitJobParams) => string;
+}
+
+/** Params accepted by the submit-job RPC / HTTP endpoint (autonomous jobs, E04). */
+export interface SubmitJobParams {
+    directory: string;
+    prompt: string;
+    tier?: 'trusted' | 'supervised';
+    preset?: string;
+    maxBudgetUsd?: number;
+    maxTurns?: number;
+    timeoutMs?: number;
+    allowedTools?: string[];
 }
 
 export class ApiMachineClient {
@@ -117,9 +131,27 @@ export class ApiMachineClient {
         spawnSession,
         resumeSession,
         stopSession,
-        requestShutdown
+        requestShutdown,
+        submitJob
     }: MachineRpcHandlers) {
         this.resumeSessionHandler = resumeSession ?? null;
+
+        // Register submit-job handler (autonomous jobs, E04). Creates a durable
+        // pending job; the daemon scheduler claims and runs it on its next tick.
+        if (submitJob) {
+            this.rpcHandlerManager.registerHandler('submit-job', async (params: any) => {
+                const { directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools } = params || {};
+                if (typeof directory !== 'string' || directory.length === 0) {
+                    throw new Error('directory is required');
+                }
+                if (typeof prompt !== 'string' || prompt.length === 0) {
+                    throw new Error('prompt is required');
+                }
+                const jobId = submitJob({ directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools });
+                logger.debug(`[API MACHINE] Submitted job ${jobId}`);
+                return { jobId };
+            });
+        }
 
         // Register spawn session handler
         this.rpcHandlerManager.registerHandler('spawn-happy-session', async (params: any) => {

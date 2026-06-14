@@ -33,6 +33,8 @@ interface JobRow {
   finishedAt: number | null
   exitReason: string | null
   costUsd: number | null
+  maxBudgetUsd: number | null
+  maxTurns: number | null
   createdAt: number
 }
 
@@ -57,6 +59,8 @@ function rowToRecord(row: JobRow): JobRecord {
   if (row.finishedAt !== null) record.finishedAt = row.finishedAt
   if (row.exitReason !== null) record.exitReason = row.exitReason
   if (row.costUsd !== null) record.costUsd = row.costUsd
+  if (row.maxBudgetUsd !== null) record.maxBudgetUsd = row.maxBudgetUsd
+  if (row.maxTurns !== null) record.maxTurns = row.maxTurns
   return record
 }
 
@@ -88,6 +92,8 @@ export class JobStore {
         finishedAt INTEGER,
         exitReason TEXT,
         costUsd REAL,
+        maxBudgetUsd REAL,
+        maxTurns INTEGER,
         createdAt INTEGER NOT NULL
       )
     `)
@@ -98,11 +104,11 @@ export class JobStore {
       INSERT INTO jobs (
         id, triggerType, triggerMetadata, tier, preset, directory, prompt,
         status, attempts, maxAttempts, sessionId, scheduledAt, claimedAt,
-        timeoutAt, finishedAt, exitReason, costUsd, createdAt
+        timeoutAt, finishedAt, exitReason, costUsd, maxBudgetUsd, maxTurns, createdAt
       ) VALUES (
         @id, @triggerType, @triggerMetadata, @tier, @preset, @directory, @prompt,
         @status, @attempts, @maxAttempts, @sessionId, @scheduledAt, @claimedAt,
-        @timeoutAt, @finishedAt, @exitReason, @costUsd, @createdAt
+        @timeoutAt, @finishedAt, @exitReason, @costUsd, @maxBudgetUsd, @maxTurns, @createdAt
       )
     `).run({
       id: job.id,
@@ -122,6 +128,8 @@ export class JobStore {
       finishedAt: job.finishedAt ?? null,
       exitReason: job.exitReason ?? null,
       costUsd: job.costUsd ?? null,
+      maxBudgetUsd: job.maxBudgetUsd ?? null,
+      maxTurns: job.maxTurns ?? null,
       createdAt: job.createdAt,
     })
   }
@@ -169,11 +177,20 @@ export class JobStore {
     return result.changes
   }
 
+  /**
+   * Update arbitrary fields WITHOUT a status transition. Use for changes that
+   * keep the job in its current status (e.g. attaching a sessionId to an
+   * already-running job — running -> running is not a legal state edge).
+   */
+  patch(id: string, partial: Partial<JobRecord>): void {
+    this.applyUpdate(id, partial)
+  }
+
   private applyUpdate(id: string, patch: Partial<JobRecord>): void {
     const columns: (keyof JobRecord)[] = [
       'triggerType', 'triggerMetadata', 'tier', 'preset', 'directory', 'prompt',
       'status', 'attempts', 'maxAttempts', 'sessionId', 'scheduledAt', 'claimedAt',
-      'timeoutAt', 'finishedAt', 'exitReason', 'costUsd', 'createdAt',
+      'timeoutAt', 'finishedAt', 'exitReason', 'costUsd', 'maxBudgetUsd', 'maxTurns', 'createdAt',
     ]
     const present = columns.filter(c => c in patch)
     if (present.length === 0) return

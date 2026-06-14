@@ -29,5 +29,7 @@ export interface JobRecord {
   finishedAt?: number;
   exitReason?: string;
   costUsd?: number;
+  maxBudgetUsd?: number;     // per-job budget ceiling (USD)
+  maxTurns?: number;         // per-job turn ceiling
   createdAt: number;
 }

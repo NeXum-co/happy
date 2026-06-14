@@ -21,6 +21,11 @@ import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stop
 import { runReaperOnce } from './reaper';
 import { loadProfiles, sanitizeWindowName } from './profiles';
 import { startDaemonControlServer } from './controlServer';
+import { JobStore } from './jobs/jobStore';
+import { Semaphore } from './jobs/semaphore';
+import { JobScheduler, buildJobFromSubmit } from './jobs/scheduler';
+import type { SubmitJobParams } from '@/api/apiMachine';
+import { randomUUID } from 'crypto';
 import { statSync } from 'fs';
 import { join } from 'path';
 import { projectPath } from '@/projectPath';
@@ -828,11 +833,34 @@ export async function startDaemon(): Promise<void> {
       pidToTrackedSession.delete(pid);
     };
 
+    // Autonomous job layer (E04): durable SQLite job store + scheduler/worker
+    // pool. The store is brand-new on first run; recoverOnStartup re-queues any
+    // running jobs whose timeout passed while the daemon was down. The scheduler
+    // claims pending jobs and spawns sessions via the same spawnSession used by
+    // the app, gating local-preset jobs through a single-permit semaphore.
+    const jobStore = new JobStore(join(configuration.happyHomeDir, 'jobs.db'));
+    jobStore.init();
+    const recoveredJobs = jobStore.recoverOnStartup();
+    logger.debug(`[DAEMON RUN] Job store ready; recovered ${recoveredJobs} timed-out job(s)`);
+    const jobScheduler = new JobScheduler({
+      store: jobStore,
+      localSemaphore: new Semaphore(1),
+      spawn: spawnSession
+    });
+    jobScheduler.start();
+    const submitJob = (params: SubmitJobParams): string => {
+      const job = buildJobFromSubmit(params, Date.now(), randomUUID());
+      jobStore.create(job);
+      logger.debug(`[DAEMON RUN] Created job ${job.id}`);
+      return job.id;
+    };
+
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
       getChildren: getCurrentChildren,
       stopSession,
       spawnSession,
+      submitJob,
       requestShutdown: () => requestShutdown('happy-cli'),
       onHappySessionWebhook
     });
@@ -896,7 +924,8 @@ export async function startDaemon(): Promise<void> {
       spawnSession,
       resumeSession,
       stopSession,
-      requestShutdown: () => requestShutdown('happy-app')
+      requestShutdown: () => requestShutdown('happy-app'),
+      submitJob
     });
 
     // Connect to server
@@ -1034,6 +1063,9 @@ export async function startDaemon(): Promise<void> {
         clearInterval(restartOnStaleVersionAndHeartbeat);
         logger.debug('[DAEMON RUN] Health check interval cleared');
       }
+
+      // Stop the autonomous job scheduler tick loop
+      jobScheduler.stop();
 
       // Update daemon state before shutting down
       await apiMachine.updateDaemonState((state: DaemonState | null) => ({

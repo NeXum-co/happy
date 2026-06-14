@@ -11,17 +11,20 @@ import { Metadata } from '@/api/types';
 import { decodeBase64 } from '@/api/encryption';
 import { TrackedSession, SessionEncryptionData } from './types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
+import type { SubmitJobParams } from '@/api/apiMachine';
 
 export function startDaemonControlServer({
   getChildren,
   stopSession,
   spawnSession,
+  submitJob,
   requestShutdown,
   onHappySessionWebhook
 }: {
   getChildren: () => TrackedSession[];
   stopSession: (sessionId: string) => boolean;
   spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
+  submitJob: (params: SubmitJobParams) => string;
   requestShutdown: () => void;
   onHappySessionWebhook: (sessionId: string, metadata: Metadata, encryption?: SessionEncryptionData) => void;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
@@ -188,6 +191,32 @@ export function startDaemonControlServer({
             error: result.errorMessage
           };
       }
+    });
+
+    // Submit an autonomous job (E04). Used by the orchestrator for integration
+    // testing without the relay. Creates a durable pending job and returns its id.
+    typed.post('/submit-job', {
+      schema: {
+        body: z.object({
+          directory: z.string(),
+          prompt: z.string(),
+          tier: z.enum(['trusted', 'supervised']).optional(),
+          preset: z.string().optional(),
+          maxBudgetUsd: z.number().optional(),
+          maxTurns: z.number().optional(),
+          timeoutMs: z.number().optional(),
+          allowedTools: z.array(z.string()).optional(),
+        }),
+        response: {
+          200: z.object({
+            jobId: z.string()
+          })
+        }
+      }
+    }, async (request) => {
+      const jobId = submitJob(request.body);
+      logger.debug(`[CONTROL SERVER] Submitted job ${jobId}`);
+      return { jobId };
     });
 
     // Stop daemon

@@ -66,6 +66,30 @@ describe('JobStore', () => {
     expect(loaded!.exitReason).toBeUndefined()
   })
 
+  it('round-trips maxBudgetUsd and maxTurns', () => {
+    store.create(makeJob({ id: 'job-limits', maxBudgetUsd: 2.5, maxTurns: 40 }))
+
+    const loaded = store.get('job-limits')!
+    expect(loaded.maxBudgetUsd).toBe(2.5)
+    expect(loaded.maxTurns).toBe(40)
+
+    // absent → undefined
+    store.create(makeJob({ id: 'job-nolimits' }))
+    const bare = store.get('job-nolimits')!
+    expect(bare.maxBudgetUsd).toBeUndefined()
+    expect(bare.maxTurns).toBeUndefined()
+  })
+
+  it('patch updates fields without a status transition', () => {
+    store.create(makeJob({ id: 'job-patch', status: 'running' }))
+
+    store.patch('job-patch', { sessionId: 'sess-42' })
+
+    const loaded = store.get('job-patch')!
+    expect(loaded.sessionId).toBe('sess-42')
+    expect(loaded.status).toBe('running') // unchanged — no transition
+  })
+
   it('returns undefined for an unknown id', () => {
     expect(store.get('nope')).toBeUndefined()
   })
