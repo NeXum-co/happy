@@ -39,6 +39,7 @@ vi.mock('@/api/rpc/RpcHandlerManager', () => ({
         handleRequest = vi.fn(async () => '');
         registerHandler = vi.fn();
         unregisterHandler = vi.fn();
+        hasHandler = vi.fn(() => false);
     }
 }));
 
@@ -143,6 +144,56 @@ describe('ApiMachineClient socket reconnection', () => {
         await vi.advanceTimersByTimeAsync(3000);
         expect(mockSocket.connect).toHaveBeenCalledTimes(2);
 
+        client.shutdown();
+    });
+});
+
+describe('ApiMachineClient setRPCHandlers — cancel-job (E04)', () => {
+    // Regression: the app cancels a pending job via the machine-RPC 'cancel-job'
+    // (apiSocket.machineRPC(..., 'cancel-job', { jobId })). The HTTP /cancel-job
+    // control-server endpoint existed, but the RPC handler was never registered,
+    // so the app's cancel was a silent no-op. Live UAT caught it; this locks it.
+    beforeEach(() => vi.clearAllMocks());
+
+    function makeClientWithCancel(cancelJob: (jobId: string) => boolean) {
+        const client = new ApiMachineClient('fake-token', makeMachine());
+        client.setRPCHandlers({
+            spawnSession: vi.fn() as any,
+            stopSession: vi.fn(() => true),
+            requestShutdown: vi.fn(),
+            cancelJob
+        });
+        const rpc = (client as any).rpcHandlerManager;
+        const call = rpc.registerHandler.mock.calls.find((c: any[]) => c[0] === 'cancel-job');
+        return { client, call };
+    }
+
+    it("registers a 'cancel-job' handler that routes to cancelJob and returns { cancelled }", async () => {
+        const cancelJob = vi.fn(() => true);
+        const { client, call } = makeClientWithCancel(cancelJob);
+        expect(call).toBeDefined();
+        const result = await call![1]({ jobId: 'job-123' });
+        expect(cancelJob).toHaveBeenCalledWith('job-123');
+        expect(result).toEqual({ cancelled: true });
+        client.shutdown();
+    });
+
+    it("'cancel-job' handler rejects a missing jobId", async () => {
+        const { client, call } = makeClientWithCancel(vi.fn(() => true));
+        await expect(call![1]({})).rejects.toThrow('jobId is required');
+        client.shutdown();
+    });
+
+    it("does not register 'cancel-job' when no cancelJob handler is provided", () => {
+        const client = new ApiMachineClient('fake-token', makeMachine());
+        client.setRPCHandlers({
+            spawnSession: vi.fn() as any,
+            stopSession: vi.fn(() => true),
+            requestShutdown: vi.fn()
+        });
+        const rpc = (client as any).rpcHandlerManager;
+        const call = rpc.registerHandler.mock.calls.find((c: any[]) => c[0] === 'cancel-job');
+        expect(call).toBeUndefined();
         client.shutdown();
     });
 });

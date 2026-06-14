@@ -97,6 +97,8 @@ type MachineRpcHandlers = {
     listJobs?: (filter?: { status?: JobStatus }) => JobRecordView[];
     /** Get a single durable job by id. Returns JobRecordView or null if not found. */
     getJob?: (id: string) => JobRecordView | null;
+    /** Cancel a non-running (pending/retrying) job; returns whether it was cancelled. */
+    cancelJob?: (jobId: string) => boolean;
 }
 
 /** Params accepted by the submit-job RPC / HTTP endpoint (autonomous jobs, E04). */
@@ -143,7 +145,8 @@ export class ApiMachineClient {
         submitJob,
         stopJob,
         listJobs,
-        getJob
+        getJob,
+        cancelJob
     }: MachineRpcHandlers) {
         this.resumeSessionHandler = resumeSession ?? null;
 
@@ -194,6 +197,19 @@ export class ApiMachineClient {
                 const { id } = params || {};
                 if (typeof id !== 'string' || id.length === 0) throw new Error('id is required');
                 return { job: getJob(id) };
+            });
+        }
+
+        // Register cancel-job handler (autonomous jobs, E04). Cancels a non-running
+        // (pending/retrying) job to a terminal 'dead' state; a running job is refused
+        // (use stop-job to kill a live session). Mirrors the HTTP /cancel-job endpoint.
+        if (cancelJob) {
+            this.rpcHandlerManager.registerHandler('cancel-job', async (params: any) => {
+                const { jobId } = params || {};
+                if (typeof jobId !== 'string' || jobId.length === 0) throw new Error('jobId is required');
+                const cancelled = cancelJob(jobId);
+                logger.debug(`[API MACHINE] Cancel job ${jobId}: ${cancelled}`);
+                return { cancelled };
             });
         }
 

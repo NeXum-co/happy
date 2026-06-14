@@ -1033,7 +1033,8 @@ export async function startDaemon(): Promise<void> {
       submitJob,
       stopJob,
       listJobs,
-      getJob
+      getJob,
+      cancelJob
     });
 
     // Connect to server
