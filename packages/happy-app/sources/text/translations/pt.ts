@@ -1043,6 +1043,7 @@ export const pt: TranslationStructure = {
         fieldPrompt: 'Prompt',
         fieldTier: 'Nível',
         fieldPreset: 'Preset',
+        fieldTrigger: 'Gatilho',
         fieldBudget: 'Orçamento máximo (USD)',
         fieldTurns: 'Máximo de turnos',
         fieldTimeout: 'Tempo limite (minutos)',

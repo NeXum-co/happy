@@ -67,7 +67,7 @@ function NewRunScreen() {
                     onChangeText={setDirectory}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    placeholder="/home/joshuam/code/..."
+                    placeholder="/path/to/project"
                     placeholderTextColor={theme.colors.textSecondary}
                 />
 

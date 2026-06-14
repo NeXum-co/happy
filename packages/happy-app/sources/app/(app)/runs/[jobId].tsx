@@ -98,6 +98,17 @@ function JobDetailScreen() {
 
     return (
         <ItemList>
+            {job.status === 'needs-attention' && (
+                <ItemGroup>
+                    <Item
+                        title={t('run.escalation')}
+                        icon={<Ionicons name="alert-circle-outline" size={29} color={theme.colors.textDestructive} />}
+                        titleStyle={{ color: theme.colors.textDestructive }}
+                        showChevron={false}
+                    />
+                </ItemGroup>
+            )}
+
             <ItemGroup>
                 <Item title={t('run.fieldPrompt')} subtitle={job.prompt} subtitleLines={0} showChevron={false} />
             </ItemGroup>
@@ -105,7 +116,7 @@ function JobDetailScreen() {
             <ItemGroup>
                 <Item title={t('run.fieldTier')} detail={tierLabel(job.tier)} showChevron={false} />
                 <Item title={t('run.fieldPreset')} detail={job.preset} showChevron={false} />
-                <Item title="Trigger" detail={job.triggerType} showChevron={false} />
+                <Item title={t('run.fieldTrigger')} detail={job.triggerType} showChevron={false} />
                 <Item
                     title={statusLabel(job.status)}
                     detail={durationLabel(job)}

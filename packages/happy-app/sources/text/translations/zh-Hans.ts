@@ -1041,6 +1041,7 @@ export const zhHans: TranslationStructure = {
         fieldPrompt: '提示词',
         fieldTier: '层级',
         fieldPreset: '预设',
+        fieldTrigger: '触发器',
         fieldBudget: '最大预算 (USD)',
         fieldTurns: '最大轮次',
         fieldTimeout: '超时 (分钟)',

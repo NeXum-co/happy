@@ -1040,6 +1040,7 @@ export const zhHant: TranslationStructure = {
         fieldPrompt: '提示詞',
         fieldTier: '層級',
         fieldPreset: '預設',
+        fieldTrigger: '觸發器',
         fieldBudget: '最大預算 (USD)',
         fieldTurns: '最大回合數',
         fieldTimeout: '逾時 (分鐘)',

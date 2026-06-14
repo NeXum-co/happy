@@ -1059,6 +1059,7 @@ export const en: TranslationStructure = {
         fieldPrompt: 'Prompt',
         fieldTier: 'Tier',
         fieldPreset: 'Preset',
+        fieldTrigger: 'Trigger',
         fieldBudget: 'Max budget (USD)',
         fieldTurns: 'Max turns',
         fieldTimeout: 'Timeout (minutes)',

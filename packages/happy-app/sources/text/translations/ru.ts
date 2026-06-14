@@ -1069,6 +1069,7 @@ export const ru: TranslationStructure = {
         fieldPrompt: 'Prompt',
         fieldTier: 'Уровень',
         fieldPreset: 'Preset',
+        fieldTrigger: 'Триггер',
         fieldBudget: 'Максимальный бюджет (USD)',
         fieldTurns: 'Максимум шагов',
         fieldTimeout: 'Таймаут (минуты)',

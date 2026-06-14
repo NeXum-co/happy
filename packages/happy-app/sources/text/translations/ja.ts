@@ -1042,6 +1042,7 @@ export const ja: TranslationStructure = {
         fieldPrompt: 'プロンプト',
         fieldTier: 'ティア',
         fieldPreset: 'プリセット',
+        fieldTrigger: 'トリガー',
         fieldBudget: '最大予算 (USD)',
         fieldTurns: '最大ターン数',
         fieldTimeout: 'タイムアウト (分)',

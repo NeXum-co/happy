@@ -1070,6 +1070,7 @@ export const pl: TranslationStructure = {
         fieldPrompt: 'Prompt',
         fieldTier: 'Poziom',
         fieldPreset: 'Preset',
+        fieldTrigger: 'Wyzwalacz',
         fieldBudget: 'Maksymalny budżet (USD)',
         fieldTurns: 'Maksymalna liczba kroków',
         fieldTimeout: 'Limit czasu (minuty)',

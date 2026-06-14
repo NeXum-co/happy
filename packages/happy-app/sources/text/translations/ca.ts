@@ -1044,6 +1044,7 @@ export const ca: TranslationStructure = {
         fieldPrompt: 'Prompt',
         fieldTier: 'Nivell',
         fieldPreset: 'Preset',
+        fieldTrigger: 'Activador',
         fieldBudget: 'Pressupost màxim (USD)',
         fieldTurns: 'Torns màxims',
         fieldTimeout: 'Temps límit (minuts)',
