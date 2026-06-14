@@ -27,6 +27,7 @@ interface JobRow {
   attempts: number
   maxAttempts: number
   sessionId: string | null
+  sessionPid: number | null
   scheduledAt: number | null
   claimedAt: number | null
   timeoutAt: number | null
@@ -55,6 +56,7 @@ function rowToRecord(row: JobRow): JobRecord {
     createdAt: row.createdAt,
   }
   if (row.sessionId !== null) record.sessionId = row.sessionId
+  if (row.sessionPid !== null) record.sessionPid = row.sessionPid
   if (row.scheduledAt !== null) record.scheduledAt = row.scheduledAt
   if (row.claimedAt !== null) record.claimedAt = row.claimedAt
   if (row.timeoutAt !== null) record.timeoutAt = row.timeoutAt
@@ -90,6 +92,7 @@ export class JobStore {
         attempts INTEGER NOT NULL,
         maxAttempts INTEGER NOT NULL,
         sessionId TEXT,
+        sessionPid INTEGER,
         scheduledAt INTEGER,
         claimedAt INTEGER,
         timeoutAt INTEGER,
@@ -103,18 +106,23 @@ export class JobStore {
         createdAt INTEGER NOT NULL
       )
     `)
+    // Idempotent migration: add sessionPid to a store created before it existed.
+    const cols = this.db.prepare(`PRAGMA table_info(jobs)`).all() as { name: string }[]
+    if (!cols.some(c => c.name === 'sessionPid')) {
+      this.db.exec(`ALTER TABLE jobs ADD COLUMN sessionPid INTEGER`)
+    }
   }
 
   create(job: JobRecord): void {
     this.db.prepare(`
       INSERT INTO jobs (
         id, triggerType, triggerMetadata, tier, preset, directory, prompt,
-        status, attempts, maxAttempts, sessionId, scheduledAt, claimedAt,
+        status, attempts, maxAttempts, sessionId, sessionPid, scheduledAt, claimedAt,
         timeoutAt, finishedAt, exitReason, costUsd, maxBudgetUsd, maxTurns,
         gitHeadBefore, gitHeadAfter, createdAt
       ) VALUES (
         @id, @triggerType, @triggerMetadata, @tier, @preset, @directory, @prompt,
-        @status, @attempts, @maxAttempts, @sessionId, @scheduledAt, @claimedAt,
+        @status, @attempts, @maxAttempts, @sessionId, @sessionPid, @scheduledAt, @claimedAt,
         @timeoutAt, @finishedAt, @exitReason, @costUsd, @maxBudgetUsd, @maxTurns,
         @gitHeadBefore, @gitHeadAfter, @createdAt
       )
@@ -130,6 +138,7 @@ export class JobStore {
       attempts: job.attempts,
       maxAttempts: job.maxAttempts,
       sessionId: job.sessionId ?? null,
+      sessionPid: job.sessionPid ?? null,
       scheduledAt: job.scheduledAt ?? null,
       claimedAt: job.claimedAt ?? null,
       timeoutAt: job.timeoutAt ?? null,
@@ -184,12 +193,26 @@ export class JobStore {
     return claim(now)
   }
 
-  recoverOnStartup(now: number = Date.now()): number {
-    const result = this.db.prepare(`
-      UPDATE jobs SET status = 'pending'
-      WHERE status = 'running' AND timeoutAt IS NOT NULL AND timeoutAt < ?
-    `).run(now)
-    return result.changes
+  /**
+   * Re-queue jobs left 'running' by a previous daemon. Job sessions are spawned
+   * detached, so some may have survived the restart — `isAlive(pid)` tells a
+   * live session apart from a dead one. A job with a live session is left
+   * running (re-queuing it would double-run the work); a job with a dead or
+   * unknown pid is reset to 'pending' with its session attachment cleared so it
+   * is claimed fresh. This deliberately bypasses the state machine (running ->
+   * pending is not a normal edge) — it is crash recovery, not a lifecycle step.
+   */
+  recoverOnStartup(isAlive: (pid: number) => boolean): number {
+    const requeue = this.db.prepare(`
+      UPDATE jobs SET status = 'pending', sessionId = NULL, sessionPid = NULL, claimedAt = NULL
+      WHERE id = ? AND status = 'running'
+    `)
+    let recovered = 0
+    for (const job of this.list({ status: 'running' })) {
+      if (job.sessionPid !== undefined && isAlive(job.sessionPid)) continue
+      recovered += requeue.run(job.id).changes
+    }
+    return recovered
   }
 
   /**
@@ -204,7 +227,7 @@ export class JobStore {
   private applyUpdate(id: string, patch: Partial<JobRecord>): void {
     const columns: (keyof JobRecord)[] = [
       'triggerType', 'triggerMetadata', 'tier', 'preset', 'directory', 'prompt',
-      'status', 'attempts', 'maxAttempts', 'sessionId', 'scheduledAt', 'claimedAt',
+      'status', 'attempts', 'maxAttempts', 'sessionId', 'sessionPid', 'scheduledAt', 'claimedAt',
       'timeoutAt', 'finishedAt', 'exitReason', 'costUsd', 'maxBudgetUsd', 'maxTurns',
       'gitHeadBefore', 'gitHeadAfter', 'createdAt',
     ]

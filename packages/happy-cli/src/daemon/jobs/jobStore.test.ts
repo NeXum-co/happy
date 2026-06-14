@@ -146,18 +146,26 @@ describe('JobStore', () => {
     expect(claimed!.id).toBe('future')
   })
 
-  it('recoverOnStartup re-queues timed-out running jobs and leaves future ones', () => {
-    store.create(makeJob({ id: 'stale', status: 'running', timeoutAt: 100, attempts: 2 }))
-    store.create(makeJob({ id: 'fresh', status: 'running', timeoutAt: 9000, attempts: 1 }))
+  it('recoverOnStartup re-queues running jobs with a dead or missing pid, leaving live ones', () => {
+    store.create(makeJob({ id: 'dead', status: 'running', sessionId: 'sess-dead', sessionPid: 111, claimedAt: 500, attempts: 2 }))
+    store.create(makeJob({ id: 'live', status: 'running', sessionId: 'sess-live', sessionPid: 222, claimedAt: 500, attempts: 1 }))
+    store.create(makeJob({ id: 'nopid', status: 'running', sessionId: 'sess-nopid', claimedAt: 500, attempts: 0 }))
 
-    const recovered = store.recoverOnStartup(5000)
-    expect(recovered).toBe(1)
+    // Only pid 222 is alive (its session survived the restart).
+    const recovered = store.recoverOnStartup((pid) => pid === 222)
+    expect(recovered).toBe(2)
 
-    const stale = store.get('stale')!
-    expect(stale.status).toBe('pending')
-    expect(stale.attempts).toBe(2) // attempts unchanged
+    const dead = store.get('dead')!
+    expect(dead.status).toBe('pending')
+    expect(dead.attempts).toBe(2) // attempts unchanged
+    expect(dead.sessionId).toBeUndefined() // session attachment cleared
+    expect(dead.sessionPid).toBeUndefined()
 
-    expect(store.get('fresh')!.status).toBe('running')
+    expect(store.get('nopid')!.status).toBe('pending') // unknown pid → requeued
+
+    const live = store.get('live')!
+    expect(live.status).toBe('running') // still-alive session left running
+    expect(live.sessionPid).toBe(222)
   })
 
   it('list filters by status', () => {

@@ -23,6 +23,7 @@ export interface JobRecord {
   attempts: number;
   maxAttempts: number;       // default 5
   sessionId?: string;
+  sessionPid?: number;       // OS pid of the spawned session, for restart liveness checks
   scheduledAt?: number;      // epoch ms
   claimedAt?: number;
   timeoutAt?: number;

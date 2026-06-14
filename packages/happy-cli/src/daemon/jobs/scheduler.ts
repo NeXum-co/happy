@@ -159,8 +159,10 @@ export class JobScheduler {
 
       if (result.type === 'success') {
         // The job stays 'running'; the running -> succeeded transition is
-        // driven by the spawned session's lifecycle (P7), not here.
-        this.store.patch(job.id, { sessionId: result.sessionId })
+        // driven by the spawned session's lifecycle (P7), not here. The pid is
+        // stored so restart recovery can tell a still-alive detached session
+        // apart from a dead one (IMP-1).
+        this.store.patch(job.id, { sessionId: result.sessionId, sessionPid: result.pid })
         return
       }
 
