@@ -192,4 +192,27 @@ describe('JobStore', () => {
     expect(names).toContain('idx_jobs_session_id')
     expect(names).toContain('idx_jobs_status_created')
   })
+
+  it('createIfAbsent returns true and persists the row on first call', () => {
+    const job = makeJob({ id: 'job-cia-1', prompt: 'first prompt' })
+    const created = store.createIfAbsent(job)
+    expect(created).toBe(true)
+
+    const loaded = store.get('job-cia-1')
+    expect(loaded).toBeDefined()
+    expect(loaded!.prompt).toBe('first prompt')
+  })
+
+  it('createIfAbsent returns false and does NOT overwrite on second call', () => {
+    const original = makeJob({ id: 'job-cia-2', prompt: 'original' })
+    store.createIfAbsent(original)
+
+    const duplicate = makeJob({ id: 'job-cia-2', prompt: 'overwrite attempt' })
+    const created = store.createIfAbsent(duplicate)
+    expect(created).toBe(false)
+
+    // The row must still have the original prompt
+    const loaded = store.get('job-cia-2')!
+    expect(loaded.prompt).toBe('original')
+  })
 })

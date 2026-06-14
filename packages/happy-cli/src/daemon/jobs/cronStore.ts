@@ -1,0 +1,119 @@
+/**
+ * Durable SQLite-backed store for cron schedules.
+ *
+ * Wraps a synchronous better-sqlite3 database holding one row per CronSchedule
+ * in the cron_schedules table. Uses the same db file as JobStore (jobs.db) so
+ * both stores share a single WAL-mode database. allowedTools is stored as a JSON
+ * TEXT column (NULL when absent). SQLite has no boolean type; enabled is stored
+ * as INTEGER 0/1 and converted back to a real boolean on read.
+ */
+
+import Database from 'better-sqlite3'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import type { CronSchedule } from './cronTypes'
+
+interface CronRow {
+  id: string
+  cronExpr: string
+  directory: string
+  prompt: string
+  tier: string
+  preset: string
+  maxBudgetUsd: number | null
+  maxTurns: number | null
+  timeoutMs: number | null
+  allowedTools: string | null
+  enabled: number
+  createdAt: number
+}
+
+function rowToSchedule(row: CronRow): CronSchedule {
+  const schedule: CronSchedule = {
+    id: row.id,
+    cronExpr: row.cronExpr,
+    directory: row.directory,
+    prompt: row.prompt,
+    tier: row.tier as CronSchedule['tier'],
+    preset: row.preset,
+    enabled: row.enabled === 1,
+    createdAt: row.createdAt,
+  }
+  if (row.maxBudgetUsd !== null) schedule.maxBudgetUsd = row.maxBudgetUsd
+  if (row.maxTurns !== null) schedule.maxTurns = row.maxTurns
+  if (row.timeoutMs !== null) schedule.timeoutMs = row.timeoutMs
+  if (row.allowedTools !== null) schedule.allowedTools = JSON.parse(row.allowedTools) as string[]
+  return schedule
+}
+
+export class CronStore {
+  private readonly db: Database.Database
+
+  constructor(dbPath: string = join(homedir(), '.happy', 'jobs.db')) {
+    this.db = new Database(dbPath)
+    this.db.pragma('journal_mode = WAL')
+  }
+
+  init(): void {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS cron_schedules (
+        id TEXT PRIMARY KEY,
+        cronExpr TEXT NOT NULL,
+        directory TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        tier TEXT NOT NULL,
+        preset TEXT NOT NULL,
+        maxBudgetUsd REAL,
+        maxTurns INTEGER,
+        timeoutMs INTEGER,
+        allowedTools TEXT,
+        enabled INTEGER NOT NULL,
+        createdAt INTEGER NOT NULL
+      )
+    `)
+  }
+
+  create(s: CronSchedule): void {
+    this.db.prepare(`
+      INSERT INTO cron_schedules (
+        id, cronExpr, directory, prompt, tier, preset,
+        maxBudgetUsd, maxTurns, timeoutMs, allowedTools, enabled, createdAt
+      ) VALUES (
+        @id, @cronExpr, @directory, @prompt, @tier, @preset,
+        @maxBudgetUsd, @maxTurns, @timeoutMs, @allowedTools, @enabled, @createdAt
+      )
+    `).run({
+      id: s.id,
+      cronExpr: s.cronExpr,
+      directory: s.directory,
+      prompt: s.prompt,
+      tier: s.tier,
+      preset: s.preset,
+      maxBudgetUsd: s.maxBudgetUsd ?? null,
+      maxTurns: s.maxTurns ?? null,
+      timeoutMs: s.timeoutMs ?? null,
+      allowedTools: s.allowedTools !== undefined ? JSON.stringify(s.allowedTools) : null,
+      enabled: s.enabled ? 1 : 0,
+      createdAt: s.createdAt,
+    })
+  }
+
+  get(id: string): CronSchedule | undefined {
+    const row = this.db.prepare('SELECT * FROM cron_schedules WHERE id = ?').get(id) as CronRow | undefined
+    return row ? rowToSchedule(row) : undefined
+  }
+
+  list(): CronSchedule[] {
+    const rows = this.db.prepare('SELECT * FROM cron_schedules ORDER BY createdAt ASC').all() as CronRow[]
+    return rows.map(rowToSchedule)
+  }
+
+  delete(id: string): boolean {
+    const result = this.db.prepare('DELETE FROM cron_schedules WHERE id = ?').run(id)
+    return result.changes === 1
+  }
+
+  setEnabled(id: string, enabled: boolean): void {
+    this.db.prepare('UPDATE cron_schedules SET enabled = ? WHERE id = ?').run(enabled ? 1 : 0, id)
+  }
+}

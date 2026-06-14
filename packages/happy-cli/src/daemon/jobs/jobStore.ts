@@ -160,6 +160,48 @@ export class JobStore {
     })
   }
 
+  /** Idempotent insert: no-op if id already exists (cron dedupe, D-E04-19). Returns whether a row was created. */
+  createIfAbsent(job: JobRecord): boolean {
+    const result = this.db.prepare(`
+      INSERT OR IGNORE INTO jobs (
+        id, triggerType, triggerMetadata, tier, preset, directory, prompt,
+        status, attempts, maxAttempts, sessionId, sessionPid, scheduledAt, claimedAt,
+        timeoutAt, finishedAt, exitReason, costUsd, maxBudgetUsd, maxTurns,
+        gitHeadBefore, gitHeadAfter, createdAt
+      ) VALUES (
+        @id, @triggerType, @triggerMetadata, @tier, @preset, @directory, @prompt,
+        @status, @attempts, @maxAttempts, @sessionId, @sessionPid, @scheduledAt, @claimedAt,
+        @timeoutAt, @finishedAt, @exitReason, @costUsd, @maxBudgetUsd, @maxTurns,
+        @gitHeadBefore, @gitHeadAfter, @createdAt
+      )
+    `).run({
+      id: job.id,
+      triggerType: job.triggerType,
+      triggerMetadata: job.triggerMetadata,
+      tier: job.tier,
+      preset: job.preset,
+      directory: job.directory,
+      prompt: job.prompt,
+      status: job.status,
+      attempts: job.attempts,
+      maxAttempts: job.maxAttempts,
+      sessionId: job.sessionId ?? null,
+      sessionPid: job.sessionPid ?? null,
+      scheduledAt: job.scheduledAt ?? null,
+      claimedAt: job.claimedAt ?? null,
+      timeoutAt: job.timeoutAt ?? null,
+      finishedAt: job.finishedAt ?? null,
+      exitReason: job.exitReason ?? null,
+      costUsd: job.costUsd ?? null,
+      maxBudgetUsd: job.maxBudgetUsd ?? null,
+      maxTurns: job.maxTurns ?? null,
+      gitHeadBefore: job.gitHeadBefore ?? null,
+      gitHeadAfter: job.gitHeadAfter ?? null,
+      createdAt: job.createdAt,
+    })
+    return result.changes === 1
+  }
+
   get(id: string): JobRecord | undefined {
     const row = this.db.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as JobRow | undefined
     return row ? rowToRecord(row) : undefined
