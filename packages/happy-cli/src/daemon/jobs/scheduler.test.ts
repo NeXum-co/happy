@@ -8,7 +8,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, mkdirSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { JobStore } from './jobStore'
@@ -67,6 +68,40 @@ describe('JobScheduler', () => {
     const loaded = store.get('sup')!
     expect(loaded.sessionId).toBe('sess-xyz')
     expect(loaded.status).toBe('running')
+  })
+
+  it('captures gitHeadBefore on tick and gitHeadAfter on onSessionExit success (D-E04-7)', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'happy-audit-sched-'))
+    execFileSync('git', ['init', '-b', 'main'], { cwd: repo })
+    execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: repo })
+    execFileSync('git', ['config', 'user.name', 'Test'], { cwd: repo })
+    writeFileSync(join(repo, 'file.txt'), 'before\n')
+    execFileSync('git', ['add', 'file.txt'], { cwd: repo })
+    execFileSync('git', ['commit', '-m', 'initial'], { cwd: repo })
+    const headBefore = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim()
+
+    store.create(makeJob({ id: 'audit', tier: 'supervised', directory: repo }))
+
+    const spawn = async (): Promise<SpawnSessionResult> => ({ type: 'success', sessionId: 'sess-audit' })
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn })
+
+    await scheduler.tick()
+    expect(store.get('audit')!.gitHeadBefore).toBe(headBefore)
+
+    // The job makes a commit, then its session exits successfully.
+    writeFileSync(join(repo, 'file.txt'), 'after\n')
+    execFileSync('git', ['add', 'file.txt'], { cwd: repo })
+    execFileSync('git', ['commit', '-m', 'job change'], { cwd: repo })
+    const headAfter = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim()
+
+    scheduler.onSessionExit('sess-audit', 'success')
+
+    const loaded = store.get('audit')!
+    expect(loaded.status).toBe('succeeded')
+    expect(loaded.gitHeadAfter).toBe(headAfter)
+    expect(loaded.gitHeadAfter).not.toBe(loaded.gitHeadBefore)
+
+    rmSync(repo, { recursive: true, force: true })
   })
 
   it('re-queues a transient (429) failure as pending with incremented attempts', async () => {

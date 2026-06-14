@@ -22,6 +22,7 @@ import type { JobStore } from './jobStore'
 import type { Semaphore } from './semaphore'
 import type { JobRecord } from './jobTypes'
 import { classifyFailure, shouldRetry } from './retry'
+import { captureGitState } from './audit'
 import type { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers'
 
 interface SchedulerDeps {
@@ -115,6 +116,10 @@ export class JobScheduler {
       return
     }
 
+    // Audit trail (D-E04-7): record the git HEAD before the job runs so a
+    // reviewer can diff what it changed. captureGitState never throws.
+    this.store.patch(job.id, { gitHeadBefore: captureGitState(job.directory).head })
+
     const gated = this.isLocal(job)
     const release = gated ? await this.localSemaphore.acquire() : undefined
     try {
@@ -165,7 +170,10 @@ export class JobScheduler {
     if (!job || job.status !== 'running') return
 
     if (outcome === 'success') {
-      this.store.transition(job.id, 'succeeded', { finishedAt: this.now() })
+      // Audit trail (D-E04-7): capture the git HEAD after the job finished so a
+      // reviewer can compare gitHeadBefore/gitHeadAfter or diffSince the before.
+      const after = captureGitState(job.directory).head
+      this.store.transition(job.id, 'succeeded', { finishedAt: this.now(), gitHeadAfter: after })
       return
     }
     if (outcome === 'killed') {

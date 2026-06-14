@@ -35,6 +35,8 @@ interface JobRow {
   costUsd: number | null
   maxBudgetUsd: number | null
   maxTurns: number | null
+  gitHeadBefore: string | null
+  gitHeadAfter: string | null
   createdAt: number
 }
 
@@ -61,6 +63,8 @@ function rowToRecord(row: JobRow): JobRecord {
   if (row.costUsd !== null) record.costUsd = row.costUsd
   if (row.maxBudgetUsd !== null) record.maxBudgetUsd = row.maxBudgetUsd
   if (row.maxTurns !== null) record.maxTurns = row.maxTurns
+  if (row.gitHeadBefore !== null) record.gitHeadBefore = row.gitHeadBefore
+  if (row.gitHeadAfter !== null) record.gitHeadAfter = row.gitHeadAfter
   return record
 }
 
@@ -94,6 +98,8 @@ export class JobStore {
         costUsd REAL,
         maxBudgetUsd REAL,
         maxTurns INTEGER,
+        gitHeadBefore TEXT,
+        gitHeadAfter TEXT,
         createdAt INTEGER NOT NULL
       )
     `)
@@ -104,11 +110,13 @@ export class JobStore {
       INSERT INTO jobs (
         id, triggerType, triggerMetadata, tier, preset, directory, prompt,
         status, attempts, maxAttempts, sessionId, scheduledAt, claimedAt,
-        timeoutAt, finishedAt, exitReason, costUsd, maxBudgetUsd, maxTurns, createdAt
+        timeoutAt, finishedAt, exitReason, costUsd, maxBudgetUsd, maxTurns,
+        gitHeadBefore, gitHeadAfter, createdAt
       ) VALUES (
         @id, @triggerType, @triggerMetadata, @tier, @preset, @directory, @prompt,
         @status, @attempts, @maxAttempts, @sessionId, @scheduledAt, @claimedAt,
-        @timeoutAt, @finishedAt, @exitReason, @costUsd, @maxBudgetUsd, @maxTurns, @createdAt
+        @timeoutAt, @finishedAt, @exitReason, @costUsd, @maxBudgetUsd, @maxTurns,
+        @gitHeadBefore, @gitHeadAfter, @createdAt
       )
     `).run({
       id: job.id,
@@ -130,6 +138,8 @@ export class JobStore {
       costUsd: job.costUsd ?? null,
       maxBudgetUsd: job.maxBudgetUsd ?? null,
       maxTurns: job.maxTurns ?? null,
+      gitHeadBefore: job.gitHeadBefore ?? null,
+      gitHeadAfter: job.gitHeadAfter ?? null,
       createdAt: job.createdAt,
     })
   }
@@ -195,7 +205,8 @@ export class JobStore {
     const columns: (keyof JobRecord)[] = [
       'triggerType', 'triggerMetadata', 'tier', 'preset', 'directory', 'prompt',
       'status', 'attempts', 'maxAttempts', 'sessionId', 'scheduledAt', 'claimedAt',
-      'timeoutAt', 'finishedAt', 'exitReason', 'costUsd', 'maxBudgetUsd', 'maxTurns', 'createdAt',
+      'timeoutAt', 'finishedAt', 'exitReason', 'costUsd', 'maxBudgetUsd', 'maxTurns',
+      'gitHeadBefore', 'gitHeadAfter', 'createdAt',
     ]
     const present = columns.filter(c => c in patch)
     if (present.length === 0) return

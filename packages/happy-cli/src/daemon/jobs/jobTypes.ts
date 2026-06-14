@@ -31,5 +31,7 @@ export interface JobRecord {
   costUsd?: number;
   maxBudgetUsd?: number;     // per-job budget ceiling (USD)
   maxTurns?: number;         // per-job turn ceiling
+  gitHeadBefore?: string;    // HEAD captured just before the job spawned
+  gitHeadAfter?: string;     // HEAD captured when the job succeeded
   createdAt: number;
 }

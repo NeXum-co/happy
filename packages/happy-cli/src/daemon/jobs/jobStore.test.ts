@@ -80,6 +80,20 @@ describe('JobStore', () => {
     expect(bare.maxTurns).toBeUndefined()
   })
 
+  it('round-trips gitHeadBefore and gitHeadAfter', () => {
+    store.create(makeJob({ id: 'job-audit', gitHeadBefore: 'aaaa1111', gitHeadAfter: 'bbbb2222' }))
+
+    const loaded = store.get('job-audit')!
+    expect(loaded.gitHeadBefore).toBe('aaaa1111')
+    expect(loaded.gitHeadAfter).toBe('bbbb2222')
+
+    // absent → undefined
+    store.create(makeJob({ id: 'job-noaudit' }))
+    const bare = store.get('job-noaudit')!
+    expect(bare.gitHeadBefore).toBeUndefined()
+    expect(bare.gitHeadAfter).toBeUndefined()
+  })
+
   it('patch updates fields without a status transition', () => {
     store.create(makeJob({ id: 'job-patch', status: 'running' }))
 
