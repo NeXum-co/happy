@@ -10,11 +10,12 @@ import { ensureLocalProxyBypass } from '../utils/proxyBypass'
 import { resolveHappyEntrypoint } from './happyEntrypoint'
 
 /**
- * Wraps the official SDK query() with our QueryOptions adapter
+ * Maps our QueryOptions to the official SDK Options. Pure: covers only the
+ * static option mapping (no env/abort/canCallTool wiring — that stays in
+ * query()). When permissionMode is 'bypassPermissions' the SDK additionally
+ * requires allowDangerouslySkipPermissions, so we set it here.
  */
-export function query(params: { prompt: QueryPrompt; options?: QueryOptions }): Query {
-    const opts = params.options
-
+export function buildSdkOptions(opts: QueryOptions | undefined): Options {
     // Build system prompt
     let systemPrompt: Options['systemPrompt'] = undefined
     if (opts?.customSystemPrompt) {
@@ -28,7 +29,7 @@ export function query(params: { prompt: QueryPrompt; options?: QueryOptions }): 
     }
 
     // Map QueryOptions -> official Options
-    const sdkOptions: Options = {
+    return {
         cwd: opts?.cwd,
         resume: opts?.resume,
         continue: opts?.continue,
@@ -37,6 +38,10 @@ export function query(params: { prompt: QueryPrompt; options?: QueryOptions }): 
         maxTurns: opts?.maxTurns,
         maxBudgetUsd: opts?.maxBudgetUsd,
         permissionMode: opts?.permissionMode,
+        // The SDK only honours 'bypassPermissions' when this companion flag is
+        // set (sdk.d.ts:1253/1262). Without it the spawned session falls back
+        // to prompting, defeating a TRUSTED autonomous job.
+        allowDangerouslySkipPermissions: opts?.permissionMode === 'bypassPermissions' ? true : undefined,
         allowedTools: opts?.allowedTools,
         disallowedTools: opts?.disallowedTools,
         mcpServers: opts?.mcpServers as Options['mcpServers'],
@@ -52,6 +57,15 @@ export function query(params: { prompt: QueryPrompt; options?: QueryOptions }): 
         sessionId: undefined,
         effort: opts?.effort,
     }
+}
+
+/**
+ * Wraps the official SDK query() with our QueryOptions adapter
+ */
+export function query(params: { prompt: QueryPrompt; options?: QueryOptions }): Query {
+    const opts = params.options
+
+    const sdkOptions = buildSdkOptions(opts)
 
     // Map abort signal -> AbortController
     if (opts?.abort) {

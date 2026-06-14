@@ -117,12 +117,21 @@ export async function claudeRemote(opts: {
         }
     }
 
+    // Per-job circuit breakers from the shared autonomous-job env contract
+    // (set by the spawning phase, P6b). maxBudgetUsd/maxTurns are not part of
+    // EnhancedMode, so they are read from the env here. Apply only when the
+    // env value parses to a finite number.
+    const envMaxBudgetUsd = Number(process.env.HAPPY_JOB_MAX_BUDGET_USD);
+    const envMaxTurns = Number(process.env.HAPPY_JOB_MAX_TURNS);
+
     // Prepare SDK options
     let mode = initial.mode;
     const sdkOptions: QueryOptions = {
         cwd: opts.path,
         resume: startFrom ?? undefined,
         mcpServers: opts.mcpServers,
+        maxBudgetUsd: Number.isFinite(envMaxBudgetUsd) ? envMaxBudgetUsd : undefined,
+        maxTurns: Number.isFinite(envMaxTurns) ? envMaxTurns : undefined,
         permissionMode: mapToClaudeMode(initial.mode.permissionMode),
         model: initial.mode.model,
         fallbackModel: initial.mode.fallbackModel,

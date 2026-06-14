@@ -16,7 +16,7 @@ import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 import { getToolName } from "./utils/getToolName";
 import { getAskUserQuestionToolCallIds } from "./utils/questionNotification";
 import { cleanupStdinAfterInk } from "@/utils/terminalStdinCleanup";
-import { seedFirstMessage } from "@/claude/seedPrompt";
+import { seedFirstMessage, resolveSeedMode } from "@/claude/seedPrompt";
 import type { MessageParam, ContentBlockParam } from '@anthropic-ai/sdk/resources';
 
 interface PermissionsField {
@@ -335,7 +335,7 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                         const seed = seedFirstMessage(process.env.HAPPY_INITIAL_PROMPT, seeded);
                         if (seed !== null) {
                             seeded = true;
-                            const seedMode: EnhancedMode = mode ?? { permissionMode: 'default' };
+                            const seedMode: EnhancedMode = mode ?? resolveSeedMode(process.env);
                             permissionHandler.handleModeChange(seedMode.permissionMode);
                             return { message: seed, mode: seedMode };
                         }

@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { seedFirstMessage } from './seedPrompt'
+import { seedFirstMessage, resolveSeedMode } from './seedPrompt'
 
 describe('seedFirstMessage', () => {
   it('returns the prompt on first injection', () => {
@@ -23,5 +23,35 @@ describe('seedFirstMessage', () => {
 
   it('returns null when the env value is empty', () => {
     expect(seedFirstMessage('', false)).toBe(null)
+  })
+})
+
+describe('resolveSeedMode', () => {
+  it('maps a TRUSTED job to bypassPermissions without allowedTools', () => {
+    expect(resolveSeedMode({ HAPPY_JOB_PERMISSION_MODE: 'bypassPermissions' })).toEqual({
+      permissionMode: 'bypassPermissions',
+    })
+  })
+
+  it('maps a SUPERVISED job to default with the allowed-tools CSV', () => {
+    expect(
+      resolveSeedMode({ HAPPY_JOB_PERMISSION_MODE: 'default', HAPPY_JOB_ALLOWED_TOOLS: 'Read,Grep' })
+    ).toEqual({ permissionMode: 'default', allowedTools: ['Read', 'Grep'] })
+  })
+
+  it('defaults to default mode with no override when the env is absent', () => {
+    expect(resolveSeedMode({})).toEqual({ permissionMode: 'default' })
+  })
+
+  it('carries allowedTools through for a TRUSTED job when present', () => {
+    expect(
+      resolveSeedMode({ HAPPY_JOB_PERMISSION_MODE: 'bypassPermissions', HAPPY_JOB_ALLOWED_TOOLS: 'Bash' })
+    ).toEqual({ permissionMode: 'bypassPermissions', allowedTools: ['Bash'] })
+  })
+
+  it('trims whitespace and drops empty entries in the CSV', () => {
+    expect(
+      resolveSeedMode({ HAPPY_JOB_PERMISSION_MODE: 'default', HAPPY_JOB_ALLOWED_TOOLS: ' Read , , Grep ,' })
+    ).toEqual({ permissionMode: 'default', allowedTools: ['Read', 'Grep'] })
   })
 })
