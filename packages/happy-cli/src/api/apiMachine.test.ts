@@ -297,3 +297,118 @@ describe('ApiMachineClient setRPCHandlers — cron (E04)', () => {
         client.shutdown();
     });
 });
+
+describe('ApiMachineClient setRPCHandlers — event (E04)', () => {
+    // Mirrors the cron block: the app manages event subscriptions via the
+    // machine-RPCs 'submit-event-subscription' / 'list-event-subscriptions' /
+    // 'delete-event-subscription', and delivers events via 'trigger-event'. These
+    // lock the handler registration, routing and input-validation.
+    beforeEach(() => vi.clearAllMocks());
+
+    function makeClient(handlers: Record<string, any>) {
+        const client = new ApiMachineClient('fake-token', makeMachine());
+        client.setRPCHandlers({
+            spawnSession: vi.fn() as any,
+            stopSession: vi.fn(() => true),
+            requestShutdown: vi.fn(),
+            ...handlers
+        });
+        const rpc = (client as any).rpcHandlerManager;
+        const find = (method: string) =>
+            rpc.registerHandler.mock.calls.find((c: any[]) => c[0] === method);
+        return { client, find };
+    }
+
+    it("registers a 'submit-event-subscription' handler that routes to submitEventSubscription and returns { subscriptionId }", async () => {
+        const submitEventSubscription = vi.fn(() => 'sub-123');
+        const { client, find } = makeClient({ submitEventSubscription });
+        const call = find('submit-event-subscription');
+        expect(call).toBeDefined();
+        const result = await call![1]({ eventType: 'git.commit', directory: '/x', prompt: 'p' });
+        expect(submitEventSubscription).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'git.commit',
+            directory: '/x',
+            prompt: 'p'
+        }));
+        expect(result).toEqual({ subscriptionId: 'sub-123' });
+        client.shutdown();
+    });
+
+    it("'submit-event-subscription' handler rejects a missing eventType, directory or prompt", async () => {
+        const { client, find } = makeClient({ submitEventSubscription: vi.fn(() => 'sub-123') });
+        const call = find('submit-event-subscription');
+        await expect(call![1]({ directory: '/x', prompt: 'p' }))
+            .rejects.toThrow('eventType is required');
+        await expect(call![1]({ eventType: 'git.commit', prompt: 'p' }))
+            .rejects.toThrow('directory is required');
+        await expect(call![1]({ eventType: 'git.commit', directory: '/x' }))
+            .rejects.toThrow('prompt is required');
+        client.shutdown();
+    });
+
+    it("registers a 'list-event-subscriptions' handler that returns { subscriptions }", async () => {
+        const listEventSubscriptions = vi.fn(() => [{ id: 's1' } as any]);
+        const { client, find } = makeClient({ listEventSubscriptions });
+        const call = find('list-event-subscriptions');
+        expect(call).toBeDefined();
+        const result = await call![1]({});
+        expect(listEventSubscriptions).toHaveBeenCalled();
+        expect(result).toEqual({ subscriptions: [{ id: 's1' }] });
+        client.shutdown();
+    });
+
+    it("registers a 'delete-event-subscription' handler that routes to deleteEventSubscription and returns { deleted }", async () => {
+        const deleteEventSubscription = vi.fn(() => true);
+        const { client, find } = makeClient({ deleteEventSubscription });
+        const call = find('delete-event-subscription');
+        expect(call).toBeDefined();
+        const result = await call![1]({ id: 'sub-123' });
+        expect(deleteEventSubscription).toHaveBeenCalledWith('sub-123');
+        expect(result).toEqual({ deleted: true });
+        client.shutdown();
+    });
+
+    it("'delete-event-subscription' handler rejects a missing id", async () => {
+        const { client, find } = makeClient({ deleteEventSubscription: vi.fn(() => true) });
+        const call = find('delete-event-subscription');
+        await expect(call![1]({})).rejects.toThrow('id is required');
+        client.shutdown();
+    });
+
+    it("registers a 'trigger-event' handler that routes to triggerEvent and returns { created }", async () => {
+        const triggerEvent = vi.fn(() => ({ created: ['job-1', 'job-2'] }));
+        const { client, find } = makeClient({ triggerEvent });
+        const call = find('trigger-event');
+        expect(call).toBeDefined();
+        const result = await call![1]({ eventType: 'git.commit', matchKey: '/repo', payload: { sha: 'abc' } });
+        expect(triggerEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'git.commit',
+            matchKey: '/repo',
+            payload: { sha: 'abc' }
+        }));
+        expect(result).toEqual({ created: ['job-1', 'job-2'] });
+        client.shutdown();
+    });
+
+    it("'trigger-event' handler rejects a missing eventType", async () => {
+        const { client, find } = makeClient({ triggerEvent: vi.fn(() => ({ created: [] })) });
+        const call = find('trigger-event');
+        await expect(call![1]({ payload: {} })).rejects.toThrow('eventType is required');
+        client.shutdown();
+    });
+
+    it("does not register the event handlers when no event handlers are provided", () => {
+        const client = new ApiMachineClient('fake-token', makeMachine());
+        client.setRPCHandlers({
+            spawnSession: vi.fn() as any,
+            stopSession: vi.fn(() => true),
+            requestShutdown: vi.fn()
+        });
+        const rpc = (client as any).rpcHandlerManager;
+        for (const method of ['submit-event-subscription', 'list-event-subscriptions', 'delete-event-subscription', 'trigger-event']) {
+            const call = rpc.registerHandler.mock.calls.find((c: any[]) => c[0] === method);
+            expect(call).toBeUndefined();
+        }
+        client.shutdown();
+    });
+});

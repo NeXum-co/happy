@@ -16,6 +16,8 @@ import type { JobStatus } from './jobs/jobTypes';
 import { jobRecordViewSchema, type JobRecordView } from './jobs/jobView';
 import type { SubmitCronParams } from './jobs/cronFeeder';
 import type { CronScheduleView } from './jobs/cronTypes';
+import type { SubmitEventSubscriptionParams } from './jobs/eventTrigger';
+import type { EventSubscriptionView } from './jobs/eventTypes';
 
 export function startDaemonControlServer({
   getChildren,
@@ -30,6 +32,10 @@ export function startDaemonControlServer({
   submitCron,
   listCrons,
   deleteCron,
+  submitEventSubscription,
+  listEventSubscriptions,
+  deleteEventSubscription,
+  triggerEvent,
   requestShutdown,
   onHappySessionWebhook
 }: {
@@ -45,6 +51,10 @@ export function startDaemonControlServer({
   submitCron: (params: SubmitCronParams) => string;
   listCrons: () => CronScheduleView[];
   deleteCron: (id: string) => boolean;
+  submitEventSubscription: (params: SubmitEventSubscriptionParams) => string;
+  listEventSubscriptions: () => EventSubscriptionView[];
+  deleteEventSubscription: (id: string) => boolean;
+  triggerEvent: (params: { eventType: string; matchKey?: string; idempotencyKey?: string; payload?: unknown }) => { created: string[] };
   requestShutdown: () => void;
   onHappySessionWebhook: (sessionId: string, metadata: Metadata, encryption?: SessionEncryptionData) => void;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
@@ -379,6 +389,91 @@ export function startDaemonControlServer({
       const { id } = request.body;
       logger.debug(`[CONTROL SERVER] Delete cron request: ${id}`);
       return { deleted: deleteCron(id) };
+    });
+
+    // Submit an event subscription (E04). Validates eventType/directory/prompt
+    // daemon-side and creates a durable enabled subscription; trigger-event turns
+    // matching events into jobs.
+    typed.post('/submit-event-subscription', {
+      schema: {
+        body: z.object({
+          eventType: z.string(),
+          matchKey: z.string().optional(),
+          directory: z.string(),
+          prompt: z.string(),
+          tier: z.enum(['trusted', 'supervised']).optional(),
+          preset: z.string().optional(),
+          maxBudgetUsd: z.number().optional(),
+          maxTurns: z.number().optional(),
+          timeoutMs: z.number().optional(),
+          allowedTools: z.array(z.string()).optional(),
+        }),
+        response: {
+          200: z.object({
+            subscriptionId: z.string()
+          })
+        }
+      }
+    }, async (request) => {
+      const subscriptionId = submitEventSubscription(request.body);
+      logger.debug(`[CONTROL SERVER] Submitted event subscription ${subscriptionId}`);
+      return { subscriptionId };
+    });
+
+    // List event subscriptions (E04). Returns all subscriptions as
+    // EventSubscriptionView projections for the dashboard.
+    typed.get('/event-subscriptions', {
+      schema: {
+        response: {
+          200: z.object({
+            subscriptions: z.array(z.any())
+          })
+        }
+      }
+    }, async () => {
+      logger.debug('[CONTROL SERVER] List event subscriptions request');
+      return { subscriptions: listEventSubscriptions() };
+    });
+
+    // Delete an event subscription by id (E04). Returns whether a row was removed.
+    typed.post('/delete-event-subscription', {
+      schema: {
+        body: z.object({
+          id: z.string()
+        }),
+        response: {
+          200: z.object({
+            deleted: z.boolean()
+          })
+        }
+      }
+    }, async (request) => {
+      const { id } = request.body;
+      logger.debug(`[CONTROL SERVER] Delete event subscription request: ${id}`);
+      return { deleted: deleteEventSubscription(id) };
+    });
+
+    // Deliver an event (E04). Matches the event against subscriptions and creates
+    // a job per match (deduped by idempotencyKey); returns the created/targeted
+    // job ids.
+    typed.post('/trigger-event', {
+      schema: {
+        body: z.object({
+          eventType: z.string(),
+          matchKey: z.string().optional(),
+          idempotencyKey: z.string().optional(),
+          payload: z.any().optional(),
+        }),
+        response: {
+          200: z.object({
+            created: z.array(z.string())
+          })
+        }
+      }
+    }, async (request) => {
+      const { created } = triggerEvent(request.body);
+      logger.debug(`[CONTROL SERVER] Trigger event ${request.body.eventType}: created ${created.length} job(s)`);
+      return { created };
     });
 
     // Record an autonomous job's final cost (E04). Reported by a cloud-preset

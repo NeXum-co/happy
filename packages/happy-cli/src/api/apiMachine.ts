@@ -27,6 +27,8 @@ import type { JobRecordView } from '@/daemon/jobs/jobView';
 import type { SubmitCronParams } from '@/daemon/jobs/cronFeeder';
 import type { CronScheduleView } from '@/daemon/jobs/cronTypes';
 import { validateCronExpr } from '@/daemon/jobs/cronSchedule';
+import type { SubmitEventSubscriptionParams } from '@/daemon/jobs/eventTrigger';
+import type { EventSubscriptionView } from '@/daemon/jobs/eventTypes';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -108,6 +110,14 @@ type MachineRpcHandlers = {
     listCrons?: () => CronScheduleView[];
     /** Delete a cron schedule by id; returns whether one was removed. */
     deleteCron?: (id: string) => boolean;
+    /** Create a durable event subscription from submit params; returns its id. */
+    submitEventSubscription?: (params: SubmitEventSubscriptionParams) => string;
+    /** List all event subscriptions as EventSubscriptionView projections. */
+    listEventSubscriptions?: () => EventSubscriptionView[];
+    /** Delete an event subscription by id; returns whether one was removed. */
+    deleteEventSubscription?: (id: string) => boolean;
+    /** Deliver an event: match subscriptions and create jobs; returns created job ids. */
+    triggerEvent?: (params: { eventType: string; matchKey?: string; idempotencyKey?: string; payload?: unknown }) => { created: string[] };
 }
 
 /** Params accepted by the submit-job RPC / HTTP endpoint (autonomous jobs, E04). */
@@ -158,7 +168,11 @@ export class ApiMachineClient {
         cancelJob,
         submitCron,
         listCrons,
-        deleteCron
+        deleteCron,
+        submitEventSubscription,
+        listEventSubscriptions,
+        deleteEventSubscription,
+        triggerEvent
     }: MachineRpcHandlers) {
         this.resumeSessionHandler = resumeSession ?? null;
 
@@ -263,6 +277,62 @@ export class ApiMachineClient {
                 const deleted = deleteCron(id);
                 logger.debug(`[API MACHINE] Delete cron ${id}: ${deleted}`);
                 return { deleted };
+            });
+        }
+
+        // Register submit-event-subscription handler (event subscriptions, E04).
+        // Validates eventType/directory/prompt before creating a durable enabled
+        // subscription; trigger-event turns matching events into jobs.
+        if (submitEventSubscription) {
+            this.rpcHandlerManager.registerHandler('submit-event-subscription', async (params: any) => {
+                const { eventType, matchKey, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools } = params || {};
+                if (typeof eventType !== 'string' || eventType.length === 0) {
+                    throw new Error('eventType is required');
+                }
+                if (typeof directory !== 'string' || directory.length === 0) {
+                    throw new Error('directory is required');
+                }
+                if (typeof prompt !== 'string' || prompt.length === 0) {
+                    throw new Error('prompt is required');
+                }
+                const subscriptionId = submitEventSubscription({ eventType, matchKey, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools });
+                logger.debug(`[API MACHINE] Submitted event subscription ${subscriptionId}`);
+                return { subscriptionId };
+            });
+        }
+
+        // Register list-event-subscriptions handler (event subscriptions, E04).
+        // Returns all subscriptions as EventSubscriptionView projections.
+        if (listEventSubscriptions) {
+            this.rpcHandlerManager.registerHandler('list-event-subscriptions', async () => {
+                return { subscriptions: listEventSubscriptions() };
+            });
+        }
+
+        // Register delete-event-subscription handler (event subscriptions, E04).
+        // Removes a subscription by id; returns whether a row was deleted.
+        if (deleteEventSubscription) {
+            this.rpcHandlerManager.registerHandler('delete-event-subscription', async (params: any) => {
+                const { id } = params || {};
+                if (typeof id !== 'string' || id.length === 0) throw new Error('id is required');
+                const deleted = deleteEventSubscription(id);
+                logger.debug(`[API MACHINE] Delete event subscription ${id}: ${deleted}`);
+                return { deleted };
+            });
+        }
+
+        // Register trigger-event handler (event subscriptions, E04). Matches the
+        // incoming event against subscriptions and creates a job per match (deduped
+        // by idempotencyKey); returns the created/targeted job ids.
+        if (triggerEvent) {
+            this.rpcHandlerManager.registerHandler('trigger-event', async (params: any) => {
+                const { eventType, matchKey, idempotencyKey, payload } = params || {};
+                if (typeof eventType !== 'string' || eventType.length === 0) {
+                    throw new Error('eventType is required');
+                }
+                const { created } = triggerEvent({ eventType, matchKey, idempotencyKey, payload });
+                logger.debug(`[API MACHINE] Triggered event ${eventType}: created ${created.length} job(s)`);
+                return { created };
             });
         }
 

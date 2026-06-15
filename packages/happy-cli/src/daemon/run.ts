@@ -28,6 +28,9 @@ import { CronStore } from './jobs/cronStore';
 import { CronFeeder, buildCronFromSubmit, type SubmitCronParams } from './jobs/cronFeeder';
 import { validateCronExpr } from './jobs/cronSchedule';
 import type { CronScheduleView } from './jobs/cronTypes';
+import { EventStore } from './jobs/eventStore';
+import { matchSubscriptions, buildEventJob, buildEventSubscriptionFromSubmit, type SubmitEventSubscriptionParams } from './jobs/eventTrigger';
+import type { EventSubscriptionView } from './jobs/eventTypes';
 import type { SubmitJobParams } from '@/api/apiMachine';
 import type { JobStatus } from './jobs/jobTypes';
 import { toJobRecordView } from './jobs/jobView';
@@ -918,6 +921,13 @@ export async function startDaemon(): Promise<void> {
     const cronFeeder = new CronFeeder({ cronStore, jobStore });
     cronFeeder.start();
 
+    // Event layer (E04): durable SQLite subscription store sharing jobs.db. An
+    // incoming event (trigger-event) is matched against enabled subscriptions and
+    // each match becomes an immediately-claimable pending JobRecord. No feeder/loop
+    // — events are pushed in via the trigger-event RPC / HTTP endpoint.
+    const eventStore = new EventStore(join(configuration.happyHomeDir, 'jobs.db'));
+    eventStore.init();
+
     const submitJob = (params: SubmitJobParams): string => {
       const job = buildJobFromSubmit(params, Date.now(), randomUUID());
       jobStore.create(job);
@@ -938,6 +948,46 @@ export async function startDaemon(): Promise<void> {
     const listCrons = (): CronScheduleView[] => cronStore.list();
 
     const deleteCron = (id: string): boolean => cronStore.delete(id);
+
+    // Event subscription management closures (E04). submitEventSubscription
+    // validates the required fields before persisting an enabled subscription;
+    // listEventSubscriptions/deleteEventSubscription are thin store passthroughs.
+    const submitEventSubscription = (params: SubmitEventSubscriptionParams): string => {
+      if (!params.eventType) throw new Error('eventType is required');
+      if (!params.directory) throw new Error('directory is required');
+      if (!params.prompt) throw new Error('prompt is required');
+      const subscription = buildEventSubscriptionFromSubmit(params, Date.now(), randomUUID());
+      eventStore.create(subscription);
+      logger.debug(`[DAEMON RUN] Created event subscription ${subscription.id}`);
+      return subscription.id;
+    };
+
+    const listEventSubscriptions = (): EventSubscriptionView[] => eventStore.list();
+
+    const deleteEventSubscription = (id: string): boolean => eventStore.delete(id);
+
+    // Deliver an event (E04). Match enabled subscriptions for the eventType (and
+    // optional matchKey), then build a pending job per match and insert it
+    // idempotently. With an idempotencyKey the job id is deterministic
+    // (`event:{subId}:{key}`) so a re-delivery dedupes via createIfAbsent; without
+    // one a random id is generated per call. The built id is collected regardless
+    // of whether a new row was inserted, so the caller sees which ids were targeted.
+    // A failure for one subscription is logged and skipped — it never aborts the rest.
+    const triggerEvent = ({ eventType, matchKey, idempotencyKey, payload }: { eventType: string; matchKey?: string; idempotencyKey?: string; payload?: unknown }): { created: string[] } => {
+      const subs = matchSubscriptions(eventStore.list(), eventType, matchKey);
+      const created: string[] = [];
+      for (const sub of subs) {
+        try {
+          const builtJob = buildEventJob(sub, payload, idempotencyKey, Date.now(), idempotencyKey ? undefined : (subId) => 'event:' + subId + ':' + randomUUID());
+          const inserted = jobStore.createIfAbsent(builtJob);
+          created.push(builtJob.id);
+          logger.debug(`[DAEMON RUN] triggerEvent: subscription ${sub.id} -> job ${builtJob.id} (inserted: ${inserted})`);
+        } catch (error) {
+          logger.debug(`[DAEMON RUN] triggerEvent: subscription ${sub.id} failed:`, error);
+        }
+      }
+      return { created };
+    };
 
     const listJobs = (filter?: { status?: JobStatus }) =>
       jobStore.list(filter).map(toJobRecordView);
@@ -997,6 +1047,10 @@ export async function startDaemon(): Promise<void> {
       submitCron,
       listCrons,
       deleteCron,
+      submitEventSubscription,
+      listEventSubscriptions,
+      deleteEventSubscription,
+      triggerEvent,
       requestShutdown: () => requestShutdown('happy-cli'),
       onHappySessionWebhook
     });
@@ -1068,7 +1122,11 @@ export async function startDaemon(): Promise<void> {
       cancelJob,
       submitCron,
       listCrons,
-      deleteCron
+      deleteCron,
+      submitEventSubscription,
+      listEventSubscriptions,
+      deleteEventSubscription,
+      triggerEvent
     });
 
     // Connect to server
