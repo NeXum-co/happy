@@ -89,6 +89,10 @@ describe('cron spine integration (AC-7)', () => {
     expect(jobStore.list().filter(j => j.triggerType === 'cron')).toHaveLength(1)
 
     // The scheduler claims and runs the cron job exactly like a manual one.
+    // This AC-7 cron schedule carries no dispositionTopic, so the E05 pre-spawn
+    // gate would fail-closed and park it; mark it gateResolved to exercise the
+    // cron→claim+run path here (the gate itself is tested in scheduler.test.ts).
+    jobStore.patch(job.id, { gateResolved: true })
     const calls: SpawnSessionOptions[] = []
     const spawn = async (opts: SpawnSessionOptions): Promise<SpawnSessionResult> => {
       calls.push(opts)
