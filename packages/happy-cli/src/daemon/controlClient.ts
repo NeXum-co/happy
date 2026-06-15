@@ -115,6 +115,26 @@ export async function spawnDaemonSession(directory: string, sessionId?: string):
   return result;
 }
 
+export interface SubmitEventSubscriptionRequest {
+  eventType: string;
+  matchKey?: string;
+  directory: string;
+  prompt: string;
+  tier?: 'trusted' | 'supervised';
+  preset?: string;
+}
+
+/**
+ * Create a durable event subscription on the running daemon (E04). Returns the
+ * subscriptionId on success, or `{ error }` when no daemon is running / the
+ * request fails — the caller decides how to surface it.
+ */
+export async function submitEventSubscription(
+  request: SubmitEventSubscriptionRequest
+): Promise<{ subscriptionId?: string; error?: string }> {
+  return daemonPost('/submit-event-subscription', request);
+}
+
 export async function stopDaemonHttp(): Promise<void> {
   await daemonPost('/stop');
 }

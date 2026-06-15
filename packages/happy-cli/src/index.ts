@@ -34,6 +34,7 @@ import { extractNoSandboxFlag } from './utils/sandboxFlags'
 import { handleResumeCommand } from '@/resume/handleResumeCommand'
 import { ensureDaemonRunning } from './daemon/ensureDaemonRunning'
 import { handleCodexCommand } from './commands/codexCommand'
+import { handleEventCommand } from './commands/eventGitHook'
 import { runFleetCommand } from './fleet/fleetStatus'
 
 
@@ -83,6 +84,18 @@ Conversation history is preserved on the server, but in-flight tool calls are in
     // Handle auth subcommands
     try {
       await handleAuthCommand(args.slice(1));
+    } catch (error) {
+      console.error(chalk.red('Error:'), error instanceof Error ? error.message : 'Unknown error')
+      if (process.env.DEBUG) {
+        console.error(error)
+      }
+      process.exit(1)
+    }
+    return;
+  } else if (subcommand === 'event') {
+    // Handle event subcommands (install-git-hook)
+    try {
+      await handleEventCommand(args.slice(1));
     } catch (error) {
       console.error(chalk.red('Error:'), error instanceof Error ? error.message : 'Unknown error')
       if (process.env.DEBUG) {
@@ -687,6 +700,7 @@ ${chalk.bold('Usage:')}
   happy connect           Connect AI vendor API keys
   happy sandbox           Configure and manage OS-level sandboxing
   happy notify            Send push notification
+  happy event             Manage event triggers (install-git-hook)
   happy daemon            Manage background service that allows
                             to spawn new sessions away from your computer
   happy doctor            System diagnostics & troubleshooting
