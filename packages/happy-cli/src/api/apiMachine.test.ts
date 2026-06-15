@@ -197,3 +197,103 @@ describe('ApiMachineClient setRPCHandlers — cancel-job (E04)', () => {
         client.shutdown();
     });
 });
+
+describe('ApiMachineClient setRPCHandlers — cron (E04)', () => {
+    // Mirrors the cancel-job block: the app manages cron schedules via the
+    // machine-RPCs 'submit-cron' / 'list-crons' / 'delete-cron'. These lock the
+    // handler registration, routing and input-validation. The submit-cron
+    // handler runs the REAL validateCronExpr (no mock), so 'nonsense' is rejected
+    // and a valid expression passes through.
+    beforeEach(() => vi.clearAllMocks());
+
+    function makeClient(handlers: Record<string, any>) {
+        const client = new ApiMachineClient('fake-token', makeMachine());
+        client.setRPCHandlers({
+            spawnSession: vi.fn() as any,
+            stopSession: vi.fn(() => true),
+            requestShutdown: vi.fn(),
+            ...handlers
+        });
+        const rpc = (client as any).rpcHandlerManager;
+        const find = (method: string) =>
+            rpc.registerHandler.mock.calls.find((c: any[]) => c[0] === method);
+        return { client, find };
+    }
+
+    it("registers a 'submit-cron' handler that routes to submitCron and returns { cronId }", async () => {
+        const submitCron = vi.fn(() => 'cron-123');
+        const { client, find } = makeClient({ submitCron });
+        const call = find('submit-cron');
+        expect(call).toBeDefined();
+        const result = await call![1]({ cronExpr: '*/5 * * * *', directory: '/x', prompt: 'p' });
+        expect(submitCron).toHaveBeenCalledWith(expect.objectContaining({
+            cronExpr: '*/5 * * * *',
+            directory: '/x',
+            prompt: 'p'
+        }));
+        expect(result).toEqual({ cronId: 'cron-123' });
+        client.shutdown();
+    });
+
+    it("'submit-cron' handler rejects an invalid cronExpr", async () => {
+        const { client, find } = makeClient({ submitCron: vi.fn(() => 'cron-123') });
+        const call = find('submit-cron');
+        await expect(call![1]({ cronExpr: 'nonsense', directory: '/x', prompt: 'p' }))
+            .rejects.toThrow('invalid cronExpr');
+        client.shutdown();
+    });
+
+    it("'submit-cron' handler rejects a missing directory or prompt", async () => {
+        const { client, find } = makeClient({ submitCron: vi.fn(() => 'cron-123') });
+        const call = find('submit-cron');
+        await expect(call![1]({ cronExpr: '*/5 * * * *', prompt: 'p' }))
+            .rejects.toThrow('directory is required');
+        await expect(call![1]({ cronExpr: '*/5 * * * *', directory: '/x' }))
+            .rejects.toThrow('prompt is required');
+        client.shutdown();
+    });
+
+    it("registers a 'list-crons' handler that returns { crons }", async () => {
+        const listCrons = vi.fn(() => [{ id: 'c1' } as any]);
+        const { client, find } = makeClient({ listCrons });
+        const call = find('list-crons');
+        expect(call).toBeDefined();
+        const result = await call![1]({});
+        expect(listCrons).toHaveBeenCalled();
+        expect(result).toEqual({ crons: [{ id: 'c1' }] });
+        client.shutdown();
+    });
+
+    it("registers a 'delete-cron' handler that routes to deleteCron and returns { deleted }", async () => {
+        const deleteCron = vi.fn(() => true);
+        const { client, find } = makeClient({ deleteCron });
+        const call = find('delete-cron');
+        expect(call).toBeDefined();
+        const result = await call![1]({ id: 'cron-123' });
+        expect(deleteCron).toHaveBeenCalledWith('cron-123');
+        expect(result).toEqual({ deleted: true });
+        client.shutdown();
+    });
+
+    it("'delete-cron' handler rejects a missing id", async () => {
+        const { client, find } = makeClient({ deleteCron: vi.fn(() => true) });
+        const call = find('delete-cron');
+        await expect(call![1]({})).rejects.toThrow('id is required');
+        client.shutdown();
+    });
+
+    it("does not register the cron handlers when no cron handlers are provided", () => {
+        const client = new ApiMachineClient('fake-token', makeMachine());
+        client.setRPCHandlers({
+            spawnSession: vi.fn() as any,
+            stopSession: vi.fn(() => true),
+            requestShutdown: vi.fn()
+        });
+        const rpc = (client as any).rpcHandlerManager;
+        for (const method of ['submit-cron', 'list-crons', 'delete-cron']) {
+            const call = rpc.registerHandler.mock.calls.find((c: any[]) => c[0] === method);
+            expect(call).toBeUndefined();
+        }
+        client.shutdown();
+    });
+});

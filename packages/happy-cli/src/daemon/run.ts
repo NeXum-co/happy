@@ -24,6 +24,10 @@ import { startDaemonControlServer } from './controlServer';
 import { JobStore } from './jobs/jobStore';
 import { Semaphore } from './jobs/semaphore';
 import { JobScheduler, buildJobFromSubmit } from './jobs/scheduler';
+import { CronStore } from './jobs/cronStore';
+import { CronFeeder, buildCronFromSubmit, type SubmitCronParams } from './jobs/cronFeeder';
+import { validateCronExpr } from './jobs/cronSchedule';
+import type { CronScheduleView } from './jobs/cronTypes';
 import type { SubmitJobParams } from '@/api/apiMachine';
 import type { JobStatus } from './jobs/jobTypes';
 import { toJobRecordView } from './jobs/jobView';
@@ -904,12 +908,36 @@ export async function startDaemon(): Promise<void> {
     };
 
     jobScheduler.start();
+
+    // Cron layer (E04): durable SQLite schedule store + feeder. The feeder shares
+    // jobs.db with the job store and, on each tick, turns due schedules into
+    // pending JobRecords the scheduler then claims. The watermark is in-memory
+    // (no catch-up on restart) — see CronFeeder docs.
+    const cronStore = new CronStore(join(configuration.happyHomeDir, 'jobs.db'));
+    cronStore.init();
+    const cronFeeder = new CronFeeder({ cronStore, jobStore });
+    cronFeeder.start();
+
     const submitJob = (params: SubmitJobParams): string => {
       const job = buildJobFromSubmit(params, Date.now(), randomUUID());
       jobStore.create(job);
       logger.debug(`[DAEMON RUN] Created job ${job.id}`);
       return job.id;
     };
+
+    // Cron management closures (E04). submitCron validates the expression before
+    // persisting an enabled schedule; listCrons/deleteCron are thin store passthroughs.
+    const submitCron = (params: SubmitCronParams): string => {
+      if (!validateCronExpr(params.cronExpr)) throw new Error('invalid cronExpr');
+      const schedule = buildCronFromSubmit(params, Date.now(), randomUUID());
+      cronStore.create(schedule);
+      logger.debug(`[DAEMON RUN] Created cron schedule ${schedule.id}`);
+      return schedule.id;
+    };
+
+    const listCrons = (): CronScheduleView[] => cronStore.list();
+
+    const deleteCron = (id: string): boolean => cronStore.delete(id);
 
     const listJobs = (filter?: { status?: JobStatus }) =>
       jobStore.list(filter).map(toJobRecordView);
@@ -966,6 +994,9 @@ export async function startDaemon(): Promise<void> {
       listJobs,
       getJob,
       patchJobCost,
+      submitCron,
+      listCrons,
+      deleteCron,
       requestShutdown: () => requestShutdown('happy-cli'),
       onHappySessionWebhook
     });
@@ -1034,7 +1065,10 @@ export async function startDaemon(): Promise<void> {
       stopJob,
       listJobs,
       getJob,
-      cancelJob
+      cancelJob,
+      submitCron,
+      listCrons,
+      deleteCron
     });
 
     // Connect to server
@@ -1175,6 +1209,9 @@ export async function startDaemon(): Promise<void> {
 
       // Stop the autonomous job scheduler tick loop
       jobScheduler.stop();
+
+      // Stop the cron feeder tick loop
+      cronFeeder.stop();
 
       // Update daemon state before shutting down
       await apiMachine.updateDaemonState((state: DaemonState | null) => ({

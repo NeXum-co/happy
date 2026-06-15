@@ -14,6 +14,8 @@ import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/regist
 import type { SubmitJobParams } from '@/api/apiMachine';
 import type { JobStatus } from './jobs/jobTypes';
 import { jobRecordViewSchema, type JobRecordView } from './jobs/jobView';
+import type { SubmitCronParams } from './jobs/cronFeeder';
+import type { CronScheduleView } from './jobs/cronTypes';
 
 export function startDaemonControlServer({
   getChildren,
@@ -25,6 +27,9 @@ export function startDaemonControlServer({
   listJobs,
   getJob,
   patchJobCost,
+  submitCron,
+  listCrons,
+  deleteCron,
   requestShutdown,
   onHappySessionWebhook
 }: {
@@ -37,6 +42,9 @@ export function startDaemonControlServer({
   listJobs: (filter?: { status?: JobStatus }) => JobRecordView[];
   getJob: (id: string) => JobRecordView | null;
   patchJobCost: (sessionId: string, costUsd: number) => boolean;
+  submitCron: (params: SubmitCronParams) => string;
+  listCrons: () => CronScheduleView[];
+  deleteCron: (id: string) => boolean;
   requestShutdown: () => void;
   onHappySessionWebhook: (sessionId: string, metadata: Metadata, encryption?: SessionEncryptionData) => void;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
@@ -310,6 +318,67 @@ export function startDaemonControlServer({
       const { id } = request.params as { id: string };
       logger.debug(`[CONTROL SERVER] Get job request: id=${id}`);
       return { job: getJob(id) };
+    });
+
+    // Submit a cron schedule (E04). Validates the cron expression daemon-side
+    // (submitCron throws on an invalid expr) and creates a durable enabled
+    // schedule; the cron feeder turns it into jobs on its ticks.
+    typed.post('/submit-cron', {
+      schema: {
+        body: z.object({
+          cronExpr: z.string(),
+          directory: z.string(),
+          prompt: z.string(),
+          tier: z.enum(['trusted', 'supervised']).optional(),
+          preset: z.string().optional(),
+          maxBudgetUsd: z.number().optional(),
+          maxTurns: z.number().optional(),
+          timeoutMs: z.number().optional(),
+          allowedTools: z.array(z.string()).optional(),
+        }),
+        response: {
+          200: z.object({
+            cronId: z.string()
+          })
+        }
+      }
+    }, async (request) => {
+      const cronId = submitCron(request.body);
+      logger.debug(`[CONTROL SERVER] Submitted cron ${cronId}`);
+      return { cronId };
+    });
+
+    // List cron schedules (E04). Returns all schedules as CronScheduleView
+    // projections for the dashboard.
+    typed.get('/crons', {
+      schema: {
+        response: {
+          200: z.object({
+            crons: z.array(z.any())
+          })
+        }
+      }
+    }, async () => {
+      logger.debug('[CONTROL SERVER] List crons request');
+      return { crons: listCrons() };
+    });
+
+    // Delete a cron schedule by id (E04). Returns whether a row was removed.
+    typed.post('/delete-cron', {
+      schema: {
+        body: z.object({
+          id: z.string()
+        }),
+        response: {
+          200: z.object({
+            deleted: z.boolean()
+          })
+        }
+      }
+    }, async (request) => {
+      const { id } = request.body;
+      logger.debug(`[CONTROL SERVER] Delete cron request: ${id}`);
+      return { deleted: deleteCron(id) };
     });
 
     // Record an autonomous job's final cost (E04). Reported by a cloud-preset

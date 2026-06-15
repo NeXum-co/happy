@@ -15,7 +15,8 @@ import { join } from 'node:path'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { CronStore } from './cronStore'
 import { JobStore } from './jobStore'
-import { CronFeeder, buildCronJob } from './cronFeeder'
+import { CronFeeder, buildCronJob, buildCronFromSubmit } from './cronFeeder'
+import type { SubmitCronParams } from './cronFeeder'
 import type { CronSchedule } from './cronTypes'
 
 const T0 = Date.UTC(2026, 0, 1, 0, 0, 0)        // 1767225600000
@@ -169,5 +170,64 @@ describe('buildCronJob', () => {
     expect(job.maxTurns).toBeUndefined()
     expect(job.timeoutAt).toBeUndefined()
     expect(JSON.parse(job.triggerMetadata).allowedTools).toEqual([])
+  })
+})
+
+describe('buildCronFromSubmit', () => {
+  it('applies defaults (supervised tier, local-qwen preset, enabled) and round-trips id/createdAt', () => {
+    const params: SubmitCronParams = {
+      cronExpr: '*/5 * * * *',
+      directory: '/tmp/work',
+      prompt: 'do the thing',
+    }
+
+    const schedule = buildCronFromSubmit(params, T0, 'sched-xyz')
+
+    expect(schedule.id).toBe('sched-xyz')
+    expect(schedule.cronExpr).toBe('*/5 * * * *')
+    expect(schedule.directory).toBe('/tmp/work')
+    expect(schedule.prompt).toBe('do the thing')
+    expect(schedule.tier).toBe('supervised')
+    expect(schedule.preset).toBe('local-qwen')
+    expect(schedule.enabled).toBe(true)
+    expect(schedule.createdAt).toBe(T0)
+    expect(schedule.maxBudgetUsd).toBeUndefined()
+    expect(schedule.maxTurns).toBeUndefined()
+    expect(schedule.timeoutMs).toBeUndefined()
+    expect(schedule.allowedTools).toBeUndefined()
+  })
+
+  it('honours an explicit tier/preset over the defaults', () => {
+    const params: SubmitCronParams = {
+      cronExpr: '0 * * * *',
+      directory: '/tmp/work',
+      prompt: 'p',
+      tier: 'trusted',
+      preset: 'claude-cloud',
+    }
+
+    const schedule = buildCronFromSubmit(params, T0, 'sched-1')
+
+    expect(schedule.tier).toBe('trusted')
+    expect(schedule.preset).toBe('claude-cloud')
+  })
+
+  it('copies optional caps only when set', () => {
+    const params: SubmitCronParams = {
+      cronExpr: '0 * * * *',
+      directory: '/tmp/work',
+      prompt: 'p',
+      maxBudgetUsd: 2.5,
+      maxTurns: 40,
+      timeoutMs: 600_000,
+      allowedTools: ['Read'],
+    }
+
+    const schedule = buildCronFromSubmit(params, T0, 'sched-1')
+
+    expect(schedule.maxBudgetUsd).toBe(2.5)
+    expect(schedule.maxTurns).toBe(40)
+    expect(schedule.timeoutMs).toBe(600_000)
+    expect(schedule.allowedTools).toEqual(['Read'])
   })
 })

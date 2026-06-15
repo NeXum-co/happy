@@ -24,6 +24,9 @@ import {
 } from '@/claude/utils/claudeSessionFork';
 import type { JobStatus } from '@/daemon/jobs/jobTypes';
 import type { JobRecordView } from '@/daemon/jobs/jobView';
+import type { SubmitCronParams } from '@/daemon/jobs/cronFeeder';
+import type { CronScheduleView } from '@/daemon/jobs/cronTypes';
+import { validateCronExpr } from '@/daemon/jobs/cronSchedule';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -99,6 +102,12 @@ type MachineRpcHandlers = {
     getJob?: (id: string) => JobRecordView | null;
     /** Cancel a non-running (pending/retrying) job; returns whether it was cancelled. */
     cancelJob?: (jobId: string) => boolean;
+    /** Create a durable cron schedule from submit-cron params; returns its id. */
+    submitCron?: (params: SubmitCronParams) => string;
+    /** List all cron schedules as CronScheduleView projections. */
+    listCrons?: () => CronScheduleView[];
+    /** Delete a cron schedule by id; returns whether one was removed. */
+    deleteCron?: (id: string) => boolean;
 }
 
 /** Params accepted by the submit-job RPC / HTTP endpoint (autonomous jobs, E04). */
@@ -146,7 +155,10 @@ export class ApiMachineClient {
         stopJob,
         listJobs,
         getJob,
-        cancelJob
+        cancelJob,
+        submitCron,
+        listCrons,
+        deleteCron
     }: MachineRpcHandlers) {
         this.resumeSessionHandler = resumeSession ?? null;
 
@@ -210,6 +222,47 @@ export class ApiMachineClient {
                 const cancelled = cancelJob(jobId);
                 logger.debug(`[API MACHINE] Cancel job ${jobId}: ${cancelled}`);
                 return { cancelled };
+            });
+        }
+
+        // Register submit-cron handler (cron schedules, E04). Validates the cron
+        // expression with the real validateCronExpr before creating a durable
+        // enabled schedule; the cron feeder turns it into jobs on its ticks.
+        if (submitCron) {
+            this.rpcHandlerManager.registerHandler('submit-cron', async (params: any) => {
+                const { cronExpr, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools } = params || {};
+                if (typeof directory !== 'string' || directory.length === 0) {
+                    throw new Error('directory is required');
+                }
+                if (typeof prompt !== 'string' || prompt.length === 0) {
+                    throw new Error('prompt is required');
+                }
+                if (typeof cronExpr !== 'string' || cronExpr.length === 0 || !validateCronExpr(cronExpr)) {
+                    throw new Error('invalid cronExpr');
+                }
+                const cronId = submitCron({ cronExpr, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools });
+                logger.debug(`[API MACHINE] Submitted cron ${cronId}`);
+                return { cronId };
+            });
+        }
+
+        // Register list-crons handler (cron schedules, E04). Returns all
+        // schedules as CronScheduleView projections for the dashboard.
+        if (listCrons) {
+            this.rpcHandlerManager.registerHandler('list-crons', async () => {
+                return { crons: listCrons() };
+            });
+        }
+
+        // Register delete-cron handler (cron schedules, E04). Removes a schedule
+        // by id; returns whether a row was deleted.
+        if (deleteCron) {
+            this.rpcHandlerManager.registerHandler('delete-cron', async (params: any) => {
+                const { id } = params || {};
+                if (typeof id !== 'string' || id.length === 0) throw new Error('id is required');
+                const deleted = deleteCron(id);
+                logger.debug(`[API MACHINE] Delete cron ${id}: ${deleted}`);
+                return { deleted };
             });
         }
 

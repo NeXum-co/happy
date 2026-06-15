@@ -68,6 +68,42 @@ export function buildCronJob(schedule: CronSchedule, occurrenceMs: number, now: 
   return job
 }
 
+/** Params accepted by the submit-cron RPC / HTTP endpoint (cron schedules, E04). */
+export interface SubmitCronParams {
+  cronExpr: string
+  directory: string
+  prompt: string
+  tier?: 'trusted' | 'supervised'
+  preset?: string
+  maxBudgetUsd?: number
+  maxTurns?: number
+  timeoutMs?: number
+  allowedTools?: string[]
+}
+
+/**
+ * Pure mapping from submit-cron params to a fresh enabled CronSchedule.
+ * Defaults: supervised tier, 'local-qwen' preset, enabled. Optional caps are
+ * copied only when set. Mirrors buildJobFromSubmit.
+ */
+export function buildCronFromSubmit(params: SubmitCronParams, now: number, id: string): CronSchedule {
+  const schedule: CronSchedule = {
+    id,
+    cronExpr: params.cronExpr,
+    directory: params.directory,
+    prompt: params.prompt,
+    tier: params.tier ?? 'supervised',
+    preset: params.preset ?? 'local-qwen',
+    enabled: true,
+    createdAt: now,
+  }
+  if (params.maxBudgetUsd !== undefined) schedule.maxBudgetUsd = params.maxBudgetUsd
+  if (params.maxTurns !== undefined) schedule.maxTurns = params.maxTurns
+  if (params.timeoutMs !== undefined) schedule.timeoutMs = params.timeoutMs
+  if (params.allowedTools !== undefined) schedule.allowedTools = params.allowedTools
+  return schedule
+}
+
 export class CronFeeder {
   private readonly cronStore: CronStore
   private readonly jobStore: JobStore
