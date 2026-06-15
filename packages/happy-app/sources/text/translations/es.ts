@@ -1094,6 +1094,35 @@ export const es: TranslationStructure = {
         promptPlaceholder: 'Describe lo que quieres que haga el agente…',
     },
 
+    event: {
+        title: 'Suscripciones a eventos',
+        empty: 'Aún no hay suscripciones a eventos',
+        submit: 'Nueva suscripción',
+        submitTitle: 'Nueva suscripción a evento',
+        fieldEventType: 'Tipo de evento',
+        fieldMatchKey: 'Clave de coincidencia',
+        fieldDirectory: 'Directorio',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Nivel',
+        fieldPreset: 'Preajuste',
+        fieldBudget: 'Presupuesto máximo (USD)',
+        fieldTurns: 'Turnos máximos',
+        fieldTimeout: 'Tiempo de espera (minutos)',
+        fieldAllowedTools: 'Herramientas permitidas',
+        tierTrusted: 'Confiable (autónomo)',
+        tierSupervised: 'Supervisado (pregunta)',
+        delete: 'Eliminar suscripción',
+        deleteConfirm: '¿Eliminar esta suscripción? No se activarán más ejecuciones.',
+        statusEnabled: 'Activado',
+        statusDisabled: 'Desactivado',
+        eventTypeHint: 'En esta versión solo se admite git.commit.',
+        matchKeyPlaceholder: 'Opcional, p. ej. el nombre de una rama',
+        matchKeyHint: 'Activar solo cuando la carga del evento coincida con esta clave. Déjalo vacío para coincidir con todos.',
+        promptPlaceholder: 'Describe lo que quieres que haga el agente…',
+        allowedToolsPlaceholder: 'Opcional, separadas por comas',
+        allowedToolsHint: 'Restringe el agente a estas herramientas. Déjalo vacío para el valor predeterminado del preajuste.',
+    },
+
 } as const;
 
 export type TranslationsEs = typeof es;

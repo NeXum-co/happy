@@ -94,6 +94,22 @@ export default function RootLayout() {
                 }}
             />
             <Stack.Screen
+                name="event-subscriptions/index"
+                options={{
+                    headerShown: true,
+                    headerTitle: t('event.title'),
+                    headerBackTitle: t('common.home')
+                }}
+            />
+            <Stack.Screen
+                name="event-subscriptions/new"
+                options={{
+                    headerShown: true,
+                    headerTitle: t('event.submitTitle'),
+                    headerBackTitle: t('event.title')
+                }}
+            />
+            <Stack.Screen
                 name="runs/[jobId]"
                 options={{
                     headerShown: true,

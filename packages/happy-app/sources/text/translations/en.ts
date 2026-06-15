@@ -1108,6 +1108,35 @@ export const en: TranslationStructure = {
         promptPlaceholder: 'Describe what you want the agent to do…',
     },
 
+    event: {
+        title: 'Event subscriptions',
+        empty: 'No event subscriptions yet',
+        submit: 'New subscription',
+        submitTitle: 'New event subscription',
+        fieldEventType: 'Event type',
+        fieldMatchKey: 'Match key',
+        fieldDirectory: 'Directory',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Tier',
+        fieldPreset: 'Preset',
+        fieldBudget: 'Max budget (USD)',
+        fieldTurns: 'Max turns',
+        fieldTimeout: 'Timeout (minutes)',
+        fieldAllowedTools: 'Allowed tools',
+        tierTrusted: 'Trusted (autonomous)',
+        tierSupervised: 'Supervised (asks)',
+        delete: 'Delete subscription',
+        deleteConfirm: 'Delete this subscription? No further runs will be triggered.',
+        statusEnabled: 'Enabled',
+        statusDisabled: 'Disabled',
+        eventTypeHint: 'Only git.commit is supported in this version.',
+        matchKeyPlaceholder: 'Optional, e.g. a branch name',
+        matchKeyHint: 'Only fire when the event payload matches this key. Leave empty to match all.',
+        promptPlaceholder: 'Describe what you want the agent to do…',
+        allowedToolsPlaceholder: 'Optional, comma separated',
+        allowedToolsHint: 'Restrict the agent to these tools. Leave empty for the preset default.',
+    },
+
 } as const;
 
 export type TranslationsEn = typeof en;

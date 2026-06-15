@@ -404,6 +404,11 @@ export const SettingsView = React.memo(function SettingsView() {
                     icon={<Ionicons name="time-outline" size={29} color="#34C759" />}
                     onPress={() => router.push('/crons' as any)}
                 />
+                <Item
+                    title={t('event.title')}
+                    icon={<Ionicons name="git-commit-outline" size={29} color="#34C759" />}
+                    onPress={() => router.push('/event-subscriptions' as any)}
+                />
                 {experiments && (
                     <Item
                         title={t('settings.usage')}

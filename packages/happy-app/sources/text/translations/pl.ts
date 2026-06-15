@@ -1119,6 +1119,35 @@ export const pl: TranslationStructure = {
         promptPlaceholder: 'Opisz co chcesz, żeby agent zrobił…',
     },
 
+    event: {
+        title: 'Subskrypcje zdarzeń',
+        empty: 'Brak subskrypcji zdarzeń',
+        submit: 'Nowa subskrypcja',
+        submitTitle: 'Nowa subskrypcja zdarzenia',
+        fieldEventType: 'Typ zdarzenia',
+        fieldMatchKey: 'Klucz dopasowania',
+        fieldDirectory: 'Katalog',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Poziom',
+        fieldPreset: 'Preset',
+        fieldBudget: 'Maksymalny budżet (USD)',
+        fieldTurns: 'Maksymalna liczba tur',
+        fieldTimeout: 'Limit czasu (minuty)',
+        fieldAllowedTools: 'Dozwolone narzędzia',
+        tierTrusted: 'Zaufany (autonomiczny)',
+        tierSupervised: 'Nadzorowany (pyta)',
+        delete: 'Usuń subskrypcję',
+        deleteConfirm: 'Usunąć tę subskrypcję? Żadne kolejne uruchomienia nie zostaną wyzwolone.',
+        statusEnabled: 'Włączone',
+        statusDisabled: 'Wyłączone',
+        eventTypeHint: 'W tej wersji obsługiwane jest tylko git.commit.',
+        matchKeyPlaceholder: 'Opcjonalnie, np. nazwa gałęzi',
+        matchKeyHint: 'Uruchamiaj tylko gdy ładunek zdarzenia pasuje do tego klucza. Pozostaw puste, aby dopasować wszystkie.',
+        promptPlaceholder: 'Opisz co chcesz, żeby agent zrobił…',
+        allowedToolsPlaceholder: 'Opcjonalnie, oddzielone przecinkami',
+        allowedToolsHint: 'Ogranicz agenta do tych narzędzi. Pozostaw puste, aby użyć domyślnych dla presetu.',
+    },
+
 } as const;
 
 export type TranslationsPl = typeof pl;

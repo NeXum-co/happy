@@ -1118,6 +1118,35 @@ export const ru: TranslationStructure = {
         promptPlaceholder: 'Опишите, что вы хотите, чтобы агент сделал…',
     },
 
+    event: {
+        title: 'Подписки на события',
+        empty: 'Подписок на события пока нет',
+        submit: 'Новая подписка',
+        submitTitle: 'Новая подписка на событие',
+        fieldEventType: 'Тип события',
+        fieldMatchKey: 'Ключ совпадения',
+        fieldDirectory: 'Каталог',
+        fieldPrompt: 'Запрос',
+        fieldTier: 'Уровень',
+        fieldPreset: 'Пресет',
+        fieldBudget: 'Максимальный бюджет (USD)',
+        fieldTurns: 'Максимум ходов',
+        fieldTimeout: 'Тайм-аут (минуты)',
+        fieldAllowedTools: 'Разрешённые инструменты',
+        tierTrusted: 'Доверенный (автономный)',
+        tierSupervised: 'Контролируемый (спрашивает)',
+        delete: 'Удалить подписку',
+        deleteConfirm: 'Удалить эту подписку? Новые запуски не будут запускаться.',
+        statusEnabled: 'Включено',
+        statusDisabled: 'Отключено',
+        eventTypeHint: 'В этой версии поддерживается только git.commit.',
+        matchKeyPlaceholder: 'Необязательно, напр. имя ветки',
+        matchKeyHint: 'Срабатывать только когда полезная нагрузка события совпадает с этим ключом. Оставьте пустым для совпадения со всеми.',
+        promptPlaceholder: 'Опишите, что вы хотите, чтобы агент сделал…',
+        allowedToolsPlaceholder: 'Необязательно, через запятую',
+        allowedToolsHint: 'Ограничить агента этими инструментами. Оставьте пустым для значения по умолчанию пресета.',
+    },
+
 } as const;
 
 export type TranslationsRu = typeof ru;
