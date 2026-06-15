@@ -17,18 +17,35 @@ const POLL_INTERVAL_MS = 2000;
 
 export function useEventSubscriptionsPolling(machineId: string | null) {
     const [subscriptions, setSubscriptions] = React.useState<EventSubscriptionView[]>([]);
+    const [loading, setLoading] = React.useState(false);
 
     useFocusEffect(
         React.useCallback(() => {
             if (!machineId) {
                 setSubscriptions([]);
+                setLoading(false);
                 return;
             }
             let cancelled = false;
+            let inFlight = false;
+            setLoading(true);
             const tick = async () => {
-                const next = await machineListEventSubscriptions(machineId);
-                if (!cancelled) {
-                    setSubscriptions(next);
+                // PERF-5: skip this tick if the previous RPC is still pending so a
+                // slow request can't let overlapping fetches stack up.
+                if (inFlight) {
+                    return;
+                }
+                inFlight = true;
+                try {
+                    const next = await machineListEventSubscriptions(machineId);
+                    if (!cancelled) {
+                        setSubscriptions(next);
+                    }
+                } finally {
+                    inFlight = false;
+                    if (!cancelled) {
+                        setLoading(false);
+                    }
                 }
             };
             tick();
@@ -40,5 +57,5 @@ export function useEventSubscriptionsPolling(machineId: string | null) {
         }, [machineId]),
     );
 
-    return { subscriptions };
+    return { subscriptions, loading };
 }

@@ -23,6 +23,21 @@ function parseOptionalNumber(value: string): number | undefined {
     return Number.isFinite(n) ? n : undefined;
 }
 
+// Optional comma/space separated tool list → string[] | undefined.
+function parseOptionalTools(value: string): string[] | undefined {
+    const tools = value
+        .split(/[,\s]+/)
+        .map((tool) => tool.trim())
+        .filter((tool) => tool.length > 0);
+    return tools.length > 0 ? tools : undefined;
+}
+
+// Light client-side check: a standard cron expression has five whitespace-separated
+// fields. The daemon still performs the authoritative validation.
+function hasFiveCronFields(value: string): boolean {
+    return value.trim().split(/\s+/).filter((field) => field.length > 0).length >= 5;
+}
+
 function NewCronScreen() {
     const { theme } = useUnistyles();
     const router = useRouter();
@@ -37,6 +52,9 @@ function NewCronScreen() {
     const [budget, setBudget] = React.useState('');
     const [turns, setTurns] = React.useState('');
     const [timeoutMinutes, setTimeoutMinutes] = React.useState('');
+    const [allowedTools, setAllowedTools] = React.useState('');
+
+    const cronExprInvalid = cronExpr.trim().length > 0 && !hasFiveCronFields(cronExpr);
 
     const [submitting, submit] = useHappyAction(async () => {
         if (!onlineMachine) {
@@ -53,15 +71,29 @@ function NewCronScreen() {
             maxBudgetUsd: parseOptionalNumber(budget),
             maxTurns: parseOptionalNumber(turns),
             timeoutMs: timeoutMin !== undefined ? timeoutMin * 60000 : undefined,
+            allowedTools: parseOptionalTools(allowedTools),
         });
-        router.back();
+        Modal.alert(t('common.success'), t('cron.submitSuccess'), [
+            { text: t('common.ok'), onPress: () => router.back() },
+        ]);
     });
 
-    const canSubmit = !!onlineMachine && cronExpr.trim().length > 0 && directory.trim().length > 0 && prompt.trim().length > 0 && !submitting;
+    const canSubmit = !!onlineMachine
+        && cronExpr.trim().length > 0
+        && !cronExprInvalid
+        && directory.trim().length > 0
+        && prompt.trim().length > 0
+        && !submitting;
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <View style={styles.inner}>
+                {!onlineMachine && (
+                    <View style={styles.offlineBanner}>
+                        <Text style={styles.offlineBannerText}>{t('newSession.machineOffline')}</Text>
+                    </View>
+                )}
+
                 <Text style={styles.label}>{t('cron.fieldCronExpr')}</Text>
                 <TextInput
                     style={styles.input}
@@ -72,7 +104,9 @@ function NewCronScreen() {
                     placeholder={t('cron.cronExprPlaceholder')}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
-                <Text style={styles.hint}>{t('cron.cronExprHint')}</Text>
+                <Text style={[styles.hint, cronExprInvalid && styles.hintError]}>
+                    {cronExprInvalid ? t('cron.cronExprInvalid') : t('cron.cronExprHint')}
+                </Text>
 
                 <Text style={styles.label}>{t('cron.fieldDirectory')}</Text>
                 <TextInput
@@ -81,7 +115,7 @@ function NewCronScreen() {
                     onChangeText={setDirectory}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    placeholder="/path/to/project"
+                    placeholder={t('common.directoryPlaceholder')}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
 
@@ -100,6 +134,9 @@ function NewCronScreen() {
                     <Pressable
                         style={[styles.tierChip, tier === 'supervised' && styles.tierChipActive]}
                         onPress={() => setTier('supervised')}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: tier === 'supervised' }}
+                        accessibilityLabel={t('cron.tierSupervised')}
                     >
                         <Text style={[styles.tierChipText, tier === 'supervised' && styles.tierChipTextActive]}>
                             {t('cron.tierSupervised')}
@@ -108,6 +145,9 @@ function NewCronScreen() {
                     <Pressable
                         style={[styles.tierChip, tier === 'trusted' && styles.tierChipActive]}
                         onPress={() => setTier('trusted')}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: tier === 'trusted' }}
+                        accessibilityLabel={t('cron.tierTrusted')}
                     >
                         <Text style={[styles.tierChipText, tier === 'trusted' && styles.tierChipTextActive]}>
                             {t('cron.tierTrusted')}
@@ -130,7 +170,7 @@ function NewCronScreen() {
                     value={budget}
                     onChangeText={setBudget}
                     keyboardType="numeric"
-                    placeholder="—"
+                    placeholder={t('common.emptyPlaceholder')}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
 
@@ -140,7 +180,7 @@ function NewCronScreen() {
                     value={turns}
                     onChangeText={setTurns}
                     keyboardType="numeric"
-                    placeholder="—"
+                    placeholder={t('common.emptyPlaceholder')}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
 
@@ -150,18 +190,29 @@ function NewCronScreen() {
                     value={timeoutMinutes}
                     onChangeText={setTimeoutMinutes}
                     keyboardType="numeric"
-                    placeholder="—"
+                    placeholder={t('common.emptyPlaceholder')}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
 
-                {!onlineMachine && (
-                    <Text style={styles.offline}>{t('newSession.machineOffline')}</Text>
-                )}
+                <Text style={styles.label}>{t('cron.fieldAllowedTools')}</Text>
+                <TextInput
+                    style={styles.input}
+                    value={allowedTools}
+                    onChangeText={setAllowedTools}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    placeholder={t('cron.allowedToolsPlaceholder')}
+                    placeholderTextColor={theme.colors.textSecondary}
+                />
+                <Text style={styles.hint}>{t('cron.allowedToolsHint')}</Text>
 
                 <Pressable
                     style={[styles.submit, !canSubmit && styles.submitDisabled]}
                     disabled={!canSubmit}
                     onPress={submit}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !canSubmit, busy: submitting }}
+                    accessibilityLabel={t('cron.submit')}
                 >
                     {submitting ? (
                         <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
@@ -201,6 +252,9 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 12,
         marginTop: 4,
     },
+    hintError: {
+        color: theme.colors.status.disconnected,
+    },
     input: {
         backgroundColor: theme.colors.input.background,
         color: theme.colors.text,
@@ -234,10 +288,16 @@ const styles = StyleSheet.create((theme) => ({
     tierChipTextActive: {
         color: theme.colors.button.primary.tint,
     },
-    offline: {
+    offlineBanner: {
+        backgroundColor: theme.colors.input.background,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 4,
+    },
+    offlineBannerText: {
         color: theme.colors.status.disconnected,
         fontSize: 13,
-        marginTop: 12,
     },
     submit: {
         marginTop: 24,

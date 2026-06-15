@@ -70,7 +70,9 @@ function NewEventSubscriptionScreen() {
             timeoutMs: timeoutMin !== undefined ? timeoutMin * 60000 : undefined,
             allowedTools: parseOptionalTools(allowedTools),
         });
-        router.back();
+        Modal.alert(t('common.success'), t('event.submitSuccess'), [
+            { text: t('common.ok'), onPress: () => router.back() },
+        ]);
     });
 
     const canSubmit = !!onlineMachine && directory.trim().length > 0 && prompt.trim().length > 0 && !submitting;
@@ -78,6 +80,12 @@ function NewEventSubscriptionScreen() {
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <View style={styles.inner}>
+                {!onlineMachine && (
+                    <View style={styles.offlineBanner}>
+                        <Text style={styles.offlineBannerText}>{t('newSession.machineOffline')}</Text>
+                    </View>
+                )}
+
                 <Text style={styles.label}>{t('event.fieldEventType')}</Text>
                 <View style={styles.fixedValue}>
                     <Text style={styles.fixedValueText}>{EVENT_TYPE}</Text>
@@ -103,7 +111,7 @@ function NewEventSubscriptionScreen() {
                     onChangeText={setDirectory}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    placeholder="/path/to/project"
+                    placeholder={t('common.directoryPlaceholder')}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
 
@@ -122,6 +130,9 @@ function NewEventSubscriptionScreen() {
                     <Pressable
                         style={[styles.tierChip, tier === 'supervised' && styles.tierChipActive]}
                         onPress={() => setTier('supervised')}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: tier === 'supervised' }}
+                        accessibilityLabel={t('event.tierSupervised')}
                     >
                         <Text style={[styles.tierChipText, tier === 'supervised' && styles.tierChipTextActive]}>
                             {t('event.tierSupervised')}
@@ -130,6 +141,9 @@ function NewEventSubscriptionScreen() {
                     <Pressable
                         style={[styles.tierChip, tier === 'trusted' && styles.tierChipActive]}
                         onPress={() => setTier('trusted')}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: tier === 'trusted' }}
+                        accessibilityLabel={t('event.tierTrusted')}
                     >
                         <Text style={[styles.tierChipText, tier === 'trusted' && styles.tierChipTextActive]}>
                             {t('event.tierTrusted')}
@@ -152,7 +166,7 @@ function NewEventSubscriptionScreen() {
                     value={budget}
                     onChangeText={setBudget}
                     keyboardType="numeric"
-                    placeholder="—"
+                    placeholder={t('common.emptyPlaceholder')}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
 
@@ -162,7 +176,7 @@ function NewEventSubscriptionScreen() {
                     value={turns}
                     onChangeText={setTurns}
                     keyboardType="numeric"
-                    placeholder="—"
+                    placeholder={t('common.emptyPlaceholder')}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
 
@@ -172,7 +186,7 @@ function NewEventSubscriptionScreen() {
                     value={timeoutMinutes}
                     onChangeText={setTimeoutMinutes}
                     keyboardType="numeric"
-                    placeholder="—"
+                    placeholder={t('common.emptyPlaceholder')}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
 
@@ -188,14 +202,13 @@ function NewEventSubscriptionScreen() {
                 />
                 <Text style={styles.hint}>{t('event.allowedToolsHint')}</Text>
 
-                {!onlineMachine && (
-                    <Text style={styles.offline}>{t('newSession.machineOffline')}</Text>
-                )}
-
                 <Pressable
                     style={[styles.submit, !canSubmit && styles.submitDisabled]}
                     disabled={!canSubmit}
                     onPress={submit}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !canSubmit, busy: submitting }}
+                    accessibilityLabel={t('event.submit')}
                 >
                     {submitting ? (
                         <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
@@ -278,10 +291,16 @@ const styles = StyleSheet.create((theme) => ({
     tierChipTextActive: {
         color: theme.colors.button.primary.tint,
     },
-    offline: {
+    offlineBanner: {
+        backgroundColor: theme.colors.input.background,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 4,
+    },
+    offlineBannerText: {
         color: theme.colors.status.disconnected,
         fontSize: 13,
-        marginTop: 12,
     },
     submit: {
         marginTop: 24,

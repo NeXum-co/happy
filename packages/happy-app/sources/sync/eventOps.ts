@@ -48,7 +48,8 @@ export async function machineListEventSubscriptions(machineId: string): Promise<
             {}
         );
         return result.subscriptions;
-    } catch {
+    } catch (e) {
+        console.warn(`machineListEventSubscriptions failed for machine ${machineId}:`, e);
         return [];
     }
 }

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useUnistyles } from 'react-native-unistyles';
@@ -8,12 +9,57 @@ import { ItemList } from '@/components/ItemList';
 import { useAllMachines } from '@/sync/storage';
 import { useEventSubscriptionsPolling } from '@/hooks/useEventSubscriptionsPolling';
 import { machineDeleteEventSubscription, type EventSubscriptionView } from '@/sync/eventOps';
+import { useHappyAction } from '@/hooks/useHappyAction';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 
 // Map an event-subscription tier to its localized label.
 function tierLabel(tier: EventSubscriptionView['tier']): string {
     return tier === 'trusted' ? t('event.tierTrusted') : t('event.tierSupervised');
+}
+
+function EventSubscriptionRow({ machineId, subscription }: { machineId: string; subscription: EventSubscriptionView }) {
+    const { theme } = useUnistyles();
+
+    // useHappyAction provides the double-tap guard (UX-9, in-flight ref) and
+    // surfaces a failed delete via Modal.alert (UX-1) instead of swallowing it.
+    const [deleting, requestDelete] = useHappyAction(async () => {
+        try {
+            await machineDeleteEventSubscription(machineId, subscription.id);
+        } catch {
+            Modal.alert(t('common.error'), t('event.deleteError'), [{ text: t('common.ok') }]);
+        }
+    });
+
+    const confirmDelete = React.useCallback(() => {
+        Modal.alert(t('event.delete'), t('event.deleteConfirm'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('event.delete'), style: 'destructive', onPress: requestDelete },
+        ]);
+    }, [requestDelete]);
+
+    return (
+        <Item
+            title={subscription.eventType}
+            subtitle={`${subscription.directory} · ${subscription.enabled ? t('event.statusEnabled') : t('event.statusDisabled')}`}
+            detail={`${tierLabel(subscription.tier)} · ${subscription.preset}`}
+            icon={<Ionicons name="git-commit-outline" size={29} color={theme.colors.textSecondary} />}
+            showChevron={false}
+            loading={deleting}
+            rightElement={
+                <Pressable
+                    onPress={confirmDelete}
+                    disabled={deleting}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('event.delete')}
+                    style={{ padding: 6 }}
+                >
+                    <Ionicons name="trash-outline" size={22} color={theme.colors.textDestructive} />
+                </Pressable>
+            }
+        />
+    );
 }
 
 function EventSubscriptionsScreen() {
@@ -25,7 +71,7 @@ function EventSubscriptionsScreen() {
     const machines = useAllMachines();
     const machineId = machines.length > 0 ? machines[0].id : null;
 
-    const { subscriptions } = useEventSubscriptionsPolling(machineId);
+    const { subscriptions, loading } = useEventSubscriptionsPolling(machineId);
 
     return (
         <ItemList>
@@ -49,7 +95,18 @@ function EventSubscriptionsScreen() {
                 </ItemGroup>
             )}
 
-            {machineId && subscriptions.length === 0 && (
+            {machineId && loading && subscriptions.length === 0 && (
+                <ItemGroup>
+                    <Item
+                        title={t('common.loading')}
+                        loading
+                        showChevron={false}
+                        titleStyle={{ color: theme.colors.textSecondary }}
+                    />
+                </ItemGroup>
+            )}
+
+            {machineId && !loading && subscriptions.length === 0 && (
                 <ItemGroup>
                     <Item
                         title={t('event.empty')}
@@ -62,23 +119,7 @@ function EventSubscriptionsScreen() {
             {machineId && subscriptions.length > 0 && (
                 <ItemGroup>
                     {subscriptions.map((subscription) => (
-                        <Item
-                            key={subscription.id}
-                            title={subscription.eventType}
-                            subtitle={`${subscription.directory} · ${subscription.enabled ? t('event.statusEnabled') : t('event.statusDisabled')}`}
-                            detail={`${tierLabel(subscription.tier)} · ${subscription.preset}`}
-                            icon={<Ionicons name="git-commit-outline" size={29} color={theme.colors.textSecondary} />}
-                            onPress={() => Modal.alert(t('event.delete'), t('event.deleteConfirm'), [
-                                { text: t('common.cancel'), style: 'cancel' },
-                                {
-                                    text: t('event.delete'),
-                                    style: 'destructive',
-                                    onPress: async () => {
-                                        await machineDeleteEventSubscription(machineId, subscription.id);
-                                    },
-                                },
-                            ])}
-                        />
+                        <EventSubscriptionRow key={subscription.id} machineId={machineId} subscription={subscription} />
                     ))}
                 </ItemGroup>
             )}

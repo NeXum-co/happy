@@ -46,7 +46,8 @@ export async function machineListCrons(machineId: string): Promise<CronScheduleV
             {}
         );
         return result.crons;
-    } catch {
+    } catch (e) {
+        console.warn(`machineListCrons failed for machine ${machineId}:`, e);
         return [];
     }
 }
