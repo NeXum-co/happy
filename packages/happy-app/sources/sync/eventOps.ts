@@ -31,11 +31,14 @@ export async function machineSubmitEventSubscription(machineId: string, params: 
     maxTurns?: number;
     timeoutMs?: number;
     allowedTools?: string[];
+    dispositionTopic?: string;
 }): Promise<{ subscriptionId: string }> {
-    const result = await apiSocket.machineRPC<{ subscriptionId: string }, typeof params>(
+    const { dispositionTopic, ...rest } = params;
+    const payload = { ...rest, ...(dispositionTopic ? { dispositionTopic } : {}) };
+    const result = await apiSocket.machineRPC<{ subscriptionId: string }, typeof payload>(
         machineId,
         'submit-event-subscription',
-        params
+        payload
     );
     return result;
 }

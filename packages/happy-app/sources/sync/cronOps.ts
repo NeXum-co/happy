@@ -29,11 +29,14 @@ export async function machineSubmitCron(machineId: string, params: {
     maxTurns?: number;
     timeoutMs?: number;
     allowedTools?: string[];
+    dispositionTopic?: string;
 }): Promise<{ cronId: string }> {
-    const result = await apiSocket.machineRPC<{ cronId: string }, typeof params>(
+    const { dispositionTopic, ...rest } = params;
+    const payload = { ...rest, ...(dispositionTopic ? { dispositionTopic } : {}) };
+    const result = await apiSocket.machineRPC<{ cronId: string }, typeof payload>(
         machineId,
         'submit-cron',
-        params
+        payload
     );
     return result;
 }
