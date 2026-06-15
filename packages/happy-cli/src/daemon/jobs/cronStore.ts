@@ -71,6 +71,8 @@ export class CronStore {
         createdAt INTEGER NOT NULL
       )
     `)
+    // Index the feeder's scan path: each tick lists schedules and skips disabled ones.
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_schedules_enabled ON cron_schedules (enabled)`)
   }
 
   create(s: CronSchedule): void {
@@ -115,5 +117,10 @@ export class CronStore {
 
   setEnabled(id: string, enabled: boolean): void {
     this.db.prepare('UPDATE cron_schedules SET enabled = ? WHERE id = ?').run(enabled ? 1 : 0, id)
+  }
+
+  /** Close the underlying SQLite connection (daemon shutdown, ARCH-5). */
+  close(): void {
+    this.db.close()
   }
 }

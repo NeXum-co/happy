@@ -935,10 +935,15 @@ export async function startDaemon(): Promise<void> {
       return job.id;
     };
 
-    // Cron management closures (E04). submitCron validates the expression before
-    // persisting an enabled schedule; listCrons/deleteCron are thin store passthroughs.
+    // Cron management closures (E04). submitCron is the single canonical
+    // validator (QUAL-2): it validates directory/prompt presence and the cron
+    // expression before persisting an enabled schedule. The RPC and HTTP entry
+    // points rely on these throws rather than re-validating. listCrons/deleteCron
+    // are thin store passthroughs.
     const submitCron = (params: SubmitCronParams): string => {
-      if (!validateCronExpr(params.cronExpr)) throw new Error('invalid cronExpr');
+      if (typeof params.directory !== 'string' || params.directory.length === 0) throw new Error('directory is required');
+      if (typeof params.prompt !== 'string' || params.prompt.length === 0) throw new Error('prompt is required');
+      if (typeof params.cronExpr !== 'string' || params.cronExpr.length === 0 || !validateCronExpr(params.cronExpr)) throw new Error('invalid cronExpr');
       const schedule = buildCronFromSubmit(params, Date.now(), randomUUID());
       cronStore.create(schedule);
       logger.debug(`[DAEMON RUN] Created cron schedule ${schedule.id}`);
@@ -983,7 +988,7 @@ export async function startDaemon(): Promise<void> {
           created.push(builtJob.id);
           logger.debug(`[DAEMON RUN] triggerEvent: subscription ${sub.id} -> job ${builtJob.id} (inserted: ${inserted})`);
         } catch (error) {
-          logger.debug(`[DAEMON RUN] triggerEvent: subscription ${sub.id} failed:`, error);
+          logger.warn(`[DAEMON RUN] triggerEvent: subscription ${sub.id} failed:`, error);
         }
       }
       return { created };
@@ -1270,6 +1275,12 @@ export async function startDaemon(): Promise<void> {
 
       // Stop the cron feeder tick loop
       cronFeeder.stop();
+
+      // Close the durable SQLite stores after their tick loops are stopped, so no
+      // tick can run a query against a closed connection (ARCH-5).
+      jobStore.close();
+      cronStore.close();
+      eventStore.close();
 
       // Update daemon state before shutting down
       await apiMachine.updateDaemonState((state: DaemonState | null) => ({

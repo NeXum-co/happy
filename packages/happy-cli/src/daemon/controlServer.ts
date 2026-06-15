@@ -19,6 +19,40 @@ import type { CronScheduleView } from './jobs/cronTypes';
 import type { SubmitEventSubscriptionParams } from './jobs/eventTrigger';
 import type { EventSubscriptionView } from './jobs/eventTypes';
 
+// Typed response schemas for the cron/event list endpoints (QUAL-3/COMP-4).
+// Mirror CronScheduleView / EventSubscriptionView so the wire shape is locked
+// rather than `z.array(z.any())`. Keep in lockstep with cronTypes / eventTypes.
+const cronScheduleViewSchema = z.object({
+  id: z.string(),
+  cronExpr: z.string(),
+  directory: z.string(),
+  prompt: z.string(),
+  tier: z.enum(['trusted', 'supervised']),
+  preset: z.string(),
+  maxBudgetUsd: z.number().optional(),
+  maxTurns: z.number().optional(),
+  timeoutMs: z.number().optional(),
+  allowedTools: z.array(z.string()).optional(),
+  enabled: z.boolean(),
+  createdAt: z.number(),
+});
+
+const eventSubscriptionViewSchema = z.object({
+  id: z.string(),
+  eventType: z.string(),
+  matchKey: z.string().optional(),
+  directory: z.string(),
+  prompt: z.string(),
+  tier: z.enum(['trusted', 'supervised']),
+  preset: z.string(),
+  maxBudgetUsd: z.number().optional(),
+  maxTurns: z.number().optional(),
+  timeoutMs: z.number().optional(),
+  allowedTools: z.array(z.string()).optional(),
+  enabled: z.boolean(),
+  createdAt: z.number(),
+});
+
 export function startDaemonControlServer({
   getChildren,
   stopSession,
@@ -58,7 +92,7 @@ export function startDaemonControlServer({
   requestShutdown: () => void;
   onHappySessionWebhook: (sessionId: string, metadata: Metadata, encryption?: SessionEncryptionData) => void;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const app = fastify({
       logger: false // We use our own logger
     });
@@ -349,13 +383,22 @@ export function startDaemonControlServer({
         response: {
           200: z.object({
             cronId: z.string()
+          }),
+          400: z.object({
+            error: z.string()
           })
         }
       }
-    }, async (request) => {
-      const cronId = submitCron(request.body);
-      logger.debug(`[CONTROL SERVER] Submitted cron ${cronId}`);
-      return { cronId };
+    }, async (request, reply) => {
+      try {
+        const cronId = submitCron(request.body);
+        logger.debug(`[CONTROL SERVER] Submitted cron ${cronId}`);
+        return { cronId };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.debug(`[CONTROL SERVER] Submit cron rejected: ${message}`);
+        return reply.code(400).send({ error: message });
+      }
     });
 
     // List cron schedules (E04). Returns all schedules as CronScheduleView
@@ -364,7 +407,7 @@ export function startDaemonControlServer({
       schema: {
         response: {
           200: z.object({
-            crons: z.array(z.any())
+            crons: z.array(cronScheduleViewSchema)
           })
         }
       }
@@ -411,13 +454,22 @@ export function startDaemonControlServer({
         response: {
           200: z.object({
             subscriptionId: z.string()
+          }),
+          400: z.object({
+            error: z.string()
           })
         }
       }
-    }, async (request) => {
-      const subscriptionId = submitEventSubscription(request.body);
-      logger.debug(`[CONTROL SERVER] Submitted event subscription ${subscriptionId}`);
-      return { subscriptionId };
+    }, async (request, reply) => {
+      try {
+        const subscriptionId = submitEventSubscription(request.body);
+        logger.debug(`[CONTROL SERVER] Submitted event subscription ${subscriptionId}`);
+        return { subscriptionId };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.debug(`[CONTROL SERVER] Submit event subscription rejected: ${message}`);
+        return reply.code(400).send({ error: message });
+      }
     });
 
     // List event subscriptions (E04). Returns all subscriptions as
@@ -426,7 +478,7 @@ export function startDaemonControlServer({
       schema: {
         response: {
           200: z.object({
-            subscriptions: z.array(z.any())
+            subscriptions: z.array(eventSubscriptionViewSchema)
           })
         }
       }
@@ -467,13 +519,22 @@ export function startDaemonControlServer({
         response: {
           200: z.object({
             created: z.array(z.string())
+          }),
+          400: z.object({
+            error: z.string()
           })
         }
       }
-    }, async (request) => {
-      const { created } = triggerEvent(request.body);
-      logger.debug(`[CONTROL SERVER] Trigger event ${request.body.eventType}: created ${created.length} job(s)`);
-      return { created };
+    }, async (request, reply) => {
+      try {
+        const { created } = triggerEvent(request.body);
+        logger.debug(`[CONTROL SERVER] Trigger event ${request.body.eventType}: created ${created.length} job(s)`);
+        return { created };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.debug(`[CONTROL SERVER] Trigger event rejected: ${message}`);
+        return reply.code(400).send({ error: message });
+      }
     });
 
     // Record an autonomous job's final cost (E04). Reported by a cloud-preset
@@ -521,7 +582,8 @@ export function startDaemonControlServer({
     app.listen({ port: 0, host: '127.0.0.1' }, (err, address) => {
       if (err) {
         logger.debug('[CONTROL SERVER] Failed to start:', err);
-        throw err;
+        reject(err);
+        return;
       }
 
       const port = parseInt(address.split(':').pop()!);

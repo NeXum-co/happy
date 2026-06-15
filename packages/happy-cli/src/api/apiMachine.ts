@@ -26,7 +26,6 @@ import type { JobStatus } from '@/daemon/jobs/jobTypes';
 import type { JobRecordView } from '@/daemon/jobs/jobView';
 import type { SubmitCronParams } from '@/daemon/jobs/cronFeeder';
 import type { CronScheduleView } from '@/daemon/jobs/cronTypes';
-import { validateCronExpr } from '@/daemon/jobs/cronSchedule';
 import type { SubmitEventSubscriptionParams } from '@/daemon/jobs/eventTrigger';
 import type { EventSubscriptionView } from '@/daemon/jobs/eventTypes';
 
@@ -239,21 +238,14 @@ export class ApiMachineClient {
             });
         }
 
-        // Register submit-cron handler (cron schedules, E04). Validates the cron
-        // expression with the real validateCronExpr before creating a durable
-        // enabled schedule; the cron feeder turns it into jobs on its ticks.
+        // Register submit-cron handler (cron schedules, E04). Validation
+        // (cronExpr/directory/prompt) lives solely in the submitCron closure
+        // (daemon/run.ts) — the single source of truth (QUAL-2). The closure
+        // throws clear per-field errors; RpcHandlerManager wraps a throw into
+        // an { error } RPC response, so no duplicate checks are needed here.
         if (submitCron) {
             this.rpcHandlerManager.registerHandler('submit-cron', async (params: any) => {
                 const { cronExpr, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools } = params || {};
-                if (typeof directory !== 'string' || directory.length === 0) {
-                    throw new Error('directory is required');
-                }
-                if (typeof prompt !== 'string' || prompt.length === 0) {
-                    throw new Error('prompt is required');
-                }
-                if (typeof cronExpr !== 'string' || cronExpr.length === 0 || !validateCronExpr(cronExpr)) {
-                    throw new Error('invalid cronExpr');
-                }
                 const cronId = submitCron({ cronExpr, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools });
                 logger.debug(`[API MACHINE] Submitted cron ${cronId}`);
                 return { cronId };
@@ -281,20 +273,13 @@ export class ApiMachineClient {
         }
 
         // Register submit-event-subscription handler (event subscriptions, E04).
-        // Validates eventType/directory/prompt before creating a durable enabled
-        // subscription; trigger-event turns matching events into jobs.
+        // Validation (eventType/directory/prompt) lives solely in the
+        // submitEventSubscription closure (daemon/run.ts) — the single source of
+        // truth (QUAL-2). The closure throws clear per-field errors; a throw is
+        // wrapped into an { error } RPC response, so no duplicate checks here.
         if (submitEventSubscription) {
             this.rpcHandlerManager.registerHandler('submit-event-subscription', async (params: any) => {
                 const { eventType, matchKey, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools } = params || {};
-                if (typeof eventType !== 'string' || eventType.length === 0) {
-                    throw new Error('eventType is required');
-                }
-                if (typeof directory !== 'string' || directory.length === 0) {
-                    throw new Error('directory is required');
-                }
-                if (typeof prompt !== 'string' || prompt.length === 0) {
-                    throw new Error('prompt is required');
-                }
                 const subscriptionId = submitEventSubscription({ eventType, matchKey, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools });
                 logger.debug(`[API MACHINE] Submitted event subscription ${subscriptionId}`);
                 return { subscriptionId };

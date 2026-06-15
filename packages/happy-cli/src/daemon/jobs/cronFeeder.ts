@@ -131,14 +131,23 @@ export class CronFeeder {
       seen.add(s.id)
       if (s.enabled === false) continue
 
-      // Lazy-init: a schedule seen for the first time is watched from now, never
-      // from createdAt. This is the no-catch-up mechanism (D-E04-19).
-      const last = this.scannedThrough.get(s.id) ?? now
-      const occ = occurrencesBetween(s.cronExpr, last, now)
-      for (const o of occ) {
-        const job = buildCronJob(s, o, now)
-        if (this.newId) job.id = this.newId(s.id, o)
-        this.jobStore.createIfAbsent(job)
+      // Per-schedule try/catch so one bad schedule (e.g. an unparseable expr or a
+      // store error for a single occurrence) is skipped with its id logged,
+      // rather than aborting the rest of the tick (SF-4). The watermark still
+      // advances on failure so a persistently-broken schedule isn't retried
+      // every tick over an ever-growing window.
+      try {
+        // Lazy-init: a schedule seen for the first time is watched from now, never
+        // from createdAt. This is the no-catch-up mechanism (D-E04-19).
+        const last = this.scannedThrough.get(s.id) ?? now
+        const occ = occurrencesBetween(s.cronExpr, last, now)
+        for (const o of occ) {
+          const job = buildCronJob(s, o, now)
+          if (this.newId) job.id = this.newId(s.id, o)
+          this.jobStore.createIfAbsent(job)
+        }
+      } catch (error) {
+        logger.warn(`[CRON FEEDER] schedule ${s.id} (${s.cronExpr}) failed this tick, skipping:`, error)
       }
       this.scannedThrough.set(s.id, now)
     }

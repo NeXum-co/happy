@@ -48,10 +48,6 @@ import { runFleetCommand } from './fleet/fleetStatus'
 
   // Check if first argument is a subcommand
   const subcommand = args[0]
-  
-  // Log which subcommand was detected (for debugging)
-  if (!args.includes('--version')) {
-  }
 
   if (subcommand === 'doctor') {
     // Check for clean subcommand
@@ -701,6 +697,8 @@ ${chalk.bold('Usage:')}
   happy sandbox           Configure and manage OS-level sandboxing
   happy notify            Send push notification
   happy event             Manage event triggers (install-git-hook)
+  happy cron              Scheduled autonomous jobs — managed from the Happy app
+                            (no CLI subcommand)
   happy daemon            Manage background service that allows
                             to spawn new sessions away from your computer
   happy doctor            System diagnostics & troubleshooting

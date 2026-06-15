@@ -235,16 +235,29 @@ describe('ApiMachineClient setRPCHandlers — cron (E04)', () => {
         client.shutdown();
     });
 
-    it("'submit-cron' handler rejects an invalid cronExpr", async () => {
-        const { client, find } = makeClient({ submitCron: vi.fn(() => 'cron-123') });
+    // QUAL-2: validation now lives solely in the submitCron closure (daemon/run.ts).
+    // The handler just forwards to it; a closure throw propagates out (and is wrapped
+    // into an { error } RPC response by RpcHandlerManager in production). We model the
+    // canonical closure here so these tests assert the closure-driven error.
+    function cronClosure() {
+        return vi.fn((params: any) => {
+            if (typeof params.directory !== 'string' || params.directory.length === 0) throw new Error('directory is required');
+            if (typeof params.prompt !== 'string' || params.prompt.length === 0) throw new Error('prompt is required');
+            if (typeof params.cronExpr !== 'string' || params.cronExpr.length === 0 || params.cronExpr === 'nonsense') throw new Error('invalid cronExpr');
+            return 'cron-123';
+        });
+    }
+
+    it("'submit-cron' handler rejects an invalid cronExpr (closure-driven)", async () => {
+        const { client, find } = makeClient({ submitCron: cronClosure() });
         const call = find('submit-cron');
         await expect(call![1]({ cronExpr: 'nonsense', directory: '/x', prompt: 'p' }))
             .rejects.toThrow('invalid cronExpr');
         client.shutdown();
     });
 
-    it("'submit-cron' handler rejects a missing directory or prompt", async () => {
-        const { client, find } = makeClient({ submitCron: vi.fn(() => 'cron-123') });
+    it("'submit-cron' handler rejects a missing directory or prompt (closure-driven)", async () => {
+        const { client, find } = makeClient({ submitCron: cronClosure() });
         const call = find('submit-cron');
         await expect(call![1]({ cronExpr: '*/5 * * * *', prompt: 'p' }))
             .rejects.toThrow('directory is required');
@@ -334,8 +347,18 @@ describe('ApiMachineClient setRPCHandlers — event (E04)', () => {
         client.shutdown();
     });
 
-    it("'submit-event-subscription' handler rejects a missing eventType, directory or prompt", async () => {
-        const { client, find } = makeClient({ submitEventSubscription: vi.fn(() => 'sub-123') });
+    // QUAL-2: validation now lives solely in the submitEventSubscription closure
+    // (daemon/run.ts). The handler forwards to it; a closure throw propagates out
+    // (wrapped into an { error } RPC response by RpcHandlerManager in production).
+    // We model the canonical closure here so this test asserts the closure-driven error.
+    it("'submit-event-subscription' handler rejects a missing eventType, directory or prompt (closure-driven)", async () => {
+        const closure = vi.fn((params: any) => {
+            if (typeof params.eventType !== 'string' || params.eventType.length === 0) throw new Error('eventType is required');
+            if (typeof params.directory !== 'string' || params.directory.length === 0) throw new Error('directory is required');
+            if (typeof params.prompt !== 'string' || params.prompt.length === 0) throw new Error('prompt is required');
+            return 'sub-123';
+        });
+        const { client, find } = makeClient({ submitEventSubscription: closure });
         const call = find('submit-event-subscription');
         await expect(call![1]({ directory: '/x', prompt: 'p' }))
             .rejects.toThrow('eventType is required');

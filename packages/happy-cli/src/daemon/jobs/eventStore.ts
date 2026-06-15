@@ -75,6 +75,8 @@ export class EventStore {
         createdAt INTEGER NOT NULL
       )
     `)
+    // Index the hot match path: trigger-event filters enabled subscriptions by eventType.
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_event_subscriptions_event_type ON event_subscriptions (eventType, enabled)`)
   }
 
   create(s: EventSubscription): void {
@@ -120,5 +122,10 @@ export class EventStore {
 
   setEnabled(id: string, enabled: boolean): void {
     this.db.prepare('UPDATE event_subscriptions SET enabled = ? WHERE id = ?').run(enabled ? 1 : 0, id)
+  }
+
+  /** Close the underlying SQLite connection (daemon shutdown, ARCH-5). */
+  close(): void {
+    this.db.close()
   }
 }

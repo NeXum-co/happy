@@ -117,6 +117,7 @@ export class JobStore {
       CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs (status);
       CREATE INDEX IF NOT EXISTS idx_jobs_session_id ON jobs (sessionId);
       CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs (status, createdAt);
+      CREATE INDEX IF NOT EXISTS idx_jobs_status_scheduled ON jobs (status, scheduledAt, createdAt);
     `)
   }
 
@@ -286,5 +287,10 @@ export class JobStore {
     const params: Record<string, unknown> = { id }
     for (const c of present) params[c] = patch[c] ?? null
     this.db.prepare(`UPDATE jobs SET ${assignments} WHERE id = @id`).run(params)
+  }
+
+  /** Close the underlying SQLite connection (daemon shutdown, ARCH-5). */
+  close(): void {
+    this.db.close()
   }
 }
