@@ -1,3 +1,14 @@
+/**
+ * `happy event install-git-hook` — the v1 client for the autonomous-job event
+ * trigger (E04).
+ *
+ * Installs a git post-commit hook that POSTs a `git.commit` event to the running
+ * daemon, and creates the matching event subscription so the daemon turns those
+ * commits into jobs. renderPostCommitHook produces the hook script (pure, no IO);
+ * handleEventCommand performs the side effects (create subscription, write hook).
+ * The generated hook never fails the commit. See ../daemon/jobs/CLAUDE.md.
+ */
+
 import chalk from 'chalk'
 import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, writeFileSync } from 'node:fs'
