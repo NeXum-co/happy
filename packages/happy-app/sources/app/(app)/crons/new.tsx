@@ -53,6 +53,7 @@ function NewCronScreen() {
     const [turns, setTurns] = React.useState('');
     const [timeoutMinutes, setTimeoutMinutes] = React.useState('');
     const [allowedTools, setAllowedTools] = React.useState('');
+    const [dispositionTopic, setDispositionTopic] = React.useState('');
 
     const cronExprInvalid = cronExpr.trim().length > 0 && !hasFiveCronFields(cronExpr);
 
@@ -72,6 +73,7 @@ function NewCronScreen() {
             maxTurns: parseOptionalNumber(turns),
             timeoutMs: timeoutMin !== undefined ? timeoutMin * 60000 : undefined,
             allowedTools: parseOptionalTools(allowedTools),
+            dispositionTopic: dispositionTopic.trim() || undefined,
         });
         Modal.alert(t('common.success'), t('cron.submitSuccess'), [
             { text: t('common.ok'), onPress: () => router.back() },
@@ -205,6 +207,18 @@ function NewCronScreen() {
                     placeholderTextColor={theme.colors.textSecondary}
                 />
                 <Text style={styles.hint}>{t('cron.allowedToolsHint')}</Text>
+
+                <Text style={styles.label}>{t('cron.fieldDispositionTopic')}</Text>
+                <TextInput
+                    style={styles.input}
+                    value={dispositionTopic}
+                    onChangeText={setDispositionTopic}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    placeholder={t('cron.dispositionTopicPlaceholder')}
+                    placeholderTextColor={theme.colors.textSecondary}
+                />
+                <Text style={styles.hint}>{t('cron.dispositionTopicHint')}</Text>
 
                 <Pressable
                     style={[styles.submit, !canSubmit && styles.submitDisabled]}

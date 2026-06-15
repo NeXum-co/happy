@@ -36,6 +36,7 @@ function NewRunScreen() {
     const [budget, setBudget] = React.useState('');
     const [turns, setTurns] = React.useState('');
     const [timeoutMinutes, setTimeoutMinutes] = React.useState('');
+    const [dispositionTopic, setDispositionTopic] = React.useState('');
 
     const [submitting, submit] = useHappyAction(async () => {
         if (!onlineMachine) {
@@ -51,6 +52,7 @@ function NewRunScreen() {
             maxBudgetUsd: parseOptionalNumber(budget),
             maxTurns: parseOptionalNumber(turns),
             timeoutMs: timeoutMin !== undefined ? timeoutMin * 60000 : undefined,
+            dispositionTopic: dispositionTopic.trim() || undefined,
         });
         router.back();
     });
@@ -140,6 +142,18 @@ function NewRunScreen() {
                     placeholderTextColor={theme.colors.textSecondary}
                 />
 
+                <Text style={styles.label}>{t('run.fieldDispositionTopic')}</Text>
+                <TextInput
+                    style={styles.input}
+                    value={dispositionTopic}
+                    onChangeText={setDispositionTopic}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    placeholder={t('run.dispositionTopicPlaceholder')}
+                    placeholderTextColor={theme.colors.textSecondary}
+                />
+                <Text style={styles.hint}>{t('run.dispositionTopicHint')}</Text>
+
                 {!onlineMachine && (
                     <Text style={styles.offline}>{t('newSession.machineOffline')}</Text>
                 )}
@@ -181,6 +195,11 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         fontSize: 13,
         marginTop: 12,
+    },
+    hint: {
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+        marginTop: 4,
     },
     input: {
         backgroundColor: theme.colors.input.background,
