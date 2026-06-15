@@ -37,6 +37,11 @@ export const jobRecordViewSchema = z.object({
     maxTurns: z.number().optional(),
     gitHeadBefore: z.string().optional(),
     gitHeadAfter: z.string().optional(),
+    dispositionTopic: z.string().optional(),
+    gateAction: z.string().optional(),
+    gateBucket: z.string().optional(),
+    gateReason: z.string().optional(),
+    gateResolved: z.boolean().optional(),
 })
 
 export function toJobRecordView(j: JobRecord): JobRecordView {
