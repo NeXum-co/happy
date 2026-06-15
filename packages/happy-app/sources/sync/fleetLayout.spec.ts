@@ -13,26 +13,29 @@ function fleetSession(overrides: Partial<FleetSessionLike> & { id: string }): Fl
     };
 }
 
-describe('computeFleetLayout', () => {
-    // Fixture from the buildplan: 2 needs-you, 2 active in the same project, 1 inactive
+describe('computeFleetLayout (stabiele-sort, E02)', () => {
+    // Distinct createdAt + deliberately INVERSE activeAt, so a test that passes
+    // can only be ordering by the stable key (createdAt/id), never by activeAt.
     const sessions: FleetSessionLike[] = [
-        fleetSession({ id: 'needs-old', needsYou: true, activeAt: 100, path: '/home/user/code/beta' }),
+        fleetSession({ id: 'needs-old', needsYou: true, createdAt: 10, activeAt: 100, path: '/home/user/code/beta' }),
         fleetSession({ id: 'inactive', active: false, createdAt: 50, activeAt: 50 }),
-        fleetSession({ id: 'alpha-b', activeAt: 200, path: '/home/user/code/alpha/packages/app' }),
-        fleetSession({ id: 'needs-new', needsYou: true, activeAt: 300, path: '/home/user/code/alpha' }),
-        fleetSession({ id: 'alpha-a', activeAt: 400, path: '/home/user/code/alpha' }),
+        fleetSession({ id: 'alpha-b', createdAt: 30, activeAt: 200, path: '/home/user/code/alpha/packages/app' }),
+        fleetSession({ id: 'needs-new', needsYou: true, createdAt: 20, activeAt: 300, path: '/home/user/code/alpha' }),
+        fleetSession({ id: 'alpha-a', createdAt: 40, activeAt: 400, path: '/home/user/code/alpha' }),
     ];
 
-    it('puts needs-you sessions in the band, most recent first, across all projects', () => {
+    it('puts needs-you sessions in the band, oldest-created first (stable), across all projects', () => {
         const layout = computeFleetLayout(sessions);
-        expect(layout.needsYou.map(s => s.id)).toEqual(['needs-new', 'needs-old']);
+        // createdAt 10 < 20 → needs-old first, even though needs-new has the higher activeAt.
+        expect(layout.needsYou.map(s => s.id)).toEqual(['needs-old', 'needs-new']);
     });
 
-    it('groups remaining active sessions per project key, most recent first within the group', () => {
+    it('groups remaining active sessions per project key, oldest-created first within the group', () => {
         const layout = computeFleetLayout(sessions);
         expect(layout.projectGroups).toHaveLength(1);
         expect(layout.projectGroups[0].key).toBe('alpha');
-        expect(layout.projectGroups[0].sessions.map(s => s.id)).toEqual(['alpha-a', 'alpha-b']);
+        // createdAt 30 < 40 → alpha-b first, even though alpha-a has the higher activeAt.
+        expect(layout.projectGroups[0].sessions.map(s => s.id)).toEqual(['alpha-b', 'alpha-a']);
     });
 
     it('excludes needs-you sessions from the project groups', () => {
@@ -42,7 +45,7 @@ describe('computeFleetLayout', () => {
         expect(groupedIds).not.toContain('needs-old');
     });
 
-    it('keeps inactive sessions separate, newest created first', () => {
+    it('keeps inactive sessions separate, newest created first (createdAt is immutable → stable)', () => {
         const layout = computeFleetLayout([
             ...sessions,
             fleetSession({ id: 'inactive-newer', active: false, createdAt: 80 }),
@@ -50,14 +53,26 @@ describe('computeFleetLayout', () => {
         expect(layout.inactive.map(s => s.id)).toEqual(['inactive-newer', 'inactive']);
     });
 
-    it('orders project groups by their most recent activity', () => {
+    it('orders project groups alphabetically by key (stable), sessions within by createdAt', () => {
         const layout = computeFleetLayout([
-            fleetSession({ id: 'old-project', activeAt: 10, path: '/home/user/code/beta' }),
-            fleetSession({ id: 'recent-project', activeAt: 500, path: '/home/user/code/webshop--e02' }),
-            fleetSession({ id: 'old-project-2', activeAt: 20, path: '/home/user/code/beta/api' }),
+            fleetSession({ id: 'old-project', createdAt: 11, activeAt: 10, path: '/home/user/code/beta' }),
+            fleetSession({ id: 'recent-project', createdAt: 99, activeAt: 500, path: '/home/user/code/webshop--e02' }),
+            fleetSession({ id: 'old-project-2', createdAt: 22, activeAt: 20, path: '/home/user/code/beta/api' }),
         ]);
-        expect(layout.projectGroups.map(g => g.key)).toEqual(['webshop', 'beta']);
-        expect(layout.projectGroups[1].sessions.map(s => s.id)).toEqual(['old-project-2', 'old-project']);
+        // Alphabetical by key, NOT by most-recent activity (webshop has the higher activeAt).
+        expect(layout.projectGroups.map(g => g.key)).toEqual(['beta', 'webshop']);
+        // Within beta: createdAt 11 < 22 → old-project first.
+        expect(layout.projectGroups[0].sessions.map(s => s.id)).toEqual(['old-project', 'old-project-2']);
+    });
+
+    it('keeps the SAME order when only activeAt changes — no jump on heartbeats (the core fix)', () => {
+        const base = computeFleetLayout(sessions);
+        // Simulate heartbeats: bump every activeAt arbitrarily (and invert relative order).
+        const ticked = computeFleetLayout(sessions.map(s => ({ ...s, activeAt: 1_000_000 - s.activeAt })));
+        expect(ticked.needsYou.map(s => s.id)).toEqual(base.needsYou.map(s => s.id));
+        expect(ticked.projectGroups.map(g => g.key)).toEqual(base.projectGroups.map(g => g.key));
+        expect(ticked.projectGroups[0].sessions.map(s => s.id)).toEqual(base.projectGroups[0].sessions.map(s => s.id));
+        expect(ticked.inactive.map(s => s.id)).toEqual(base.inactive.map(s => s.id));
     });
 });
 
