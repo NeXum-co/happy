@@ -103,6 +103,8 @@ type MachineRpcHandlers = {
     getJob?: (id: string) => JobRecordView | null;
     /** Cancel a non-running (pending/retrying) job; returns whether it was cancelled. */
     cancelJob?: (jobId: string) => boolean;
+    /** Resolve a gate-parked job (E05): 'approve' runs it, 'reject' drives it to dead. Returns whether it was resolved. */
+    resolveGate?: (jobId: string, decision: 'approve' | 'reject') => Promise<boolean>;
     /** Create a durable cron schedule from submit-cron params; returns its id. */
     submitCron?: (params: SubmitCronParams) => string;
     /** List all cron schedules as CronScheduleView projections. */
@@ -165,6 +167,7 @@ export class ApiMachineClient {
         listJobs,
         getJob,
         cancelJob,
+        resolveGate,
         submitCron,
         listCrons,
         deleteCron,
@@ -235,6 +238,21 @@ export class ApiMachineClient {
                 const cancelled = cancelJob(jobId);
                 logger.debug(`[API MACHINE] Cancel job ${jobId}: ${cancelled}`);
                 return { cancelled };
+            });
+        }
+
+        // Register resolve-gate handler (autonomous jobs, E05). Resolves a job the
+        // pre-spawn confidence gate parked in 'needs-attention': 'approve' runs it
+        // (honouring a proceed-supervised downgrade), 'reject' drives it to dead.
+        // Mirrors the HTTP /resolve-gate endpoint (BUG-UAT-1: both surfaces).
+        if (resolveGate) {
+            this.rpcHandlerManager.registerHandler('resolve-gate', async (params: any) => {
+                const { jobId, decision } = params || {};
+                if (typeof jobId !== 'string' || jobId.length === 0) throw new Error('jobId is required');
+                if (decision !== 'approve' && decision !== 'reject') throw new Error("decision must be 'approve' or 'reject'");
+                const resolved = await resolveGate(jobId, decision);
+                logger.debug(`[API MACHINE] Resolve gate ${jobId} decision=${decision}: ${resolved}`);
+                return { resolved };
             });
         }
 

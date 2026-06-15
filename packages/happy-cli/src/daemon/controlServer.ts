@@ -60,6 +60,7 @@ export function startDaemonControlServer({
   submitJob,
   stopJob,
   cancelJob,
+  resolveGate,
   listJobs,
   getJob,
   patchJobCost,
@@ -79,6 +80,7 @@ export function startDaemonControlServer({
   submitJob: (params: SubmitJobParams) => string;
   stopJob: (sessionId: string) => boolean;
   cancelJob: (jobId: string) => boolean;
+  resolveGate: (jobId: string, decision: 'approve' | 'reject') => Promise<boolean>;
   listJobs: (filter?: { status?: JobStatus }) => JobRecordView[];
   getJob: (id: string) => JobRecordView | null;
   patchJobCost: (sessionId: string, costUsd: number) => boolean;
@@ -323,6 +325,29 @@ export function startDaemonControlServer({
       logger.debug(`[CONTROL SERVER] Cancel job request: ${jobId}`);
       const cancelled = cancelJob(jobId);
       return { cancelled };
+    });
+
+    // Resolve a gate-parked autonomous job (E05, D-E05-4). A job parked in
+    // 'needs-attention' by the pre-spawn confidence gate awaits Joshua: 'approve'
+    // runs it (honouring a proceed-supervised tier downgrade), 'reject' drives it
+    // to dead. Mirrors the resolve-gate RPC handler (BUG-UAT-1: both surfaces).
+    typed.post('/resolve-gate', {
+      schema: {
+        body: z.object({
+          jobId: z.string(),
+          decision: z.enum(['approve', 'reject'])
+        }),
+        response: {
+          200: z.object({
+            resolved: z.boolean()
+          })
+        }
+      }
+    }, async (request) => {
+      const { jobId, decision } = request.body;
+      logger.debug(`[CONTROL SERVER] Resolve gate request: ${jobId} decision=${decision}`);
+      const resolved = await resolveGate(jobId, decision);
+      return { resolved };
     });
 
     // List autonomous jobs (E04). GET /jobs?status=<status> returns all jobs

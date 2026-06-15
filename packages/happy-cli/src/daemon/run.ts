@@ -1038,6 +1038,13 @@ export async function startDaemon(): Promise<void> {
       return true;
     };
 
+    // Resolve a gate-parked job (E05, D-E05-4). A job the pre-spawn confidence
+    // gate parked in 'needs-attention' awaits Joshua: 'approve' runs it (honouring
+    // a proceed-supervised downgrade), 'reject' drives it to dead. Exposed on BOTH
+    // control surfaces (HTTP + RPC) via the same scheduler method (BUG-UAT-1).
+    const resolveGate = (jobId: string, decision: 'approve' | 'reject'): Promise<boolean> =>
+      jobScheduler.resolveGate(jobId, decision);
+
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
       getChildren: getCurrentChildren,
@@ -1046,6 +1053,7 @@ export async function startDaemon(): Promise<void> {
       submitJob,
       stopJob,
       cancelJob,
+      resolveGate,
       listJobs,
       getJob,
       patchJobCost,
@@ -1125,6 +1133,7 @@ export async function startDaemon(): Promise<void> {
       listJobs,
       getJob,
       cancelJob,
+      resolveGate,
       submitCron,
       listCrons,
       deleteCron,
