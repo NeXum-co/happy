@@ -8,7 +8,7 @@ import { ItemList } from '@/components/ItemList';
 import { useAllMachines } from '@/sync/storage';
 import { isMachineOnline } from '@/utils/machineUtils';
 import { useHappyAction } from '@/hooks/useHappyAction';
-import { machineGetJob, machineStopJob, machineCancelJob, type JobRecordView } from '@/sync/runOps';
+import { machineGetJob, machineStopJob, machineCancelJob, machineResolveGate, type JobRecordView } from '@/sync/runOps';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 
@@ -104,6 +104,34 @@ function JobDetailScreen() {
         }
     });
 
+    // E05 gate-parked jobs (exitReason 'gate:*'): approve runs the job at its gated
+    // tier, reject drives it to dead. The poll loop refreshes the status.
+    const [, approveGate] = useHappyAction(async () => {
+        if (!machineId || !job?.id) {
+            return;
+        }
+        const confirmed = await Modal.confirm(t('run.approve'), t('run.approveConfirm'), {
+            cancelText: t('common.cancel'),
+            confirmText: t('run.approve'),
+        });
+        if (confirmed) {
+            await machineResolveGate(machineId, job.id, 'approve');
+        }
+    });
+
+    const [, rejectGate] = useHappyAction(async () => {
+        if (!machineId || !job?.id) {
+            return;
+        }
+        const confirmed = await Modal.confirm(t('run.reject'), t('run.rejectConfirm'), {
+            cancelText: t('common.cancel'),
+            confirmText: t('run.reject'),
+        });
+        if (confirmed) {
+            await machineResolveGate(machineId, job.id, 'reject');
+        }
+    });
+
     if (!job) {
         return (
             <ItemList>
@@ -155,6 +183,41 @@ function JobDetailScreen() {
                     showChevron={false}
                 />
             </ItemGroup>
+
+            {(job.dispositionTopic || job.gateReason) && (
+                <ItemGroup>
+                    {job.dispositionTopic && (
+                        <Item title={t('run.fieldDispositionTopic')} detail={job.dispositionTopic} showChevron={false} />
+                    )}
+                    {job.gateAction && (
+                        <Item title={t('run.fieldGateAction')} detail={job.gateAction} showChevron={false} />
+                    )}
+                    {job.gateBucket && (
+                        <Item title={t('run.fieldGateBucket')} detail={job.gateBucket} showChevron={false} />
+                    )}
+                    {job.gateReason && (
+                        <Item title={t('run.fieldGateReason')} detail={job.gateReason} showChevron={false} />
+                    )}
+                </ItemGroup>
+            )}
+
+            {job.status === 'needs-attention' && (job.exitReason?.startsWith('gate:') ?? false) && (
+                <ItemGroup>
+                    <Item
+                        title={t('run.approve')}
+                        icon={<Ionicons name="checkmark-circle-outline" size={29} color={theme.colors.button.primary.background} />}
+                        onPress={approveGate}
+                        showChevron={false}
+                    />
+                    <Item
+                        title={t('run.reject')}
+                        destructive
+                        icon={<Ionicons name="close-circle-outline" size={29} color={theme.colors.textDestructive} />}
+                        onPress={rejectGate}
+                        showChevron={false}
+                    />
+                </ItemGroup>
+            )}
 
             {job.sessionId && (
                 <ItemGroup>

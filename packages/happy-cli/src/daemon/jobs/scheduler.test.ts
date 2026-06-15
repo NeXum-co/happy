@@ -14,8 +14,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { JobStore } from './jobStore'
 import { Semaphore } from './semaphore'
-import { JobScheduler } from './scheduler'
+import { JobScheduler, buildJobFromSubmit } from './scheduler'
 import type { JobRecord } from './jobTypes'
+import type { DispositionRollup } from '@/disposition/types'
 import type { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers'
 
 function makeJob(overrides: Partial<JobRecord> = {}): JobRecord {
@@ -50,7 +51,9 @@ describe('JobScheduler', () => {
   })
 
   it('runs a supervised pending job and attaches the sessionId', async () => {
-    store.create(makeJob({ id: 'sup', tier: 'supervised', directory: dir }))
+    // gateResolved short-circuits the E05 pre-spawn gate so this test exercises
+    // the spawn mechanics, not the disposition gate (covered separately).
+    store.create(makeJob({ id: 'sup', tier: 'supervised', directory: dir, gateResolved: true }))
 
     const calls: SpawnSessionOptions[] = []
     const spawn = async (opts: SpawnSessionOptions): Promise<SpawnSessionResult> => {
@@ -80,7 +83,7 @@ describe('JobScheduler', () => {
     execFileSync('git', ['commit', '-m', 'initial'], { cwd: repo })
     const headBefore = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim()
 
-    store.create(makeJob({ id: 'audit', tier: 'supervised', directory: repo }))
+    store.create(makeJob({ id: 'audit', tier: 'supervised', directory: repo, gateResolved: true }))
 
     const spawn = async (): Promise<SpawnSessionResult> => ({ type: 'success', sessionId: 'sess-audit' })
     const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn })
@@ -105,7 +108,7 @@ describe('JobScheduler', () => {
   })
 
   it('re-queues a transient (429) failure as pending with incremented attempts', async () => {
-    store.create(makeJob({ id: 'trans', directory: dir }))
+    store.create(makeJob({ id: 'trans', directory: dir, gateResolved: true }))
 
     const spawn = async (): Promise<SpawnSessionResult> => {
       throw { status: 429, message: 'rate limited' }
@@ -120,7 +123,7 @@ describe('JobScheduler', () => {
   })
 
   it('defers a retried transient failure by a backoff and does not re-claim it before scheduledAt', async () => {
-    store.create(makeJob({ id: 'retry', directory: dir }))
+    store.create(makeJob({ id: 'retry', directory: dir, gateResolved: true }))
 
     let t = 1000
     const spawn = async (): Promise<SpawnSessionResult> => {
@@ -152,7 +155,7 @@ describe('JobScheduler', () => {
   })
 
   it('marks a permanent (400) failure as dead', async () => {
-    store.create(makeJob({ id: 'perm', directory: dir }))
+    store.create(makeJob({ id: 'perm', directory: dir, gateResolved: true }))
 
     const spawn = async (): Promise<SpawnSessionResult> => {
       throw { status: 400, message: 'bad request' }
@@ -190,7 +193,7 @@ describe('JobScheduler', () => {
   it('runs a trusted job inside a git worktree with bypassPermissions', async () => {
     const worktree = mkdtempSync(join(tmpdir(), 'happy-worktree-'))
     mkdirSync(join(worktree, '.git'))
-    store.create(makeJob({ id: 'trust-git', tier: 'trusted', directory: worktree }))
+    store.create(makeJob({ id: 'trust-git', tier: 'trusted', directory: worktree, gateResolved: true }))
 
     const calls: SpawnSessionOptions[] = []
     const spawn = async (opts: SpawnSessionOptions): Promise<SpawnSessionResult> => {
@@ -297,8 +300,8 @@ describe('JobScheduler', () => {
   })
 
   it('serializes local jobs through a Semaphore(1)', async () => {
-    store.create(makeJob({ id: 'a', createdAt: 1000, directory: dir }))
-    store.create(makeJob({ id: 'b', createdAt: 2000, directory: dir }))
+    store.create(makeJob({ id: 'a', createdAt: 1000, directory: dir, gateResolved: true }))
+    store.create(makeJob({ id: 'b', createdAt: 2000, directory: dir, gateResolved: true }))
 
     let inFlight = 0
     let maxInFlight = 0
@@ -335,6 +338,165 @@ describe('JobScheduler', () => {
   })
 })
 
+describe('JobScheduler pre-spawn gate (E05)', () => {
+  let dir: string
+  let store: JobStore
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'happy-gate-test-'))
+    store = new JobStore(join(dir, 'jobs.db'))
+    store.init()
+  })
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  // A rollup mapping topics to each disposition bucket the gate maps over.
+  const fakeRollup = (): DispositionRollup => ({
+    generatedFrom: 10,
+    domains: {},
+    topics: {
+      'arch/trust': { a: 8, m: 1, o: 1, d: 0, n: 10, bucket: 'high-trust' },
+      'arch/modify': { a: 1, m: 6, o: 2, d: 1, n: 10, bucket: 'modify-prone' },
+      'arch/override': { a: 1, m: 1, o: 6, d: 2, n: 10, bucket: 'override-prone' },
+    },
+  })
+
+  function trackedSpawn() {
+    const calls: SpawnSessionOptions[] = []
+    const spawn = async (opts: SpawnSessionOptions): Promise<SpawnSessionResult> => {
+      calls.push(opts)
+      return { type: 'success', sessionId: 'sess-gate' }
+    }
+    return { calls, spawn }
+  }
+
+  it('proceed (high-trust): runs the job and persists gateAction=proceed', async () => {
+    store.create(makeJob({ id: 'g-proceed', tier: 'supervised', directory: dir, dispositionTopic: 'arch/trust' }))
+    const { calls, spawn } = trackedSpawn()
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, loadRollup: fakeRollup })
+
+    await scheduler.tick()
+
+    expect(calls).toHaveLength(1)
+    const loaded = store.get('g-proceed')!
+    expect(loaded.status).toBe('running')
+    expect(loaded.gateAction).toBe('proceed')
+    expect(loaded.gateBucket).toBe('high-trust')
+  })
+
+  it('hold (override-prone): parks in needs-attention, never spawns, exitReason gate:', async () => {
+    store.create(makeJob({ id: 'g-hold', tier: 'supervised', directory: dir, dispositionTopic: 'arch/override' }))
+    const { calls, spawn } = trackedSpawn()
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, loadRollup: fakeRollup })
+
+    await scheduler.tick()
+
+    expect(calls).toHaveLength(0)
+    const loaded = store.get('g-hold')!
+    expect(loaded.status).toBe('needs-attention')
+    expect(loaded.gateAction).toBe('hold')
+    expect(loaded.exitReason?.startsWith('gate:')).toBe(true)
+  })
+
+  it('hold (null rollup → fail-closed, AC-6): parks in needs-attention', async () => {
+    store.create(makeJob({ id: 'g-failclosed', tier: 'supervised', directory: dir, dispositionTopic: 'arch/trust' }))
+    const { calls, spawn } = trackedSpawn()
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, loadRollup: () => null })
+
+    await scheduler.tick()
+
+    expect(calls).toHaveLength(0)
+    const loaded = store.get('g-failclosed')!
+    expect(loaded.status).toBe('needs-attention')
+    expect(loaded.gateAction).toBe('hold')
+  })
+
+  it('proceed-supervised (modify-prone): downgrades a trusted job to default permission mode', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'happy-gate-repo-'))
+    mkdirSync(join(repo, '.git'))
+    store.create(makeJob({ id: 'g-downgrade', tier: 'trusted', directory: repo, dispositionTopic: 'arch/modify' }))
+    const { calls, spawn } = trackedSpawn()
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, loadRollup: fakeRollup })
+
+    await scheduler.tick()
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].environmentVariables?.HAPPY_JOB_PERMISSION_MODE).toBe('default')
+    expect(store.get('g-downgrade')!.gateAction).toBe('proceed-supervised')
+    rmSync(repo, { recursive: true, force: true })
+  })
+
+  it('disposition-env: the spawn env carries HAPPY_JOB_DISPOSITION_TOPIC', async () => {
+    store.create(makeJob({ id: 'g-env', tier: 'supervised', directory: dir, dispositionTopic: 'arch/trust' }))
+    const { calls, spawn } = trackedSpawn()
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, loadRollup: fakeRollup })
+
+    await scheduler.tick()
+
+    expect(calls[0].environmentVariables?.HAPPY_JOB_DISPOSITION_TOPIC).toBe('arch/trust')
+  })
+
+  it('resolveGate approve: a parked job runs and gateResolved is set', async () => {
+    store.create(makeJob({ id: 'g-approve', tier: 'supervised', directory: dir, dispositionTopic: 'arch/override' }))
+    const { calls, spawn } = trackedSpawn()
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, loadRollup: fakeRollup })
+
+    await scheduler.tick() // parks it (hold)
+    expect(store.get('g-approve')!.status).toBe('needs-attention')
+
+    const result = await scheduler.resolveGate('g-approve', 'approve')
+
+    expect(result).toBe(true)
+    expect(calls).toHaveLength(1)
+    const loaded = store.get('g-approve')!
+    expect(loaded.status).toBe('running')
+    expect(loaded.gateResolved).toBe(true)
+  })
+
+  it('resolveGate reject: a parked job goes dead and never spawns', async () => {
+    store.create(makeJob({ id: 'g-reject', tier: 'supervised', directory: dir, dispositionTopic: 'arch/override' }))
+    const { calls, spawn } = trackedSpawn()
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, loadRollup: fakeRollup })
+
+    await scheduler.tick()
+    const result = await scheduler.resolveGate('g-reject', 'reject')
+
+    expect(result).toBe(true)
+    expect(calls).toHaveLength(0)
+    const loaded = store.get('g-reject')!
+    expect(loaded.status).toBe('dead')
+    expect(loaded.exitReason).toBe('gate-rejected')
+  })
+
+  it('resolveGate on a non-parked job returns false', async () => {
+    store.create(makeJob({ id: 'g-running', tier: 'supervised', directory: dir, dispositionTopic: 'arch/trust' }))
+    const { spawn } = trackedSpawn()
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, loadRollup: fakeRollup })
+
+    await scheduler.tick() // proceeds → running
+    const result = await scheduler.resolveGate('g-running', 'approve')
+    expect(result).toBe(false)
+  })
+
+  it('no re-gate: a gateResolved job re-entering tick is not re-parked', async () => {
+    // Simulate an approved job that returned to pending (e.g. a retry): it carries
+    // gateResolved + an override-prone topic but must NOT be re-gated.
+    store.create(makeJob({
+      id: 'g-noregate', tier: 'supervised', directory: dir,
+      dispositionTopic: 'arch/override', gateResolved: true,
+    }))
+    const { calls, spawn } = trackedSpawn()
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, loadRollup: fakeRollup })
+
+    await scheduler.tick()
+
+    expect(calls).toHaveLength(1)
+    expect(store.get('g-noregate')!.status).toBe('running')
+  })
+})
+
 describe('JobScheduler.tierEnv local routing', () => {
   const noopSpawn = async (): Promise<SpawnSessionResult> => ({ type: 'success', sessionId: 's' })
 
@@ -361,5 +523,17 @@ describe('JobScheduler.tierEnv local routing', () => {
     expect(env.HAPPY_JOB_MODEL).toBeUndefined()
     expect(env.HAPPY_JOB_PERMISSION_MODE).toBe('bypassPermissions')
     expect(env.HAPPY_JOB_REPORT_COST).toBe('1') // cloud jobs report their real cost
+  })
+})
+
+describe('buildJobFromSubmit dispositionTopic (E05)', () => {
+  it('copies dispositionTopic from the params onto the record', () => {
+    const job = buildJobFromSubmit({ directory: '/tmp/work', prompt: 'p', dispositionTopic: 'process/deploy' }, 1000, 'job-d')
+    expect(job.dispositionTopic).toBe('process/deploy')
+  })
+
+  it('leaves dispositionTopic undefined when params omit it', () => {
+    const job = buildJobFromSubmit({ directory: '/tmp/work', prompt: 'p' }, 1000, 'job-nd')
+    expect(job.dispositionTopic).toBeUndefined()
   })
 })

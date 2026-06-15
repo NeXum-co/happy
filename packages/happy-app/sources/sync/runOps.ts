@@ -27,6 +27,11 @@ export interface JobRecordView {
     maxTurns?: number;
     gitHeadBefore?: string;
     gitHeadAfter?: string;
+    dispositionTopic?: string;
+    gateAction?: string;
+    gateBucket?: string;
+    gateReason?: string;
+    gateResolved?: boolean;
     createdAt: number;
 }
 
@@ -39,11 +44,14 @@ export async function machineSubmitJob(machineId: string, params: {
     maxTurns?: number;
     timeoutMs?: number;
     allowedTools?: string[];
+    dispositionTopic?: string;
 }): Promise<{ jobId: string }> {
-    const result = await apiSocket.machineRPC<{ jobId: string }, typeof params>(
+    const { dispositionTopic, ...rest } = params;
+    const payload = { ...rest, ...(dispositionTopic ? { dispositionTopic } : {}) };
+    const result = await apiSocket.machineRPC<{ jobId: string }, typeof payload>(
         machineId,
         'submit-job',
-        params
+        payload
     );
     return result;
 }
@@ -63,6 +71,16 @@ export async function machineCancelJob(machineId: string, jobId: string): Promis
         machineId,
         'cancel-job',
         { jobId }
+    );
+    return result;
+}
+
+/** Resolves a gate-parked job (E05): 'approve' runs it, 'reject' drives it to dead. */
+export async function machineResolveGate(machineId: string, jobId: string, decision: 'approve' | 'reject'): Promise<{ resolved: boolean }> {
+    const result = await apiSocket.machineRPC<{ resolved: boolean }, { jobId: string; decision: 'approve' | 'reject' }>(
+        machineId,
+        'resolve-gate',
+        { jobId, decision }
     );
     return result;
 }

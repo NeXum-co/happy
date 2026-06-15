@@ -1094,6 +1094,16 @@ export const ru: TranslationStructure = {
         promptPlaceholder: 'Опишите, что вы хотите, чтобы агент сделал…',
         cancel: 'Отменить задачу',
         cancelConfirm: 'Отменить эту ожидающую задачу?',
+        fieldDispositionTopic: 'Тема диспозиции',
+        dispositionTopicPlaceholder: 'напр. architecture/api-design',
+        dispositionTopicHint: 'Необязательно. Гейт уверенности использует это, чтобы определить автономность (продолжить / под контролем / удержать). Оставьте пустым, чтобы требовать одобрение перед каждым запуском.',
+        fieldGateAction: 'Решение гейта',
+        fieldGateBucket: 'Уверенность',
+        fieldGateReason: 'Причина гейта',
+        approve: 'Одобрить',
+        reject: 'Отклонить',
+        approveConfirm: 'Одобрить эту задачу? Она будет запущена на своём уровне гейта.',
+        rejectConfirm: 'Отклонить эту задачу? Она будет помечена как мёртвая.',
     },
 
     cron: {
@@ -1123,6 +1133,9 @@ export const ru: TranslationStructure = {
         promptPlaceholder: 'Опишите, что вы хотите, чтобы агент сделал…',
         allowedToolsPlaceholder: 'Необязательно, через запятую',
         allowedToolsHint: 'Ограничить агента этими инструментами. Оставьте пустым для значения по умолчанию пресета.',
+        fieldDispositionTopic: 'Тема диспозиции',
+        dispositionTopicPlaceholder: 'напр. architecture/api-design',
+        dispositionTopicHint: 'Необязательно. Гейт уверенности использует это, чтобы определить автономность (продолжить / под контролем / удержать). Оставьте пустым, чтобы требовать одобрение перед каждым запуском.',
         submitSuccess: 'Расписание создано.',
     },
 
@@ -1155,6 +1168,9 @@ export const ru: TranslationStructure = {
         promptPlaceholder: 'Опишите, что вы хотите, чтобы агент сделал…',
         allowedToolsPlaceholder: 'Необязательно, через запятую',
         allowedToolsHint: 'Ограничить агента этими инструментами. Оставьте пустым для значения по умолчанию пресета.',
+        fieldDispositionTopic: 'Тема диспозиции',
+        dispositionTopicPlaceholder: 'напр. architecture/api-design',
+        dispositionTopicHint: 'Необязательно. Гейт уверенности использует это, чтобы определить автономность (продолжить / под контролем / удержать). Оставьте пустым, чтобы требовать одобрение перед каждым запуском.',
     },
 
 } as const;

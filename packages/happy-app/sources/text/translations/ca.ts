@@ -1069,6 +1069,16 @@ export const ca: TranslationStructure = {
         promptPlaceholder: 'Descriu el que vols que faci l’agent…',
         cancel: 'Cancel·la la tasca',
         cancelConfirm: 'Cancel·lar aquesta tasca en espà?',
+        fieldDispositionTopic: 'Tema de disposició',
+        dispositionTopicPlaceholder: 'p. ex. architecture/api-design',
+        dispositionTopicHint: 'Opcional. La porta de confiança ho fa servir per decidir l’autonomia (continua / supervisat / atura). Deixeu-ho buit per requerir aprovació abans de cada execució.',
+        fieldGateAction: 'Decisió de la porta',
+        fieldGateBucket: 'Confiança',
+        fieldGateReason: 'Motiu de la porta',
+        approve: 'Aprova',
+        reject: 'Rebutja',
+        approveConfirm: 'Voleu aprovar aquesta tasca? S’executarà al seu nivell de porta.',
+        rejectConfirm: 'Voleu rebutjar aquesta tasca? Es marcarà com a morta.',
     },
 
     cron: {
@@ -1098,6 +1108,9 @@ export const ca: TranslationStructure = {
         promptPlaceholder: 'Descriu el que vols que faci l’agent…',
         allowedToolsPlaceholder: 'Opcional, separades per comes',
         allowedToolsHint: 'Restringeix l’agent a aquestes eines. Deixeu-ho buit per al valor predeterminat de la predefinició.',
+        fieldDispositionTopic: 'Tema de disposició',
+        dispositionTopicPlaceholder: 'p. ex. architecture/api-design',
+        dispositionTopicHint: 'Opcional. La porta de confiança ho fa servir per decidir l’autonomia (continua / supervisat / atura). Deixeu-ho buit per requerir aprovació abans de cada execució.',
         submitSuccess: 'Programació creada.',
     },
 
@@ -1130,6 +1143,9 @@ export const ca: TranslationStructure = {
         promptPlaceholder: 'Descriu el que vols que faci l’agent…',
         allowedToolsPlaceholder: 'Opcional, separades per comes',
         allowedToolsHint: 'Restringeix l’agent a aquestes eines. Deixeu-ho buit per al valor predeterminat de la predefinició.',
+        fieldDispositionTopic: 'Tema de disposició',
+        dispositionTopicPlaceholder: 'p. ex. architecture/api-design',
+        dispositionTopicHint: 'Opcional. La porta de confiança ho fa servir per decidir l’autonomia (continua / supervisat / atura). Deixeu-ho buit per requerir aprovació abans de cada execució.',
     },
 } as const;
 

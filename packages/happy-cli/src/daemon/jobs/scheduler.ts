@@ -24,6 +24,10 @@ import type { Semaphore } from './semaphore'
 import type { JobRecord } from './jobTypes'
 import { classifyFailure, shouldRetry, backoffMs } from './retry'
 import { captureGitState } from './audit'
+import { evaluate } from '@/disposition/gate'
+import { loadRollup as loadRollupReal } from '@/disposition/rollup'
+import type { DispositionRollup } from '@/disposition/types'
+import type { JobTier } from './jobTypes'
 import type { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers'
 
 interface SchedulerDeps {
@@ -34,6 +38,10 @@ interface SchedulerDeps {
   intervalMs?: number
   now?: () => number
   backoff?: (attempt: number) => number
+  // E05: the pre-spawn gate reads the disposition-rollup. Injected so tests pass
+  // a fake without touching the filesystem (mirrors the spawn/now deps); defaults
+  // to the real read-only loader.
+  loadRollup?: () => DispositionRollup | null
 }
 
 interface TriggerMetadata {
@@ -67,6 +75,7 @@ export class JobScheduler {
   private readonly intervalMs: number
   private readonly now: () => number
   private readonly backoff: (attempt: number) => number
+  private readonly loadRollup: () => DispositionRollup | null
   private timer: NodeJS.Timeout | null = null
   private running = false
 
@@ -78,14 +87,20 @@ export class JobScheduler {
     this.intervalMs = deps.intervalMs ?? 1000
     this.now = deps.now ?? Date.now
     this.backoff = deps.backoff ?? (attempt => backoffMs(attempt))
+    this.loadRollup = deps.loadRollup ?? (() => loadRollupReal())
   }
 
-  /** Build the SHARED ENV CONTRACT for a job's tier. */
-  tierEnv(job: JobRecord): Record<string, string> {
+  /**
+   * Build the SHARED ENV CONTRACT for a job. `effectiveTier` is the tier the
+   * gate resolved for this run (E05): a 'proceed-supervised' verdict downgrades a
+   * declared 'trusted' job to 'supervised' for the permission-mode/allowedTools
+   * posture, without mutating the persisted record. Defaults to the declared tier.
+   */
+  tierEnv(job: JobRecord, effectiveTier: JobTier = job.tier): Record<string, string> {
     const env: Record<string, string> = {
-      HAPPY_JOB_PERMISSION_MODE: job.tier === 'trusted' ? 'bypassPermissions' : 'default',
+      HAPPY_JOB_PERMISSION_MODE: effectiveTier === 'trusted' ? 'bypassPermissions' : 'default',
     }
-    if (job.tier === 'supervised') {
+    if (effectiveTier === 'supervised') {
       const meta = this.parseTriggerMetadata(job)
       if (Array.isArray(meta.allowedTools) && meta.allowedTools.length > 0) {
         env.HAPPY_JOB_ALLOWED_TOOLS = meta.allowedTools.join(',')
@@ -97,6 +112,9 @@ export class JobScheduler {
     // with known pricing). Local jobs cost nothing and would be mis-priced by the
     // pricing fallback, so only cloud jobs are told to report their cost (IMP-4).
     if (!this.isLocal(job)) env.HAPPY_JOB_REPORT_COST = '1'
+    // E05: the runtime gate in the keyed session process reads this topic to make
+    // its own canUseTool decision (D-E05-7). Slice 3 consumes this env name.
+    if (job.dispositionTopic) env.HAPPY_JOB_DISPOSITION_TOPIC = job.dispositionTopic
     Object.assign(env, LOCAL_PRESET_ENV[job.preset] ?? {})
     return env
   }
@@ -138,10 +156,36 @@ export class JobScheduler {
       return
     }
 
+    // E05 pre-spawn confidence gate (D-E05-1/4/7). A job Joshua has already
+    // approved (gateResolved) skips the eval and runs at its declared tier; every
+    // other job is gated against the disposition-rollup before it spawns.
+    let effectiveTier: JobTier = job.tier
+    if (!job.gateResolved) {
+      const verdict = evaluate(job.dispositionTopic, this.loadRollup())
+      this.store.patch(job.id, { gateAction: verdict.action, gateBucket: verdict.bucket, gateReason: verdict.reason })
+      // escalate/hold → park in needs-attention (the AC-3 containment pattern),
+      // never spawn. Joshua resolves via resolveGate. Fail-closed (D-E05-5).
+      if (verdict.action === 'hold' || verdict.action === 'escalate') {
+        this.store.transition(job.id, 'needs-attention', { exitReason: `gate:${verdict.bucket}` })
+        return
+      }
+      // proceed-supervised downgrades the effective tier (D-E05-1 tier-floor).
+      effectiveTier = verdict.action === 'proceed-supervised' ? 'supervised' : job.tier
+    }
+
     // Audit trail (D-E04-7): record the git HEAD before the job runs so a
     // reviewer can diff what it changed. captureGitState never throws.
     this.store.patch(job.id, { gitHeadBefore: captureGitState(job.directory).head })
 
+    await this.runJob(job, effectiveTier)
+  }
+
+  /**
+   * Spawn a claimed (running) job under the given effective tier and bind its
+   * outcome to the store. Shared by tick() (post-gate) and resolveGate('approve')
+   * so the spawn path stays in one place (D-E05-4).
+   */
+  private async runJob(job: JobRecord, effectiveTier: JobTier): Promise<void> {
     const gated = this.isLocal(job)
     const release = gated ? await this.localSemaphore.acquire() : undefined
     try {
@@ -149,7 +193,7 @@ export class JobScheduler {
         directory: job.directory,
         agent: 'claude',
         initialPrompt: job.prompt,
-        environmentVariables: this.tierEnv(job),
+        environmentVariables: this.tierEnv(job, effectiveTier),
         sessionName: 'job-' + job.id,
       }
 
@@ -181,6 +225,26 @@ export class JobScheduler {
     } finally {
       release?.()
     }
+  }
+
+  /**
+   * Resolve a gate-parked job (D-E05-4). approve → needs-attention -> running and
+   * spawn (honouring a proceed-supervised downgrade); reject → the cancel path
+   * needs-attention -> failed -> dead. Returns false if the job is not parked.
+   */
+  async resolveGate(jobId: string, decision: 'approve' | 'reject'): Promise<boolean> {
+    const job = this.store.get(jobId)
+    if (!job || job.status !== 'needs-attention') return false
+
+    if (decision === 'approve') {
+      this.store.transition(jobId, 'running', { gateResolved: true })
+      const effectiveTier: JobTier = job.gateAction === 'proceed-supervised' ? 'supervised' : job.tier
+      await this.runJob(job, effectiveTier)
+    } else {
+      this.store.transition(jobId, 'failed', { exitReason: 'gate-rejected' })
+      this.store.transition(jobId, 'dead', { finishedAt: this.now() })
+    }
+    return true
   }
 
   /**
@@ -276,6 +340,7 @@ interface SubmitJobParams {
   maxTurns?: number
   timeoutMs?: number
   allowedTools?: string[]
+  dispositionTopic?: string
 }
 
 /**
@@ -299,5 +364,6 @@ export function buildJobFromSubmit(params: SubmitJobParams, now: number, id: str
   if (params.timeoutMs !== undefined) job.timeoutAt = now + params.timeoutMs
   if (params.maxBudgetUsd !== undefined) job.maxBudgetUsd = params.maxBudgetUsd
   if (params.maxTurns !== undefined) job.maxTurns = params.maxTurns
+  if (params.dispositionTopic !== undefined) job.dispositionTopic = params.dispositionTopic
   return job
 }

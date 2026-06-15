@@ -1066,6 +1066,16 @@ export const zhHans: TranslationStructure = {
         promptPlaceholder: '描述您希望代理执行的操作…',
         cancel: '取消任务',
         cancelConfirm: '取消此待处理任务？',
+        fieldDispositionTopic: '处置主题',
+        dispositionTopicPlaceholder: '例如 architecture/api-design',
+        dispositionTopicHint: '可选。置信门据此决定自主程度（继续 / 受监督 / 暂停）。留空则每次运行前都需要批准。',
+        fieldGateAction: '门控决定',
+        fieldGateBucket: '置信度',
+        fieldGateReason: '门控原因',
+        approve: '批准',
+        reject: '拒绝',
+        approveConfirm: '批准此任务？它将在其门控层级运行。',
+        rejectConfirm: '拒绝此任务？它将被标记为已终止。',
     },
 
     cron: {
@@ -1095,6 +1105,9 @@ export const zhHans: TranslationStructure = {
         promptPlaceholder: '描述您希望代理执行的操作…',
         allowedToolsPlaceholder: '可选，以逗号分隔',
         allowedToolsHint: '将代理限制为这些工具。留空以使用预设默认值。',
+        fieldDispositionTopic: '处置主题',
+        dispositionTopicPlaceholder: '例如 architecture/api-design',
+        dispositionTopicHint: '可选。置信门据此决定自主程度（继续 / 受监督 / 暂停）。留空则每次运行前都需要批准。',
         submitSuccess: '已创建计划任务。',
     },
 
@@ -1127,5 +1140,8 @@ export const zhHans: TranslationStructure = {
         promptPlaceholder: '描述您希望代理执行的操作…',
         allowedToolsPlaceholder: '可选，以逗号分隔',
         allowedToolsHint: '将代理限制为这些工具。留空以使用预设默认值。',
+        fieldDispositionTopic: '处置主题',
+        dispositionTopicPlaceholder: '例如 architecture/api-design',
+        dispositionTopicHint: '可选。置信门据此决定自主程度（继续 / 受监督 / 暂停）。留空则每次运行前都需要批准。',
     },
 } as const;

@@ -1068,6 +1068,16 @@ export const it: TranslationStructure = {
         promptPlaceholder: 'Descrivi cosa vuoi che faccia l’agente…',
         cancel: 'Annulla lavoro',
         cancelConfirm: 'Annullare questo lavoro in attesa?',
+        fieldDispositionTopic: 'Argomento di disposizione',
+        dispositionTopicPlaceholder: 'es. architecture/api-design',
+        dispositionTopicHint: 'Facoltativo. Il gate di confidenza lo usa per decidere l’autonomia (procedi / supervisionato / sospendi). Lascia vuoto per richiedere l’approvazione prima di ogni esecuzione.',
+        fieldGateAction: 'Decisione del gate',
+        fieldGateBucket: 'Confidenza',
+        fieldGateReason: 'Motivo del gate',
+        approve: 'Approva',
+        reject: 'Rifiuta',
+        approveConfirm: 'Approvare questo lavoro? Verrà eseguito al suo livello di gate.',
+        rejectConfirm: 'Rifiutare questo lavoro? Verrà contrassegnato come morto.',
     },
 
     cron: {
@@ -1097,6 +1107,9 @@ export const it: TranslationStructure = {
         promptPlaceholder: 'Descrivi cosa vuoi che faccia l’agente…',
         allowedToolsPlaceholder: 'Facoltativo, separati da virgola',
         allowedToolsHint: 'Limita l’agente a questi strumenti. Lascia vuoto per il valore predefinito del preset.',
+        fieldDispositionTopic: 'Argomento di disposizione',
+        dispositionTopicPlaceholder: 'es. architecture/api-design',
+        dispositionTopicHint: 'Facoltativo. Il gate di confidenza lo usa per decidere l’autonomia (procedi / supervisionato / sospendi). Lascia vuoto per richiedere l’approvazione prima di ogni esecuzione.',
         submitSuccess: 'Pianificazione creata.',
     },
 
@@ -1129,6 +1142,9 @@ export const it: TranslationStructure = {
         promptPlaceholder: 'Descrivi cosa vuoi che faccia l’agente…',
         allowedToolsPlaceholder: 'Facoltativo, separati da virgola',
         allowedToolsHint: 'Limita l’agente a questi strumenti. Lascia vuoto per il valore predefinito del preset.',
+        fieldDispositionTopic: 'Argomento di disposizione',
+        dispositionTopicPlaceholder: 'es. architecture/api-design',
+        dispositionTopicHint: 'Facoltativo. Il gate di confidenza lo usa per decidere l’autonomia (procedi / supervisionato / sospendi). Lascia vuoto per richiedere l’approvazione prima di ogni esecuzione.',
     },
 } as const;
 
