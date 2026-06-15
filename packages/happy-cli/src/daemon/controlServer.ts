@@ -272,6 +272,7 @@ export function startDaemonControlServer({
           maxTurns: z.number().optional(),
           timeoutMs: z.number().optional(),
           allowedTools: z.array(z.string()).optional(),
+          dispositionTopic: z.string().optional(),
         }),
         response: {
           200: z.object({
@@ -404,6 +405,7 @@ export function startDaemonControlServer({
           maxTurns: z.number().optional(),
           timeoutMs: z.number().optional(),
           allowedTools: z.array(z.string()).optional(),
+          dispositionTopic: z.string().optional(),
         }),
         response: {
           200: z.object({
@@ -475,6 +477,7 @@ export function startDaemonControlServer({
           maxTurns: z.number().optional(),
           timeoutMs: z.number().optional(),
           allowedTools: z.array(z.string()).optional(),
+          dispositionTopic: z.string().optional(),
         }),
         response: {
           200: z.object({
