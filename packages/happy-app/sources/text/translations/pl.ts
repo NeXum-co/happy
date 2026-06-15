@@ -1095,6 +1095,16 @@ export const pl: TranslationStructure = {
         promptPlaceholder: 'Opisz co chcesz, żeby agent zrobił…',
         cancel: 'Anuluj zadanie',
         cancelConfirm: 'Anulować to oczekujące zadanie?',
+        fieldDispositionTopic: 'Temat dyspozycji',
+        dispositionTopicPlaceholder: 'np. architecture/api-design',
+        dispositionTopicHint: 'Opcjonalne. Bramka pewności używa tego do określenia autonomii (kontynuuj / nadzorowane / wstrzymaj). Pozostaw puste, aby wymagać zatwierdzenia przed każdym uruchomieniem.',
+        fieldGateAction: 'Decyzja bramki',
+        fieldGateBucket: 'Pewność',
+        fieldGateReason: 'Powód bramki',
+        approve: 'Zatwierdź',
+        reject: 'Odrzuć',
+        approveConfirm: 'Zatwierdzić to zadanie? Zostanie uruchomione na swoim poziomie bramki.',
+        rejectConfirm: 'Odrzucić to zadanie? Zostanie oznaczone jako martwe.',
     },
 
     cron: {
@@ -1124,6 +1134,9 @@ export const pl: TranslationStructure = {
         promptPlaceholder: 'Opisz co chcesz, żeby agent zrobił…',
         allowedToolsPlaceholder: 'Opcjonalnie, oddzielone przecinkami',
         allowedToolsHint: 'Ogranicz agenta do tych narzędzi. Pozostaw puste, aby użyć domyślnych dla presetu.',
+        fieldDispositionTopic: 'Temat dyspozycji',
+        dispositionTopicPlaceholder: 'np. architecture/api-design',
+        dispositionTopicHint: 'Opcjonalne. Bramka pewności używa tego do określenia autonomii (kontynuuj / nadzorowane / wstrzymaj). Pozostaw puste, aby wymagać zatwierdzenia przed każdym uruchomieniem.',
         submitSuccess: 'Utworzono harmonogram.',
     },
 
@@ -1156,6 +1169,9 @@ export const pl: TranslationStructure = {
         promptPlaceholder: 'Opisz co chcesz, żeby agent zrobił…',
         allowedToolsPlaceholder: 'Opcjonalnie, oddzielone przecinkami',
         allowedToolsHint: 'Ogranicz agenta do tych narzędzi. Pozostaw puste, aby użyć domyślnych dla presetu.',
+        fieldDispositionTopic: 'Temat dyspozycji',
+        dispositionTopicPlaceholder: 'np. architecture/api-design',
+        dispositionTopicHint: 'Opcjonalne. Bramka pewności używa tego do określenia autonomii (kontynuuj / nadzorowane / wstrzymaj). Pozostaw puste, aby wymagać zatwierdzenia przed każdym uruchomieniem.',
     },
 
 } as const;

@@ -1068,6 +1068,16 @@ export const pt: TranslationStructure = {
         promptPlaceholder: 'Descreva o que você quer que o agente faça…',
         cancel: 'Cancelar tarefa',
         cancelConfirm: 'Cancelar esta tarefa pendente?',
+        fieldDispositionTopic: 'Tópico de disposição',
+        dispositionTopicPlaceholder: 'ex.: architecture/api-design',
+        dispositionTopicHint: 'Opcional. O portão de confiança usa isto para decidir a autonomia (prosseguir / supervisionado / reter). Deixe vazio para exigir aprovação antes de cada execução.',
+        fieldGateAction: 'Decisão do portão',
+        fieldGateBucket: 'Confiança',
+        fieldGateReason: 'Motivo do portão',
+        approve: 'Aprovar',
+        reject: 'Rejeitar',
+        approveConfirm: 'Aprovar esta tarefa? Ela será executada no seu nível de portão.',
+        rejectConfirm: 'Rejeitar esta tarefa? Ela será marcada como morta.',
     },
 
     cron: {
@@ -1097,6 +1107,9 @@ export const pt: TranslationStructure = {
         promptPlaceholder: 'Descreva o que você quer que o agente faça…',
         allowedToolsPlaceholder: 'Opcional, separadas por vírgula',
         allowedToolsHint: 'Restringe o agente a estas ferramentas. Deixe vazio para o padrão da predefinição.',
+        fieldDispositionTopic: 'Tópico de disposição',
+        dispositionTopicPlaceholder: 'ex.: architecture/api-design',
+        dispositionTopicHint: 'Opcional. O portão de confiança usa isto para decidir a autonomia (prosseguir / supervisionado / reter). Deixe vazio para exigir aprovação antes de cada execução.',
         submitSuccess: 'Agendamento criado.',
     },
 
@@ -1129,6 +1142,9 @@ export const pt: TranslationStructure = {
         promptPlaceholder: 'Descreva o que você quer que o agente faça…',
         allowedToolsPlaceholder: 'Opcional, separadas por vírgula',
         allowedToolsHint: 'Restringe o agente a estas ferramentas. Deixe vazio para o padrão da predefinição.',
+        fieldDispositionTopic: 'Tópico de disposição',
+        dispositionTopicPlaceholder: 'ex.: architecture/api-design',
+        dispositionTopicHint: 'Opcional. O portão de confiança usa isto para decidir a autonomia (prosseguir / supervisionado / reter). Deixe vazio para exigir aprovação antes de cada execução.',
     },
 } as const;
 

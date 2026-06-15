@@ -1065,6 +1065,16 @@ export const zhHant: TranslationStructure = {
         promptPlaceholder: '描述您希望代理執行的操作…',
         cancel: '取消任務',
         cancelConfirm: '取消此待處理任務？',
+        fieldDispositionTopic: '處置主題',
+        dispositionTopicPlaceholder: '例如 architecture/api-design',
+        dispositionTopicHint: '選用。信心閘門會據此決定自主程度（繼續 / 受監督 / 暫停）。留空則每次執行前都需要核准。',
+        fieldGateAction: '閘門決定',
+        fieldGateBucket: '信心度',
+        fieldGateReason: '閘門原因',
+        approve: '核准',
+        reject: '拒絕',
+        approveConfirm: '核准此任務？它將以其閘門層級執行。',
+        rejectConfirm: '拒絕此任務？它將被標記為已終止。',
     },
 
     cron: {
@@ -1094,6 +1104,9 @@ export const zhHant: TranslationStructure = {
         promptPlaceholder: '描述您希望代理執行的操作…',
         allowedToolsPlaceholder: '選用，以逗號分隔',
         allowedToolsHint: '將代理限制為這些工具。留空以使用預設的預設值。',
+        fieldDispositionTopic: '處置主題',
+        dispositionTopicPlaceholder: '例如 architecture/api-design',
+        dispositionTopicHint: '選用。信心閘門會據此決定自主程度（繼續 / 受監督 / 暫停）。留空則每次執行前都需要核准。',
         submitSuccess: '已建立排程。',
     },
 
@@ -1126,5 +1139,8 @@ export const zhHant: TranslationStructure = {
         promptPlaceholder: '描述您希望代理執行的操作…',
         allowedToolsPlaceholder: '選用，以逗號分隔',
         allowedToolsHint: '將代理限制為這些工具。留空以使用預設的預設值。',
+        fieldDispositionTopic: '處置主題',
+        dispositionTopicPlaceholder: '例如 architecture/api-design',
+        dispositionTopicHint: '選用。信心閘門會據此決定自主程度（繼續 / 受監督 / 暫停）。留空則每次執行前都需要核准。',
     },
 } as const;

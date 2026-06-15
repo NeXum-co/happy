@@ -1067,6 +1067,16 @@ export const ja: TranslationStructure = {
         promptPlaceholder: 'エージェントに何をしてほしいか説明してください…',
         cancel: 'ジョブをキャンセル',
         cancelConfirm: 'この保留中のジョブをキャンセルしますか？',
+        fieldDispositionTopic: '処理トピック',
+        dispositionTopicPlaceholder: '例: architecture/api-design',
+        dispositionTopicHint: '任意。確信度ゲートはこれを使って自律性（続行 / 監視あり / 保留）を判断します。空欄の場合は実行ごとに承認が必要になります。',
+        fieldGateAction: 'ゲートの判定',
+        fieldGateBucket: '確信度',
+        fieldGateReason: 'ゲートの理由',
+        approve: '承認',
+        reject: '却下',
+        approveConfirm: 'このジョブを承認しますか？ゲートで決まったティアで実行されます。',
+        rejectConfirm: 'このジョブを却下しますか？終了済みとしてマークされます。',
     },
 
     cron: {
@@ -1096,6 +1106,9 @@ export const ja: TranslationStructure = {
         promptPlaceholder: 'エージェントに何をしてほしいか説明してください…',
         allowedToolsPlaceholder: '任意、カンマ区切り',
         allowedToolsHint: 'エージェントをこれらのツールに制限します。空欄の場合はプリセットの既定値を使用します。',
+        fieldDispositionTopic: '処理トピック',
+        dispositionTopicPlaceholder: '例: architecture/api-design',
+        dispositionTopicHint: '任意。確信度ゲートはこれを使って自律性（続行 / 監視あり / 保留）を判断します。空欄の場合は実行ごとに承認が必要になります。',
         submitSuccess: 'スケジュールを作成しました。',
     },
 
@@ -1128,5 +1141,8 @@ export const ja: TranslationStructure = {
         promptPlaceholder: 'エージェントに何をしてほしいか説明してください…',
         allowedToolsPlaceholder: '任意、カンマ区切り',
         allowedToolsHint: 'エージェントをこれらのツールに制限します。空欄の場合はプリセットの既定値を使用します。',
+        fieldDispositionTopic: '処理トピック',
+        dispositionTopicPlaceholder: '例: architecture/api-design',
+        dispositionTopicHint: '任意。確信度ゲートはこれを使って自律性（続行 / 監視あり / 保留）を判断します。空欄の場合は実行ごとに承認が必要になります。',
     },
 } as const;

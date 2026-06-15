@@ -1070,6 +1070,16 @@ export const es: TranslationStructure = {
         promptPlaceholder: 'Describe lo que quieres que haga el agente…',
         cancel: 'Cancelar tarea',
         cancelConfirm: '¿Cancelar esta tarea pendiente?',
+        fieldDispositionTopic: 'Tema de disposición',
+        dispositionTopicPlaceholder: 'p. ej. architecture/api-design',
+        dispositionTopicHint: 'Opcional. La puerta de confianza lo usa para decidir la autonomía (continuar / supervisado / retener). Déjalo vacío para requerir aprobación antes de cada ejecución.',
+        fieldGateAction: 'Decisión de la puerta',
+        fieldGateBucket: 'Confianza',
+        fieldGateReason: 'Motivo de la puerta',
+        approve: 'Aprobar',
+        reject: 'Rechazar',
+        approveConfirm: '¿Aprobar esta tarea? Se ejecutará en su nivel de puerta.',
+        rejectConfirm: '¿Rechazar esta tarea? Se marcará como muerta.',
     },
 
     cron: {
@@ -1099,6 +1109,9 @@ export const es: TranslationStructure = {
         promptPlaceholder: 'Describe lo que quieres que haga el agente…',
         allowedToolsPlaceholder: 'Opcional, separadas por comas',
         allowedToolsHint: 'Restringe el agente a estas herramientas. Déjalo vacío para el valor predeterminado del preajuste.',
+        fieldDispositionTopic: 'Tema de disposición',
+        dispositionTopicPlaceholder: 'p. ej. architecture/api-design',
+        dispositionTopicHint: 'Opcional. La puerta de confianza lo usa para decidir la autonomía (continuar / supervisado / retener). Déjalo vacío para requerir aprobación antes de cada ejecución.',
         submitSuccess: 'Programación creada.',
     },
 
@@ -1131,6 +1144,9 @@ export const es: TranslationStructure = {
         promptPlaceholder: 'Describe lo que quieres que haga el agente…',
         allowedToolsPlaceholder: 'Opcional, separadas por comas',
         allowedToolsHint: 'Restringe el agente a estas herramientas. Déjalo vacío para el valor predeterminado del preajuste.',
+        fieldDispositionTopic: 'Tema de disposición',
+        dispositionTopicPlaceholder: 'p. ej. architecture/api-design',
+        dispositionTopicHint: 'Opcional. La puerta de confianza lo usa para decidir la autonomía (continuar / supervisado / retener). Déjalo vacío para requerir aprobación antes de cada ejecución.',
     },
 
 } as const;

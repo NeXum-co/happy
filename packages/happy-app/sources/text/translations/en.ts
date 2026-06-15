@@ -1084,6 +1084,16 @@ export const en: TranslationStructure = {
         promptPlaceholder: 'Describe what you want the agent to do…',
         cancel: 'Cancel job',
         cancelConfirm: 'Cancel this pending job?',
+        fieldDispositionTopic: 'Disposition topic',
+        dispositionTopicPlaceholder: 'e.g. architecture/api-design',
+        dispositionTopicHint: 'Optional. The confidence gate uses this to decide autonomy (proceed / supervised / hold). Leave empty to require approval before each run.',
+        fieldGateAction: 'Gate decision',
+        fieldGateBucket: 'Confidence',
+        fieldGateReason: 'Gate reason',
+        approve: 'Approve',
+        reject: 'Reject',
+        approveConfirm: 'Approve this job? It runs at its gated tier.',
+        rejectConfirm: 'Reject this job? It will be marked dead.',
     },
 
     cron: {
@@ -1113,6 +1123,9 @@ export const en: TranslationStructure = {
         promptPlaceholder: 'Describe what you want the agent to do…',
         allowedToolsPlaceholder: 'Optional, comma separated',
         allowedToolsHint: 'Restrict the agent to these tools. Leave empty for the preset default.',
+        fieldDispositionTopic: 'Disposition topic',
+        dispositionTopicPlaceholder: 'e.g. architecture/api-design',
+        dispositionTopicHint: 'Optional. The confidence gate uses this to decide autonomy (proceed / supervised / hold). Leave empty to require approval before each run.',
         submitSuccess: 'Schedule created.',
     },
 
@@ -1145,6 +1158,9 @@ export const en: TranslationStructure = {
         promptPlaceholder: 'Describe what you want the agent to do…',
         allowedToolsPlaceholder: 'Optional, comma separated',
         allowedToolsHint: 'Restrict the agent to these tools. Leave empty for the preset default.',
+        fieldDispositionTopic: 'Disposition topic',
+        dispositionTopicPlaceholder: 'e.g. architecture/api-design',
+        dispositionTopicHint: 'Optional. The confidence gate uses this to decide autonomy (proceed / supervised / hold). Leave empty to require approval before each run.',
     },
 
 } as const;
