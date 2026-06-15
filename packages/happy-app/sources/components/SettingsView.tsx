@@ -399,6 +399,11 @@ export const SettingsView = React.memo(function SettingsView() {
                     icon={<Ionicons name="hardware-chip-outline" size={29} color="#34C759" />}
                     onPress={() => router.push('/runs' as any)}
                 />
+                <Item
+                    title={t('cron.title')}
+                    icon={<Ionicons name="time-outline" size={29} color="#34C759" />}
+                    onPress={() => router.push('/crons' as any)}
+                />
                 {experiments && (
                     <Item
                         title={t('settings.usage')}

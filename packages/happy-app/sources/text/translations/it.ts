@@ -1067,6 +1067,30 @@ export const it: TranslationStructure = {
         cancel: 'Annulla lavoro',
         cancelConfirm: 'Annullare questo lavoro in attesa?',
     },
+
+    cron: {
+        title: 'Pianificazioni',
+        empty: 'Nessuna pianificazione cron',
+        submit: 'Crea pianificazione',
+        submitTitle: 'Nuova pianificazione cron',
+        fieldCronExpr: 'Espressione cron',
+        fieldDirectory: 'Directory',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Livello',
+        fieldPreset: 'Preimpostazione',
+        fieldBudget: 'Budget massimo (USD)',
+        fieldTurns: 'Turni massimi',
+        fieldTimeout: 'Timeout (minuti)',
+        tierTrusted: 'Affidabile (autonomo)',
+        tierSupervised: 'Supervisionato (chiede)',
+        delete: 'Elimina pianificazione',
+        deleteConfirm: 'Eliminare questa pianificazione? Non verranno accodate altre esecuzioni.',
+        statusEnabled: 'Abilitata',
+        statusDisabled: 'Disabilitata',
+        cronExprPlaceholder: 'es. */30 * * * *',
+        cronExprHint: 'Espressione cron a cinque campi, valutata nel fuso orario del daemon.',
+        promptPlaceholder: 'Descrivi cosa vuoi che faccia l’agente…',
+    },
 } as const;
 
 export type TranslationsIt = typeof it;

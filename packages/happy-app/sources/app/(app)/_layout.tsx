@@ -78,6 +78,22 @@ export default function RootLayout() {
                 }}
             />
             <Stack.Screen
+                name="crons/index"
+                options={{
+                    headerShown: true,
+                    headerTitle: t('cron.title'),
+                    headerBackTitle: t('common.home')
+                }}
+            />
+            <Stack.Screen
+                name="crons/new"
+                options={{
+                    headerShown: true,
+                    headerTitle: t('cron.submitTitle'),
+                    headerBackTitle: t('cron.title')
+                }}
+            />
+            <Stack.Screen
                 name="runs/[jobId]"
                 options={{
                     headerShown: true,

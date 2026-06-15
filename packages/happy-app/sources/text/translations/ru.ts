@@ -1094,6 +1094,30 @@ export const ru: TranslationStructure = {
         cancelConfirm: 'Отменить эту ожидающую задачу?',
     },
 
+    cron: {
+        title: 'Расписания',
+        empty: 'Расписаний cron пока нет',
+        submit: 'Создать расписание',
+        submitTitle: 'Новое расписание cron',
+        fieldCronExpr: 'Выражение cron',
+        fieldDirectory: 'Каталог',
+        fieldPrompt: 'Запрос',
+        fieldTier: 'Уровень',
+        fieldPreset: 'Пресет',
+        fieldBudget: 'Максимальный бюджет (USD)',
+        fieldTurns: 'Максимум ходов',
+        fieldTimeout: 'Тайм-аут (минуты)',
+        tierTrusted: 'Доверенный (автономный)',
+        tierSupervised: 'Контролируемый (спрашивает)',
+        delete: 'Удалить расписание',
+        deleteConfirm: 'Удалить это расписание? Новые запуски не будут поставлены в очередь.',
+        statusEnabled: 'Включено',
+        statusDisabled: 'Отключено',
+        cronExprPlaceholder: 'напр. */30 * * * *',
+        cronExprHint: 'Выражение cron из пяти полей, вычисляется в часовом поясе демона.',
+        promptPlaceholder: 'Опишите, что вы хотите, чтобы агент сделал…',
+    },
+
 } as const;
 
 export type TranslationsRu = typeof ru;

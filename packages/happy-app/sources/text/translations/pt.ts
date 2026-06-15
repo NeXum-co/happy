@@ -1067,6 +1067,30 @@ export const pt: TranslationStructure = {
         cancel: 'Cancelar tarefa',
         cancelConfirm: 'Cancelar esta tarefa pendente?',
     },
+
+    cron: {
+        title: 'Agendamentos',
+        empty: 'Ainda não há agendamentos cron',
+        submit: 'Criar agendamento',
+        submitTitle: 'Novo agendamento cron',
+        fieldCronExpr: 'Expressão cron',
+        fieldDirectory: 'Diretório',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Nível',
+        fieldPreset: 'Predefinição',
+        fieldBudget: 'Orçamento máximo (USD)',
+        fieldTurns: 'Turnos máximos',
+        fieldTimeout: 'Tempo limite (minutos)',
+        tierTrusted: 'Confiável (autônomo)',
+        tierSupervised: 'Supervisionado (pergunta)',
+        delete: 'Excluir agendamento',
+        deleteConfirm: 'Excluir este agendamento? Nenhuma execução adicional será enfileirada.',
+        statusEnabled: 'Ativado',
+        statusDisabled: 'Desativado',
+        cronExprPlaceholder: 'ex.: */30 * * * *',
+        cronExprHint: 'Expressão cron de cinco campos, avaliada no fuso horário do daemon.',
+        promptPlaceholder: 'Descreva o que você quer que o agente faça…',
+    },
 } as const;
 
 export type TranslationsPt = typeof pt;

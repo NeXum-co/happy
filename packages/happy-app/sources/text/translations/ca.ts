@@ -1068,6 +1068,30 @@ export const ca: TranslationStructure = {
         cancel: 'Cancel·la la tasca',
         cancelConfirm: 'Cancel·lar aquesta tasca en espà?',
     },
+
+    cron: {
+        title: 'Programacions',
+        empty: 'Encara no hi ha programacions cron',
+        submit: 'Crea una programació',
+        submitTitle: 'Nova programació cron',
+        fieldCronExpr: 'Expressió cron',
+        fieldDirectory: 'Directori',
+        fieldPrompt: 'Indicació',
+        fieldTier: 'Nivell',
+        fieldPreset: 'Predefinit',
+        fieldBudget: 'Pressupost màxim (USD)',
+        fieldTurns: 'Torns màxims',
+        fieldTimeout: 'Temps d’espera (minuts)',
+        tierTrusted: 'De confiança (autònom)',
+        tierSupervised: 'Supervisat (pregunta)',
+        delete: 'Elimina la programació',
+        deleteConfirm: 'Voleu eliminar aquesta programació? No s’encuaran més execucions.',
+        statusEnabled: 'Activada',
+        statusDisabled: 'Desactivada',
+        cronExprPlaceholder: 'p. ex. */30 * * * *',
+        cronExprHint: 'Expressió cron de cinc camps, avaluada en la zona horària del dimoni.',
+        promptPlaceholder: 'Descriu el que vols que faci l’agent…',
+    },
 } as const;
 
 export type TranslationsCa = typeof ca;

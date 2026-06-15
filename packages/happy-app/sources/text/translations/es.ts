@@ -1070,6 +1070,30 @@ export const es: TranslationStructure = {
         cancelConfirm: '¿Cancelar esta tarea pendiente?',
     },
 
+    cron: {
+        title: 'Programaciones',
+        empty: 'Aún no hay programaciones cron',
+        submit: 'Crear programación',
+        submitTitle: 'Nueva programación cron',
+        fieldCronExpr: 'Expresión cron',
+        fieldDirectory: 'Directorio',
+        fieldPrompt: 'Instrucción',
+        fieldTier: 'Nivel',
+        fieldPreset: 'Predefinido',
+        fieldBudget: 'Presupuesto máximo (USD)',
+        fieldTurns: 'Turnos máximos',
+        fieldTimeout: 'Tiempo de espera (minutos)',
+        tierTrusted: 'De confianza (autónomo)',
+        tierSupervised: 'Supervisado (pregunta)',
+        delete: 'Eliminar programación',
+        deleteConfirm: '¿Eliminar esta programación? No se pondrán en cola más ejecuciones.',
+        statusEnabled: 'Activada',
+        statusDisabled: 'Desactivada',
+        cronExprPlaceholder: 'p. ej. */30 * * * *',
+        cronExprHint: 'Expresión cron de cinco campos, evaluada en la zona horaria del demonio.',
+        promptPlaceholder: 'Describe lo que quieres que haga el agente…',
+    },
+
 } as const;
 
 export type TranslationsEs = typeof es;

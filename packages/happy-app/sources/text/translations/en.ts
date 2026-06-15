@@ -1084,6 +1084,30 @@ export const en: TranslationStructure = {
         cancelConfirm: 'Cancel this pending job?',
     },
 
+    cron: {
+        title: 'Schedules',
+        empty: 'No cron schedules yet',
+        submit: 'Create schedule',
+        submitTitle: 'New cron schedule',
+        fieldCronExpr: 'Cron expression',
+        fieldDirectory: 'Directory',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Tier',
+        fieldPreset: 'Preset',
+        fieldBudget: 'Max budget (USD)',
+        fieldTurns: 'Max turns',
+        fieldTimeout: 'Timeout (minutes)',
+        tierTrusted: 'Trusted (autonomous)',
+        tierSupervised: 'Supervised (asks)',
+        delete: 'Delete schedule',
+        deleteConfirm: 'Delete this schedule? No further runs will be queued.',
+        statusEnabled: 'Enabled',
+        statusDisabled: 'Disabled',
+        cronExprPlaceholder: 'e.g. */30 * * * *',
+        cronExprHint: 'Five-field cron expression, evaluated in the daemon timezone.',
+        promptPlaceholder: 'Describe what you want the agent to do…',
+    },
+
 } as const;
 
 export type TranslationsEn = typeof en;

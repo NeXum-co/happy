@@ -1095,6 +1095,30 @@ export const pl: TranslationStructure = {
         cancelConfirm: 'Anulować to oczekujące zadanie?',
     },
 
+    cron: {
+        title: 'Harmonogramy',
+        empty: 'Brak harmonogramów cron',
+        submit: 'Utwórz harmonogram',
+        submitTitle: 'Nowy harmonogram cron',
+        fieldCronExpr: 'Wyrażenie cron',
+        fieldDirectory: 'Katalog',
+        fieldPrompt: 'Prompt',
+        fieldTier: 'Poziom',
+        fieldPreset: 'Ustawienie wstępne',
+        fieldBudget: 'Maksymalny budżet (USD)',
+        fieldTurns: 'Maksymalna liczba tur',
+        fieldTimeout: 'Limit czasu (minuty)',
+        tierTrusted: 'Zaufany (autonomiczny)',
+        tierSupervised: 'Nadzorowany (pyta)',
+        delete: 'Usuń harmonogram',
+        deleteConfirm: 'Usunąć ten harmonogram? Kolejne uruchomienia nie będą kolejkowane.',
+        statusEnabled: 'Włączony',
+        statusDisabled: 'Wyłączony',
+        cronExprPlaceholder: 'np. */30 * * * *',
+        cronExprHint: 'Pięciopolowe wyrażenie cron, oceniane w strefie czasowej demona.',
+        promptPlaceholder: 'Opisz co chcesz, żeby agent zrobił…',
+    },
+
 } as const;
 
 export type TranslationsPl = typeof pl;
