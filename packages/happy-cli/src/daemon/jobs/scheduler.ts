@@ -276,6 +276,7 @@ interface SubmitJobParams {
   maxTurns?: number
   timeoutMs?: number
   allowedTools?: string[]
+  dispositionTopic?: string
 }
 
 /**
@@ -299,5 +300,6 @@ export function buildJobFromSubmit(params: SubmitJobParams, now: number, id: str
   if (params.timeoutMs !== undefined) job.timeoutAt = now + params.timeoutMs
   if (params.maxBudgetUsd !== undefined) job.maxBudgetUsd = params.maxBudgetUsd
   if (params.maxTurns !== undefined) job.maxTurns = params.maxTurns
+  if (params.dispositionTopic !== undefined) job.dispositionTopic = params.dispositionTopic
   return job
 }

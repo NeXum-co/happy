@@ -80,6 +80,7 @@ export function buildEventJob(
   if (sub.maxBudgetUsd !== undefined) job.maxBudgetUsd = sub.maxBudgetUsd
   if (sub.maxTurns !== undefined) job.maxTurns = sub.maxTurns
   if (sub.timeoutMs !== undefined) job.timeoutAt = now + sub.timeoutMs
+  if (sub.dispositionTopic !== undefined) job.dispositionTopic = sub.dispositionTopic
   return job
 }
 
@@ -95,6 +96,7 @@ export interface SubmitEventSubscriptionParams {
   maxTurns?: number
   timeoutMs?: number
   allowedTools?: string[]
+  dispositionTopic?: string
 }
 
 /**
@@ -122,5 +124,6 @@ export function buildEventSubscriptionFromSubmit(
   if (params.maxTurns !== undefined) sub.maxTurns = params.maxTurns
   if (params.timeoutMs !== undefined) sub.timeoutMs = params.timeoutMs
   if (params.allowedTools !== undefined) sub.allowedTools = params.allowedTools
+  if (params.dispositionTopic !== undefined) sub.dispositionTopic = params.dispositionTopic
   return sub
 }

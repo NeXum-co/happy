@@ -17,6 +17,7 @@ export interface CronSchedule {
   maxTurns?: number;
   timeoutMs?: number;
   allowedTools?: string[];
+  dispositionTopic?: string; // E05: topic for the confidence gate on each fired job
   enabled: boolean;
   createdAt: number;        // epoch ms
 }

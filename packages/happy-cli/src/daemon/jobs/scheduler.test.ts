@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { JobStore } from './jobStore'
 import { Semaphore } from './semaphore'
-import { JobScheduler } from './scheduler'
+import { JobScheduler, buildJobFromSubmit } from './scheduler'
 import type { JobRecord } from './jobTypes'
 import type { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers'
 
@@ -361,5 +361,17 @@ describe('JobScheduler.tierEnv local routing', () => {
     expect(env.HAPPY_JOB_MODEL).toBeUndefined()
     expect(env.HAPPY_JOB_PERMISSION_MODE).toBe('bypassPermissions')
     expect(env.HAPPY_JOB_REPORT_COST).toBe('1') // cloud jobs report their real cost
+  })
+})
+
+describe('buildJobFromSubmit dispositionTopic (E05)', () => {
+  it('copies dispositionTopic from the params onto the record', () => {
+    const job = buildJobFromSubmit({ directory: '/tmp/work', prompt: 'p', dispositionTopic: 'process/deploy' }, 1000, 'job-d')
+    expect(job.dispositionTopic).toBe('process/deploy')
+  })
+
+  it('leaves dispositionTopic undefined when params omit it', () => {
+    const job = buildJobFromSubmit({ directory: '/tmp/work', prompt: 'p' }, 1000, 'job-nd')
+    expect(job.dispositionTopic).toBeUndefined()
   })
 })

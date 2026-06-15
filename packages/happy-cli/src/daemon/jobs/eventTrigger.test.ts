@@ -109,6 +109,14 @@ describe('buildEventJob', () => {
     expect(() => buildEventJob(sub, { sha: 'z' }, undefined, T0)).toThrow()
   })
 
+  it('copies dispositionTopic from the subscription when set, leaves undefined otherwise (E05)', () => {
+    const withTopic = buildEventJob(makeSub({ dispositionTopic: 'process/deploy' }), { sha: 'z' }, 'k', T0)
+    expect(withTopic.dispositionTopic).toBe('process/deploy')
+
+    const without = buildEventJob(makeSub(), { sha: 'z' }, 'k', T0)
+    expect(without.dispositionTopic).toBeUndefined()
+  })
+
   it('includes optional caps and timeoutAt only when the subscription sets them', () => {
     const sub = makeSub({ maxBudgetUsd: 2.5, maxTurns: 40, timeoutMs: 600_000, allowedTools: ['Read'] })
 
