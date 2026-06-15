@@ -23,6 +23,11 @@ const PRESET = 'local-qwen'
  */
 export function renderPostCommitHook(opts: { repoRoot: string; statePath: string }): string {
   const { repoRoot, statePath } = opts
+  // SEC-2: repoRoot is embedded at render time as the matchKey. JSON-escape it
+  // in TS (backslash FIRST, then double-quote) so it can sit safely inside the
+  // double-quoted shell payload below — no single-quoted shell region holds it,
+  // so a `'` in the path is harmless.
+  const matchKeyJson = repoRoot.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
   return `#!/bin/sh
 # Happy event trigger — git.commit (auto-generated, do not edit)
 # Never fails the commit.
@@ -36,9 +41,20 @@ state_file="${statePath}"
 port="$(grep -o '"httpPort"[[:space:]]*:[[:space:]]*[0-9]*' "$state_file" | grep -o '[0-9]*$')"
 [ -n "$port" ] || exit 0
 
+# SEC-1: JSON-escape each runtime value (backslash first, then double-quote)
+# so a commit subject / branch name containing a quote cannot break out of the
+# shell quoting and execute arbitrary commands. Commit subject (%s) is single
+# line, so no newline handling is needed.
+json_escape() { printf '%s' "$1" | sed -e 's/\\\\/\\\\\\\\/g' -e 's/"/\\\\"/g'; }
+sha_e=$(json_escape "$sha")
+branch_e=$(json_escape "$branch")
+msg_e=$(json_escape "$message")
+
+payload="{\\"eventType\\":\\"git.commit\\",\\"matchKey\\":\\"${matchKeyJson}\\",\\"idempotencyKey\\":\\"$sha_e\\",\\"payload\\":{\\"sha\\":\\"$sha_e\\",\\"branch\\":\\"$branch_e\\",\\"message\\":\\"$msg_e\\"}}"
+
 curl -s -X POST "http://127.0.0.1:$port/trigger-event" \\
   -H 'Content-Type: application/json' \\
-  -d '{"eventType":"git.commit","matchKey":"${repoRoot}","idempotencyKey":"'"$sha"'","payload":{"sha":"'"$sha"'","branch":"'"$branch"'","message":"'"$message"'"}}' \\
+  -d "$payload" \\
   >/dev/null 2>&1 || true
 
 exit 0

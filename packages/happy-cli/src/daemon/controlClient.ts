@@ -102,6 +102,9 @@ export async function reportDaemonJobCost(sessionId: string, costUsd: number): P
 
 export async function listDaemonSessions(): Promise<any[]> {
   const result = await daemonPost('/list');
+  if (result?.error) {
+    logger.debug(`[CONTROL CLIENT] listDaemonSessions failed: ${result.error}`);
+  }
   return result.children || [];
 }
 
@@ -122,6 +125,10 @@ export interface SubmitEventSubscriptionRequest {
   prompt: string;
   tier?: 'trusted' | 'supervised';
   preset?: string;
+  maxBudgetUsd?: number;
+  maxTurns?: number;
+  timeoutMs?: number;
+  allowedTools?: string[];
 }
 
 /**
