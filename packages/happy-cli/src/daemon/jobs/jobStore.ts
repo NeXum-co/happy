@@ -73,8 +73,8 @@ function rowToRecord(row: JobRow): JobRecord {
   if (row.gitHeadBefore !== null) record.gitHeadBefore = row.gitHeadBefore
   if (row.gitHeadAfter !== null) record.gitHeadAfter = row.gitHeadAfter
   if (row.dispositionTopic !== null) record.dispositionTopic = row.dispositionTopic
-  if (row.gateAction !== null) record.gateAction = row.gateAction
-  if (row.gateBucket !== null) record.gateBucket = row.gateBucket
+  if (row.gateAction !== null) record.gateAction = row.gateAction as JobRecord['gateAction']
+  if (row.gateBucket !== null) record.gateBucket = row.gateBucket as JobRecord['gateBucket']
   if (row.gateReason !== null) record.gateReason = row.gateReason
   if (row.gateResolved !== null) record.gateResolved = row.gateResolved === 1
   return record

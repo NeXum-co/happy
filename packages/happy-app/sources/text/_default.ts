@@ -1073,7 +1073,7 @@ export const en = {
         cancelConfirm: 'Cancel this pending job?',
         fieldDispositionTopic: 'Disposition topic',
         dispositionTopicPlaceholder: 'e.g. architecture/api-design',
-        dispositionTopicHint: 'Optional. The confidence gate uses this to decide autonomy (proceed / supervised / hold). Leave empty to require approval before each run.',
+        dispositionTopicHint: 'Optional. The confidence gate uses this to decide autonomy (proceed / supervised / hold). Leave it empty — or enter a topic the gate doesn’t recognize — and the job is held for your approval before each run.',
         fieldGateAction: 'Gate decision',
         fieldGateBucket: 'Confidence',
         fieldGateReason: 'Gate reason',
@@ -1081,6 +1081,17 @@ export const en = {
         reject: 'Reject',
         approveConfirm: 'Approve this job? It runs at its gated tier.',
         rejectConfirm: 'Reject this job? It will be marked dead.',
+        gateActionProceed: 'Proceed autonomously',
+        gateActionProceedSupervised: 'Proceed (supervised)',
+        gateActionEscalate: 'Ask before starting',
+        gateActionHold: 'Held for approval',
+        gateBucketHighTrust: 'High trust',
+        gateBucketModifyProne: 'Often adjusted',
+        gateBucketMixed: 'Mixed',
+        gateBucketOverrideProne: 'Often overridden',
+        gateBucketThin: 'Insufficient data',
+        resolveGateFailed: 'Could not resolve',
+        resolveGateFailedMessage: 'This job is no longer awaiting your decision — it may have already been resolved or changed.',
     },
 
     cron: {
@@ -1112,7 +1123,7 @@ export const en = {
         allowedToolsHint: 'Restrict the agent to these tools. Leave empty for the preset default.',
         fieldDispositionTopic: 'Disposition topic',
         dispositionTopicPlaceholder: 'e.g. architecture/api-design',
-        dispositionTopicHint: 'Optional. The confidence gate uses this to decide autonomy (proceed / supervised / hold). Leave empty to require approval before each run.',
+        dispositionTopicHint: 'Optional. The confidence gate uses this to decide autonomy (proceed / supervised / hold). Leave it empty — or enter a topic the gate doesn’t recognize — and the job is held for your approval before each run.',
         submitSuccess: 'Schedule created.',
     },
 
@@ -1147,7 +1158,7 @@ export const en = {
         allowedToolsHint: 'Restrict the agent to these tools. Leave empty for the preset default.',
         fieldDispositionTopic: 'Disposition topic',
         dispositionTopicPlaceholder: 'e.g. architecture/api-design',
-        dispositionTopicHint: 'Optional. The confidence gate uses this to decide autonomy (proceed / supervised / hold). Leave empty to require approval before each run.',
+        dispositionTopicHint: 'Optional. The confidence gate uses this to decide autonomy (proceed / supervised / hold). Leave it empty — or enter a topic the gate doesn’t recognize — and the job is held for your approval before each run.',
     },
 
 } as const;

@@ -21,6 +21,15 @@ describe('shouldAutoApprove', () => {
     expect(shouldAutoApprove('Write', 'security/x', rollup)).toBe(false);
     expect(shouldAutoApprove('Edit', 'security/x', rollup)).toBe(false);
   });
+  it('high-trust + non-safe-list tool (Task/WebFetch/WebSearch/mcp__*/KillBash) -> false (safe-list floor, SEC-001)', () => {
+    // The floor is an explicit read-only ALLOW-list, not a deny-list: any tool
+    // outside it (sub-agent spawn, network egress, MCP, …) is never auto-approved.
+    expect(shouldAutoApprove('Task', 'security/x', rollup)).toBe(false);
+    expect(shouldAutoApprove('WebFetch', 'security/x', rollup)).toBe(false);
+    expect(shouldAutoApprove('WebSearch', 'security/x', rollup)).toBe(false);
+    expect(shouldAutoApprove('mcp__memory__create_entities', 'security/x', rollup)).toBe(false);
+    expect(shouldAutoApprove('KillBash', 'security/x', rollup)).toBe(false);
+  });
   it('non-high-trust bucket -> false', () => {
     expect(shouldAutoApprove('Read', 'architecture/x', rollup)).toBe(false);
   });

@@ -1097,7 +1097,7 @@ export const pl: TranslationStructure = {
         cancelConfirm: 'Anulować to oczekujące zadanie?',
         fieldDispositionTopic: 'Temat dyspozycji',
         dispositionTopicPlaceholder: 'np. architecture/api-design',
-        dispositionTopicHint: 'Opcjonalne. Bramka pewności używa tego do określenia autonomii (kontynuuj / nadzorowane / wstrzymaj). Pozostaw puste, aby wymagać zatwierdzenia przed każdym uruchomieniem.',
+        dispositionTopicHint: 'Opcjonalne. Bramka pewności używa tego do określenia autonomii (kontynuuj / nadzorowane / wstrzymaj). Pozostaw puste lub wpisz temat nierozpoznawany przez bramkę, a zadanie zostanie wstrzymane do zatwierdzenia przed każdym uruchomieniem.',
         fieldGateAction: 'Decyzja bramki',
         fieldGateBucket: 'Pewność',
         fieldGateReason: 'Powód bramki',
@@ -1105,6 +1105,17 @@ export const pl: TranslationStructure = {
         reject: 'Odrzuć',
         approveConfirm: 'Zatwierdzić to zadanie? Zostanie uruchomione na swoim poziomie bramki.',
         rejectConfirm: 'Odrzucić to zadanie? Zostanie oznaczone jako martwe.',
+        gateActionProceed: 'Działaj autonomicznie',
+        gateActionProceedSupervised: 'Działaj (pod nadzorem)',
+        gateActionEscalate: 'Zapytaj przed uruchomieniem',
+        gateActionHold: 'Wstrzymane do zatwierdzenia',
+        gateBucketHighTrust: 'Wysokie zaufanie',
+        gateBucketModifyProne: 'Często korygowane',
+        gateBucketMixed: 'Mieszane',
+        gateBucketOverrideProne: 'Często odrzucane',
+        gateBucketThin: 'Za mało danych',
+        resolveGateFailed: 'Nie udało się rozstrzygnąć',
+        resolveGateFailedMessage: 'To zadanie nie czeka już na Twoją decyzję — mogło już zostać rozstrzygnięte lub zmienione.',
     },
 
     cron: {
@@ -1136,7 +1147,7 @@ export const pl: TranslationStructure = {
         allowedToolsHint: 'Ogranicz agenta do tych narzędzi. Pozostaw puste, aby użyć domyślnych dla presetu.',
         fieldDispositionTopic: 'Temat dyspozycji',
         dispositionTopicPlaceholder: 'np. architecture/api-design',
-        dispositionTopicHint: 'Opcjonalne. Bramka pewności używa tego do określenia autonomii (kontynuuj / nadzorowane / wstrzymaj). Pozostaw puste, aby wymagać zatwierdzenia przed każdym uruchomieniem.',
+        dispositionTopicHint: 'Opcjonalne. Bramka pewności używa tego do określenia autonomii (kontynuuj / nadzorowane / wstrzymaj). Pozostaw puste lub wpisz temat nierozpoznawany przez bramkę, a zadanie zostanie wstrzymane do zatwierdzenia przed każdym uruchomieniem.',
         submitSuccess: 'Utworzono harmonogram.',
     },
 
@@ -1171,7 +1182,7 @@ export const pl: TranslationStructure = {
         allowedToolsHint: 'Ogranicz agenta do tych narzędzi. Pozostaw puste, aby użyć domyślnych dla presetu.',
         fieldDispositionTopic: 'Temat dyspozycji',
         dispositionTopicPlaceholder: 'np. architecture/api-design',
-        dispositionTopicHint: 'Opcjonalne. Bramka pewności używa tego do określenia autonomii (kontynuuj / nadzorowane / wstrzymaj). Pozostaw puste, aby wymagać zatwierdzenia przed każdym uruchomieniem.',
+        dispositionTopicHint: 'Opcjonalne. Bramka pewności używa tego do określenia autonomii (kontynuuj / nadzorowane / wstrzymaj). Pozostaw puste lub wpisz temat nierozpoznawany przez bramkę, a zadanie zostanie wstrzymane do zatwierdzenia przed każdym uruchomieniem.',
     },
 
 } as const;

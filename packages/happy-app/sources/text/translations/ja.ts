@@ -1069,7 +1069,7 @@ export const ja: TranslationStructure = {
         cancelConfirm: 'この保留中のジョブをキャンセルしますか？',
         fieldDispositionTopic: '処理トピック',
         dispositionTopicPlaceholder: '例: architecture/api-design',
-        dispositionTopicHint: '任意。確信度ゲートはこれを使って自律性（続行 / 監視あり / 保留）を判断します。空欄の場合は実行ごとに承認が必要になります。',
+        dispositionTopicHint: '任意。確信度ゲートはこれを使って自律性（続行 / 監視あり / 保留）を判断します。空欄のまま、またはゲートが認識しないトピックを入力すると、ジョブは実行ごとに承認待ちで保留されます。',
         fieldGateAction: 'ゲートの判定',
         fieldGateBucket: '確信度',
         fieldGateReason: 'ゲートの理由',
@@ -1077,6 +1077,17 @@ export const ja: TranslationStructure = {
         reject: '却下',
         approveConfirm: 'このジョブを承認しますか？ゲートで決まったティアで実行されます。',
         rejectConfirm: 'このジョブを却下しますか？終了済みとしてマークされます。',
+        gateActionProceed: '自律的に実行',
+        gateActionProceedSupervised: '実行（監督あり）',
+        gateActionEscalate: '開始前に確認',
+        gateActionHold: '承認待ち',
+        gateBucketHighTrust: '高い信頼',
+        gateBucketModifyProne: '修正されやすい',
+        gateBucketMixed: '混在',
+        gateBucketOverrideProne: '却下されやすい',
+        gateBucketThin: 'データ不足',
+        resolveGateFailed: '処理できませんでした',
+        resolveGateFailedMessage: 'このジョブはすでにあなたの判断を待っていません。すでに処理されたか、変更された可能性があります。',
     },
 
     cron: {
@@ -1108,7 +1119,7 @@ export const ja: TranslationStructure = {
         allowedToolsHint: 'エージェントをこれらのツールに制限します。空欄の場合はプリセットの既定値を使用します。',
         fieldDispositionTopic: '処理トピック',
         dispositionTopicPlaceholder: '例: architecture/api-design',
-        dispositionTopicHint: '任意。確信度ゲートはこれを使って自律性（続行 / 監視あり / 保留）を判断します。空欄の場合は実行ごとに承認が必要になります。',
+        dispositionTopicHint: '任意。確信度ゲートはこれを使って自律性（続行 / 監視あり / 保留）を判断します。空欄のまま、またはゲートが認識しないトピックを入力すると、ジョブは実行ごとに承認待ちで保留されます。',
         submitSuccess: 'スケジュールを作成しました。',
     },
 
@@ -1143,6 +1154,6 @@ export const ja: TranslationStructure = {
         allowedToolsHint: 'エージェントをこれらのツールに制限します。空欄の場合はプリセットの既定値を使用します。',
         fieldDispositionTopic: '処理トピック',
         dispositionTopicPlaceholder: '例: architecture/api-design',
-        dispositionTopicHint: '任意。確信度ゲートはこれを使って自律性（続行 / 監視あり / 保留）を判断します。空欄の場合は実行ごとに承認が必要になります。',
+        dispositionTopicHint: '任意。確信度ゲートはこれを使って自律性（続行 / 監視あり / 保留）を判断します。空欄のまま、またはゲートが認識しないトピックを入力すると、ジョブは実行ごとに承認待ちで保留されます。',
     },
 } as const;

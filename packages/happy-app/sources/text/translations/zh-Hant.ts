@@ -1067,7 +1067,7 @@ export const zhHant: TranslationStructure = {
         cancelConfirm: '取消此待處理任務？',
         fieldDispositionTopic: '處置主題',
         dispositionTopicPlaceholder: '例如 architecture/api-design',
-        dispositionTopicHint: '選用。信心閘門會據此決定自主程度（繼續 / 受監督 / 暫停）。留空則每次執行前都需要核准。',
+        dispositionTopicHint: '選用。信心閘門會據此決定自主程度（繼續 / 受監督 / 暫停）。留空或填寫閘門無法識別的主題時，任務會在每次執行前被暫停以待核准。',
         fieldGateAction: '閘門決定',
         fieldGateBucket: '信心度',
         fieldGateReason: '閘門原因',
@@ -1075,6 +1075,17 @@ export const zhHant: TranslationStructure = {
         reject: '拒絕',
         approveConfirm: '核准此任務？它將以其閘門層級執行。',
         rejectConfirm: '拒絕此任務？它將被標記為已終止。',
+        gateActionProceed: '自主執行',
+        gateActionProceedSupervised: '執行（受監督）',
+        gateActionEscalate: '開始前詢問',
+        gateActionHold: '等待核准',
+        gateBucketHighTrust: '高度信任',
+        gateBucketModifyProne: '經常調整',
+        gateBucketMixed: '混合',
+        gateBucketOverrideProne: '經常被否決',
+        gateBucketThin: '資料不足',
+        resolveGateFailed: '無法處理',
+        resolveGateFailedMessage: '此任務已不再等待您的決定，可能已被處理或變更。',
     },
 
     cron: {
@@ -1106,7 +1117,7 @@ export const zhHant: TranslationStructure = {
         allowedToolsHint: '將代理限制為這些工具。留空以使用預設的預設值。',
         fieldDispositionTopic: '處置主題',
         dispositionTopicPlaceholder: '例如 architecture/api-design',
-        dispositionTopicHint: '選用。信心閘門會據此決定自主程度（繼續 / 受監督 / 暫停）。留空則每次執行前都需要核准。',
+        dispositionTopicHint: '選用。信心閘門會據此決定自主程度（繼續 / 受監督 / 暫停）。留空或填寫閘門無法識別的主題時，任務會在每次執行前被暫停以待核准。',
         submitSuccess: '已建立排程。',
     },
 
@@ -1141,6 +1152,6 @@ export const zhHant: TranslationStructure = {
         allowedToolsHint: '將代理限制為這些工具。留空以使用預設的預設值。',
         fieldDispositionTopic: '處置主題',
         dispositionTopicPlaceholder: '例如 architecture/api-design',
-        dispositionTopicHint: '選用。信心閘門會據此決定自主程度（繼續 / 受監督 / 暫停）。留空則每次執行前都需要核准。',
+        dispositionTopicHint: '選用。信心閘門會據此決定自主程度（繼續 / 受監督 / 暫停）。留空或填寫閘門無法識別的主題時，任務會在每次執行前被暫停以待核准。',
     },
 } as const;

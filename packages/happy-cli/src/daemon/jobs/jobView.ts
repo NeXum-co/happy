@@ -38,8 +38,8 @@ export const jobRecordViewSchema = z.object({
     gitHeadBefore: z.string().optional(),
     gitHeadAfter: z.string().optional(),
     dispositionTopic: z.string().optional(),
-    gateAction: z.string().optional(),
-    gateBucket: z.string().optional(),
+    gateAction: z.enum(['proceed', 'proceed-supervised', 'escalate', 'hold']).optional(),
+    gateBucket: z.enum(['high-trust', 'modify-prone', 'mixed', 'override-prone', 'thin']).optional(),
     gateReason: z.string().optional(),
     gateResolved: z.boolean().optional(),
 })

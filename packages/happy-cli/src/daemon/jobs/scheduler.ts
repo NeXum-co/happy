@@ -144,6 +144,16 @@ export class JobScheduler {
     return !preset.startsWith('cloud')
   }
 
+  /**
+   * AC-3 containment: a 'trusted' (bypassPermissions) job may only spawn inside a
+   * git worktree (`.git` present). Checked on BOTH spawn paths — tick() pre-gate
+   * and runJob() — so resolveGate('approve') cannot bypass the guard the way it
+   * did when the check lived only in tick() (SEC-002).
+   */
+  private trustedWithoutWorktree(directory: string, effectiveTier: JobTier): boolean {
+    return effectiveTier === 'trusted' && !existsSync(join(directory, '.git'))
+  }
+
   async tick(): Promise<void> {
     this.enforceTimeouts()
 
@@ -151,7 +161,7 @@ export class JobScheduler {
     if (!job) return
 
     // Containment guard (AC-3): trusted jobs must run inside a git worktree.
-    if (job.tier === 'trusted' && !existsSync(join(job.directory, '.git'))) {
+    if (this.trustedWithoutWorktree(job.directory, job.tier)) {
       this.store.transition(job.id, 'needs-attention', { exitReason: 'trusted-requires-worktree' })
       return
     }
@@ -186,6 +196,13 @@ export class JobScheduler {
    * so the spawn path stays in one place (D-E05-4).
    */
   private async runJob(job: JobRecord, effectiveTier: JobTier): Promise<void> {
+    // AC-3 containment chokepoint (SEC-002): every spawn path passes through here,
+    // so a trusted/bypassPermissions job is never spawned outside a git worktree —
+    // not via tick(), and not via resolveGate('approve').
+    if (this.trustedWithoutWorktree(job.directory, effectiveTier)) {
+      this.store.transition(job.id, 'needs-attention', { exitReason: 'trusted-requires-worktree' })
+      return
+    }
     const gated = this.isLocal(job)
     const release = gated ? await this.localSemaphore.acquire() : undefined
     try {
@@ -237,8 +254,17 @@ export class JobScheduler {
     if (!job || job.status !== 'needs-attention') return false
 
     if (decision === 'approve') {
-      this.store.transition(jobId, 'running', { gateResolved: true })
       const effectiveTier: JobTier = job.gateAction === 'proceed-supervised' ? 'supervised' : job.tier
+      // AC-3 containment holds on the approve path too (SEC-002): refuse to spawn a
+      // trusted/bypassPermissions job outside a git worktree, even on explicit approve.
+      if (this.trustedWithoutWorktree(job.directory, effectiveTier)) {
+        this.store.patch(jobId, { gateReason: 'approve refused: trusted tier requires a git worktree (AC-3)' })
+        return false
+      }
+      // Clear the gate:* park reason so the approved (now running) job no longer reads
+      // as parked (ARCH-003); gateAction/gateBucket stay as historical audit and
+      // gateResolved marks it done.
+      this.store.transition(jobId, 'running', { gateResolved: true, exitReason: undefined })
       await this.runJob(job, effectiveTier)
     } else {
       this.store.transition(jobId, 'failed', { exitReason: 'gate-rejected' })

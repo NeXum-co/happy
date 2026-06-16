@@ -28,8 +28,8 @@ export interface JobRecordView {
     gitHeadBefore?: string;
     gitHeadAfter?: string;
     dispositionTopic?: string;
-    gateAction?: string;
-    gateBucket?: string;
+    gateAction?: 'proceed' | 'proceed-supervised' | 'escalate' | 'hold';
+    gateBucket?: 'high-trust' | 'modify-prone' | 'mixed' | 'override-prone' | 'thin';
     gateReason?: string;
     gateResolved?: boolean;
     createdAt: number;
@@ -46,12 +46,10 @@ export async function machineSubmitJob(machineId: string, params: {
     allowedTools?: string[];
     dispositionTopic?: string;
 }): Promise<{ jobId: string }> {
-    const { dispositionTopic, ...rest } = params;
-    const payload = { ...rest, ...(dispositionTopic ? { dispositionTopic } : {}) };
-    const result = await apiSocket.machineRPC<{ jobId: string }, typeof payload>(
+    const result = await apiSocket.machineRPC<{ jobId: string }, typeof params>(
         machineId,
         'submit-job',
-        payload
+        params
     );
     return result;
 }

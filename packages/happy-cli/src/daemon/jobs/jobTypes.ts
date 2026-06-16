@@ -7,6 +7,8 @@
  * lifecycle moment (claim, timeout, finish) sets them.
  */
 
+import type { GateAction, DispositionBucket } from '@/disposition/types';
+
 export type JobStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'dead' | 'needs-attention';
 export type JobTier = 'trusted' | 'supervised';
 export type TriggerType = 'manual' | 'cron' | 'event';
@@ -34,10 +36,10 @@ export interface JobRecord {
   maxTurns?: number;         // per-job turn ceiling
   gitHeadBefore?: string;    // HEAD captured just before the job spawned
   gitHeadAfter?: string;     // HEAD captured when the job succeeded
-  dispositionTopic?: string; // E05: Joshua-assigned topic for the gate lookup
-  gateAction?: string;       // E05: 'proceed' | 'proceed-supervised' | 'escalate' | 'hold'
-  gateBucket?: string;       // E05: 'high-trust' | 'modify-prone' | 'mixed' | 'override-prone' | 'thin'
-  gateReason?: string;       // E05: human-readable gate reason (embeds matched topic/domain)
+  dispositionTopic?: string;      // E05: Joshua-assigned topic for the gate lookup
+  gateAction?: GateAction;        // E05: the gate verdict's autonomy action
+  gateBucket?: DispositionBucket; // E05: the matched disposition bucket
+  gateReason?: string;            // E05: human-readable gate reason (embeds matched topic/domain)
   gateResolved?: boolean;    // E05: true once Joshua approved a parked job (tick skips re-gating)
   createdAt: number;
 }

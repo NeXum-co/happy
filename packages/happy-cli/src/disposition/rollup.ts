@@ -23,12 +23,15 @@ export function loadRollup(path: string = DEFAULT_ROLLUP_PATH): DispositionRollu
   try {
     const parsed = JSON.parse(raw) as DispositionRollup;
     if (typeof parsed?.generatedFrom !== 'number' || typeof parsed?.domains !== 'object' || typeof parsed?.topics !== 'object') {
-      logger.debug('[E05 GATE] rollup JSON missing required shape — failing closed');
+      // A present-but-malformed rollup is a systemic failure: the gate now holds
+      // EVERY job. Surface it at warn (console-visible) so the operator can tell
+      // a fleet-wide hold from a normal per-topic 'thin' gap (SF-001).
+      logger.warn('[E05 GATE] rollup JSON missing required shape — failing closed, all jobs will hold');
       return null;
     }
     return parsed;
   } catch (e) {
-    logger.debug('[E05 GATE] rollup JSON parse error — failing closed:', e);
+    logger.warn('[E05 GATE] rollup JSON parse error — failing closed, all jobs will hold:', e);
     return null;
   }
 }

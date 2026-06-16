@@ -1070,7 +1070,7 @@ export const pt: TranslationStructure = {
         cancelConfirm: 'Cancelar esta tarefa pendente?',
         fieldDispositionTopic: 'Tópico de disposição',
         dispositionTopicPlaceholder: 'ex.: architecture/api-design',
-        dispositionTopicHint: 'Opcional. O portão de confiança usa isto para decidir a autonomia (prosseguir / supervisionado / reter). Deixe vazio para exigir aprovação antes de cada execução.',
+        dispositionTopicHint: 'Opcional. O portão de confiança usa isto para decidir a autonomia (prosseguir / supervisionado / reter). Se deixar vazio ou inserir um tópico que o portão não reconhece, a tarefa fica retida para aprovação antes de cada execução.',
         fieldGateAction: 'Decisão do portão',
         fieldGateBucket: 'Confiança',
         fieldGateReason: 'Motivo do portão',
@@ -1078,6 +1078,17 @@ export const pt: TranslationStructure = {
         reject: 'Rejeitar',
         approveConfirm: 'Aprovar esta tarefa? Ela será executada no seu nível de portão.',
         rejectConfirm: 'Rejeitar esta tarefa? Ela será marcada como morta.',
+        gateActionProceed: 'Prosseguir de forma autónoma',
+        gateActionProceedSupervised: 'Prosseguir (supervisionado)',
+        gateActionEscalate: 'Perguntar antes de iniciar',
+        gateActionHold: 'Aguardando aprovação',
+        gateBucketHighTrust: 'Alta confiança',
+        gateBucketModifyProne: 'Frequentemente ajustado',
+        gateBucketMixed: 'Misto',
+        gateBucketOverrideProne: 'Frequentemente substituído',
+        gateBucketThin: 'Dados insuficientes',
+        resolveGateFailed: 'Não foi possível resolver',
+        resolveGateFailedMessage: 'Esta tarefa já não aguarda a sua decisão — pode já ter sido resolvida ou alterada.',
     },
 
     cron: {
@@ -1109,7 +1120,7 @@ export const pt: TranslationStructure = {
         allowedToolsHint: 'Restringe o agente a estas ferramentas. Deixe vazio para o padrão da predefinição.',
         fieldDispositionTopic: 'Tópico de disposição',
         dispositionTopicPlaceholder: 'ex.: architecture/api-design',
-        dispositionTopicHint: 'Opcional. O portão de confiança usa isto para decidir a autonomia (prosseguir / supervisionado / reter). Deixe vazio para exigir aprovação antes de cada execução.',
+        dispositionTopicHint: 'Opcional. O portão de confiança usa isto para decidir a autonomia (prosseguir / supervisionado / reter). Se deixar vazio ou inserir um tópico que o portão não reconhece, a tarefa fica retida para aprovação antes de cada execução.',
         submitSuccess: 'Agendamento criado.',
     },
 
@@ -1144,7 +1155,7 @@ export const pt: TranslationStructure = {
         allowedToolsHint: 'Restringe o agente a estas ferramentas. Deixe vazio para o padrão da predefinição.',
         fieldDispositionTopic: 'Tópico de disposição',
         dispositionTopicPlaceholder: 'ex.: architecture/api-design',
-        dispositionTopicHint: 'Opcional. O portão de confiança usa isto para decidir a autonomia (prosseguir / supervisionado / reter). Deixe vazio para exigir aprovação antes de cada execução.',
+        dispositionTopicHint: 'Opcional. O portão de confiança usa isto para decidir a autonomia (prosseguir / supervisionado / reter). Se deixar vazio ou inserir um tópico que o portão não reconhece, a tarefa fica retida para aprovação antes de cada execução.',
     },
 } as const;
 

@@ -93,6 +93,33 @@ describe('resolve-gate surface integration (E05, both surfaces share one closure
     const loaded = store.get('g-approve')!
     expect(loaded.status).toBe('running')
     expect(loaded.gateResolved).toBe(true)
+    // ARCH-003: the gate:* park reason is cleared on approve so the now-running
+    // job no longer reads as parked.
+    expect(loaded.exitReason).toBeUndefined()
+  })
+
+  it("SEC-002: approve of a trusted job outside a git worktree is refused — never spawns bypassPermissions outside containment", async () => {
+    // The tmp dir has no .git, so the AC-3 guard parks the trusted job before the
+    // gate. Approving it must NOT bypass containment (the bug this fixes).
+    store.create(makeJob({ id: 'g-trusted', tier: 'trusted', directory: dir, dispositionTopic: 'arch/override' }))
+    const calls: SpawnSessionOptions[] = []
+    const spawn = async (opts: SpawnSessionOptions): Promise<SpawnSessionResult> => {
+      calls.push(opts)
+      return { type: 'success', sessionId: 'sess-trusted' }
+    }
+    const jobScheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, loadRollup: fakeRollup })
+
+    await jobScheduler.tick()
+    const parked = store.get('g-trusted')!
+    expect(parked.status).toBe('needs-attention')
+    expect(parked.exitReason).toBe('trusted-requires-worktree')
+
+    const resolved = await jobScheduler.resolveGate('g-trusted', 'approve')
+
+    // The approve path enforces AC-3 too: refused, never spawned, still parked.
+    expect(resolved).toBe(false)
+    expect(calls).toHaveLength(0)
+    expect(store.get('g-trusted')!.status).toBe('needs-attention')
   })
 
   it("reject: a fresh gate-parked job goes dead, fake spawn never called", async () => {

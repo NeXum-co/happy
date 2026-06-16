@@ -1070,7 +1070,7 @@ export const it: TranslationStructure = {
         cancelConfirm: 'Annullare questo lavoro in attesa?',
         fieldDispositionTopic: 'Argomento di disposizione',
         dispositionTopicPlaceholder: 'es. architecture/api-design',
-        dispositionTopicHint: 'Facoltativo. Il gate di confidenza lo usa per decidere l’autonomia (procedi / supervisionato / sospendi). Lascia vuoto per richiedere l’approvazione prima di ogni esecuzione.',
+        dispositionTopicHint: 'Facoltativo. Il gate di confidenza lo usa per decidere l’autonomia (procedi / supervisionato / sospendi). Se lo lasci vuoto o inserisci un argomento che il gate non riconosce, il lavoro viene sospeso in attesa di approvazione prima di ogni esecuzione.',
         fieldGateAction: 'Decisione del gate',
         fieldGateBucket: 'Confidenza',
         fieldGateReason: 'Motivo del gate',
@@ -1078,6 +1078,17 @@ export const it: TranslationStructure = {
         reject: 'Rifiuta',
         approveConfirm: 'Approvare questo lavoro? Verrà eseguito al suo livello di gate.',
         rejectConfirm: 'Rifiutare questo lavoro? Verrà contrassegnato come morto.',
+        gateActionProceed: 'Procedi in autonomia',
+        gateActionProceedSupervised: 'Procedi (supervisionato)',
+        gateActionEscalate: 'Chiedi prima di iniziare',
+        gateActionHold: 'In attesa di approvazione',
+        gateBucketHighTrust: 'Alta fiducia',
+        gateBucketModifyProne: 'Spesso corretto',
+        gateBucketMixed: 'Misto',
+        gateBucketOverrideProne: 'Spesso annullato',
+        gateBucketThin: 'Dati insufficienti',
+        resolveGateFailed: 'Impossibile risolvere',
+        resolveGateFailedMessage: 'Questo lavoro non è più in attesa della tua decisione: potrebbe essere già stato risolto o modificato.',
     },
 
     cron: {
@@ -1109,7 +1120,7 @@ export const it: TranslationStructure = {
         allowedToolsHint: 'Limita l’agente a questi strumenti. Lascia vuoto per il valore predefinito del preset.',
         fieldDispositionTopic: 'Argomento di disposizione',
         dispositionTopicPlaceholder: 'es. architecture/api-design',
-        dispositionTopicHint: 'Facoltativo. Il gate di confidenza lo usa per decidere l’autonomia (procedi / supervisionato / sospendi). Lascia vuoto per richiedere l’approvazione prima di ogni esecuzione.',
+        dispositionTopicHint: 'Facoltativo. Il gate di confidenza lo usa per decidere l’autonomia (procedi / supervisionato / sospendi). Se lo lasci vuoto o inserisci un argomento che il gate non riconosce, il lavoro viene sospeso in attesa di approvazione prima di ogni esecuzione.',
         submitSuccess: 'Pianificazione creata.',
     },
 
@@ -1144,7 +1155,7 @@ export const it: TranslationStructure = {
         allowedToolsHint: 'Limita l’agente a questi strumenti. Lascia vuoto per il valore predefinito del preset.',
         fieldDispositionTopic: 'Argomento di disposizione',
         dispositionTopicPlaceholder: 'es. architecture/api-design',
-        dispositionTopicHint: 'Facoltativo. Il gate di confidenza lo usa per decidere l’autonomia (procedi / supervisionato / sospendi). Lascia vuoto per richiedere l’approvazione prima di ogni esecuzione.',
+        dispositionTopicHint: 'Facoltativo. Il gate di confidenza lo usa per decidere l’autonomia (procedi / supervisionato / sospendi). Se lo lasci vuoto o inserisci un argomento che il gate non riconosce, il lavoro viene sospeso in attesa di approvazione prima di ogni esecuzione.',
     },
 } as const;
 

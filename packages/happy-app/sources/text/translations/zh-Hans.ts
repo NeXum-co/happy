@@ -1068,7 +1068,7 @@ export const zhHans: TranslationStructure = {
         cancelConfirm: '取消此待处理任务？',
         fieldDispositionTopic: '处置主题',
         dispositionTopicPlaceholder: '例如 architecture/api-design',
-        dispositionTopicHint: '可选。置信门据此决定自主程度（继续 / 受监督 / 暂停）。留空则每次运行前都需要批准。',
+        dispositionTopicHint: '可选。置信门据此决定自主程度（继续 / 受监督 / 暂停）。留空或填写门无法识别的主题时，任务会在每次运行前被暂停以待批准。',
         fieldGateAction: '门控决定',
         fieldGateBucket: '置信度',
         fieldGateReason: '门控原因',
@@ -1076,6 +1076,17 @@ export const zhHans: TranslationStructure = {
         reject: '拒绝',
         approveConfirm: '批准此任务？它将在其门控层级运行。',
         rejectConfirm: '拒绝此任务？它将被标记为已终止。',
+        gateActionProceed: '自主执行',
+        gateActionProceedSupervised: '执行（受监督）',
+        gateActionEscalate: '开始前询问',
+        gateActionHold: '等待批准',
+        gateBucketHighTrust: '高度信任',
+        gateBucketModifyProne: '经常调整',
+        gateBucketMixed: '混合',
+        gateBucketOverrideProne: '经常被否决',
+        gateBucketThin: '数据不足',
+        resolveGateFailed: '无法处理',
+        resolveGateFailedMessage: '此任务已不再等待您的决定，可能已被处理或更改。',
     },
 
     cron: {
@@ -1107,7 +1118,7 @@ export const zhHans: TranslationStructure = {
         allowedToolsHint: '将代理限制为这些工具。留空以使用预设默认值。',
         fieldDispositionTopic: '处置主题',
         dispositionTopicPlaceholder: '例如 architecture/api-design',
-        dispositionTopicHint: '可选。置信门据此决定自主程度（继续 / 受监督 / 暂停）。留空则每次运行前都需要批准。',
+        dispositionTopicHint: '可选。置信门据此决定自主程度（继续 / 受监督 / 暂停）。留空或填写门无法识别的主题时，任务会在每次运行前被暂停以待批准。',
         submitSuccess: '已创建计划任务。',
     },
 
@@ -1142,6 +1153,6 @@ export const zhHans: TranslationStructure = {
         allowedToolsHint: '将代理限制为这些工具。留空以使用预设默认值。',
         fieldDispositionTopic: '处置主题',
         dispositionTopicPlaceholder: '例如 architecture/api-design',
-        dispositionTopicHint: '可选。置信门据此决定自主程度（继续 / 受监督 / 暂停）。留空则每次运行前都需要批准。',
+        dispositionTopicHint: '可选。置信门据此决定自主程度（继续 / 受监督 / 暂停）。留空或填写门无法识别的主题时，任务会在每次运行前被暂停以待批准。',
     },
 } as const;

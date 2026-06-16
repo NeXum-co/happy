@@ -1071,7 +1071,7 @@ export const ca: TranslationStructure = {
         cancelConfirm: 'Cancel·lar aquesta tasca en espà?',
         fieldDispositionTopic: 'Tema de disposició',
         dispositionTopicPlaceholder: 'p. ex. architecture/api-design',
-        dispositionTopicHint: 'Opcional. La porta de confiança ho fa servir per decidir l’autonomia (continua / supervisat / atura). Deixeu-ho buit per requerir aprovació abans de cada execució.',
+        dispositionTopicHint: 'Opcional. La porta de confiança ho fa servir per decidir l’autonomia (continua / supervisat / atura). Si ho deixeu buit o escriviu un tema que la porta no reconeix, la tasca es reté per a aprovació abans de cada execució.',
         fieldGateAction: 'Decisió de la porta',
         fieldGateBucket: 'Confiança',
         fieldGateReason: 'Motiu de la porta',
@@ -1079,6 +1079,17 @@ export const ca: TranslationStructure = {
         reject: 'Rebutja',
         approveConfirm: 'Voleu aprovar aquesta tasca? S’executarà al seu nivell de porta.',
         rejectConfirm: 'Voleu rebutjar aquesta tasca? Es marcarà com a morta.',
+        gateActionProceed: 'Executa de manera autònoma',
+        gateActionProceedSupervised: 'Executa (supervisat)',
+        gateActionEscalate: 'Pregunta abans de començar',
+        gateActionHold: 'En espera d’aprovació',
+        gateBucketHighTrust: 'Alta confiança',
+        gateBucketModifyProne: 'Sovint ajustat',
+        gateBucketMixed: 'Mixt',
+        gateBucketOverrideProne: 'Sovint anul·lat',
+        gateBucketThin: 'Dades insuficients',
+        resolveGateFailed: 'No s’ha pogut resoldre',
+        resolveGateFailedMessage: 'Aquesta tasca ja no espera la teva decisió: pot ser que ja s’hagi resolt o canviat.',
     },
 
     cron: {
@@ -1110,7 +1121,7 @@ export const ca: TranslationStructure = {
         allowedToolsHint: 'Restringeix l’agent a aquestes eines. Deixeu-ho buit per al valor predeterminat de la predefinició.',
         fieldDispositionTopic: 'Tema de disposició',
         dispositionTopicPlaceholder: 'p. ex. architecture/api-design',
-        dispositionTopicHint: 'Opcional. La porta de confiança ho fa servir per decidir l’autonomia (continua / supervisat / atura). Deixeu-ho buit per requerir aprovació abans de cada execució.',
+        dispositionTopicHint: 'Opcional. La porta de confiança ho fa servir per decidir l’autonomia (continua / supervisat / atura). Si ho deixeu buit o escriviu un tema que la porta no reconeix, la tasca es reté per a aprovació abans de cada execució.',
         submitSuccess: 'Programació creada.',
     },
 
@@ -1145,7 +1156,7 @@ export const ca: TranslationStructure = {
         allowedToolsHint: 'Restringeix l’agent a aquestes eines. Deixeu-ho buit per al valor predeterminat de la predefinició.',
         fieldDispositionTopic: 'Tema de disposició',
         dispositionTopicPlaceholder: 'p. ex. architecture/api-design',
-        dispositionTopicHint: 'Opcional. La porta de confiança ho fa servir per decidir l’autonomia (continua / supervisat / atura). Deixeu-ho buit per requerir aprovació abans de cada execució.',
+        dispositionTopicHint: 'Opcional. La porta de confiança ho fa servir per decidir l’autonomia (continua / supervisat / atura). Si ho deixeu buit o escriviu un tema que la porta no reconeix, la tasca es reté per a aprovació abans de cada execució.',
     },
 } as const;
 

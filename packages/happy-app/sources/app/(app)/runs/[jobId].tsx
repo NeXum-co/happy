@@ -29,6 +29,27 @@ function tierLabel(tier: JobRecordView['tier']): string {
     return tier === 'trusted' ? t('run.tierTrusted') : t('run.tierSupervised');
 }
 
+// Localized gate-verdict labels — the raw enum values (e.g. 'override-prone',
+// 'proceed-supervised') are internal and unreadable to a reviewer (UX-002).
+function gateActionLabel(action: NonNullable<JobRecordView['gateAction']>): string {
+    switch (action) {
+        case 'proceed': return t('run.gateActionProceed');
+        case 'proceed-supervised': return t('run.gateActionProceedSupervised');
+        case 'escalate': return t('run.gateActionEscalate');
+        case 'hold': return t('run.gateActionHold');
+    }
+}
+
+function gateBucketLabel(bucket: NonNullable<JobRecordView['gateBucket']>): string {
+    switch (bucket) {
+        case 'high-trust': return t('run.gateBucketHighTrust');
+        case 'modify-prone': return t('run.gateBucketModifyProne');
+        case 'mixed': return t('run.gateBucketMixed');
+        case 'override-prone': return t('run.gateBucketOverrideProne');
+        case 'thin': return t('run.gateBucketThin');
+    }
+}
+
 // Wall-clock duration of the run, in whole seconds, as a short string.
 function durationLabel(job: JobRecordView): string {
     if (!job.claimedAt) {
@@ -63,17 +84,28 @@ function JobDetailScreen() {
                 return;
             }
             let cancelled = false;
+            let interval: ReturnType<typeof setInterval> | undefined;
+            const isTerminal = (s: JobRecordView['status']) => s === 'succeeded' || s === 'dead' || s === 'failed';
             const tick = async () => {
                 const next = await machineGetJob(machineId, jobId);
-                if (!cancelled) {
-                    setJob(next);
+                if (cancelled) {
+                    return;
+                }
+                setJob(next);
+                // PERF-002: stop polling once the job is terminal — its record is
+                // immutable from here, so further get-job round-trips are wasted.
+                if (next && isTerminal(next.status) && interval) {
+                    clearInterval(interval);
+                    interval = undefined;
                 }
             };
             tick();
-            const interval = setInterval(tick, POLL_INTERVAL_MS);
+            interval = setInterval(tick, POLL_INTERVAL_MS);
             return () => {
                 cancelled = true;
-                clearInterval(interval);
+                if (interval) {
+                    clearInterval(interval);
+                }
             };
         }, [machineId, jobId]),
     );
@@ -106,7 +138,7 @@ function JobDetailScreen() {
 
     // E05 gate-parked jobs (exitReason 'gate:*'): approve runs the job at its gated
     // tier, reject drives it to dead. The poll loop refreshes the status.
-    const [, approveGate] = useHappyAction(async () => {
+    const [approving, approveGate] = useHappyAction(async () => {
         if (!machineId || !job?.id) {
             return;
         }
@@ -115,20 +147,29 @@ function JobDetailScreen() {
             confirmText: t('run.approve'),
         });
         if (confirmed) {
-            await machineResolveGate(machineId, job.id, 'approve');
+            // SF-004: resolveGate returns { resolved: false } when the job is no longer
+            // parked (already resolved / changed). Surface it instead of silently no-op'ing.
+            const { resolved } = await machineResolveGate(machineId, job.id, 'approve');
+            if (!resolved) {
+                Modal.alert(t('run.resolveGateFailed'), t('run.resolveGateFailedMessage'), [{ text: t('common.ok') }]);
+            }
         }
     });
 
-    const [, rejectGate] = useHappyAction(async () => {
+    const [rejecting, rejectGate] = useHappyAction(async () => {
         if (!machineId || !job?.id) {
             return;
         }
         const confirmed = await Modal.confirm(t('run.reject'), t('run.rejectConfirm'), {
             cancelText: t('common.cancel'),
             confirmText: t('run.reject'),
+            destructive: true,
         });
         if (confirmed) {
-            await machineResolveGate(machineId, job.id, 'reject');
+            const { resolved } = await machineResolveGate(machineId, job.id, 'reject');
+            if (!resolved) {
+                Modal.alert(t('run.resolveGateFailed'), t('run.resolveGateFailedMessage'), [{ text: t('common.ok') }]);
+            }
         }
     });
 
@@ -184,18 +225,20 @@ function JobDetailScreen() {
                 />
             </ItemGroup>
 
-            {(job.dispositionTopic || job.gateReason) && (
+            {(job.dispositionTopic || (!job.gateResolved && job.gateReason)) && (
                 <ItemGroup>
                     {job.dispositionTopic && (
                         <Item title={t('run.fieldDispositionTopic')} detail={job.dispositionTopic} showChevron={false} />
                     )}
-                    {job.gateAction && (
-                        <Item title={t('run.fieldGateAction')} detail={job.gateAction} showChevron={false} />
+                    {/* UX-006: once Joshua approved the parked job (gateResolved), the held
+                        verdict is history — show only the topic, not the "why held" rows. */}
+                    {!job.gateResolved && job.gateAction && (
+                        <Item title={t('run.fieldGateAction')} detail={gateActionLabel(job.gateAction)} showChevron={false} />
                     )}
-                    {job.gateBucket && (
-                        <Item title={t('run.fieldGateBucket')} detail={job.gateBucket} showChevron={false} />
+                    {!job.gateResolved && job.gateBucket && (
+                        <Item title={t('run.fieldGateBucket')} detail={gateBucketLabel(job.gateBucket)} showChevron={false} />
                     )}
-                    {job.gateReason && (
+                    {!job.gateResolved && job.gateReason && (
                         <Item title={t('run.fieldGateReason')} detail={job.gateReason} showChevron={false} />
                     )}
                 </ItemGroup>
@@ -207,6 +250,8 @@ function JobDetailScreen() {
                         title={t('run.approve')}
                         icon={<Ionicons name="checkmark-circle-outline" size={29} color={theme.colors.button.primary.background} />}
                         onPress={approveGate}
+                        loading={approving}
+                        disabled={approving || rejecting}
                         showChevron={false}
                     />
                     <Item
@@ -214,6 +259,8 @@ function JobDetailScreen() {
                         destructive
                         icon={<Ionicons name="close-circle-outline" size={29} color={theme.colors.textDestructive} />}
                         onPress={rejectGate}
+                        loading={rejecting}
+                        disabled={approving || rejecting}
                         showChevron={false}
                     />
                 </ItemGroup>
@@ -221,13 +268,11 @@ function JobDetailScreen() {
 
             {job.sessionId && (
                 <ItemGroup>
-                    {job.sessionId && (
-                        <Item
-                            title={t('run.openSession')}
-                            icon={<Ionicons name="open-outline" size={29} color={theme.colors.button.primary.background} />}
-                            onPress={() => router.push(`/session/${job.sessionId}` as any)}
-                        />
-                    )}
+                    <Item
+                        title={t('run.openSession')}
+                        icon={<Ionicons name="open-outline" size={29} color={theme.colors.button.primary.background} />}
+                        onPress={() => router.push(`/session/${job.sessionId}` as any)}
+                    />
                     {job.status === 'running' && job.sessionId && (
                         <Item
                             title={t('run.stop')}

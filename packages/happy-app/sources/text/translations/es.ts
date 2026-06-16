@@ -1072,7 +1072,7 @@ export const es: TranslationStructure = {
         cancelConfirm: '¿Cancelar esta tarea pendiente?',
         fieldDispositionTopic: 'Tema de disposición',
         dispositionTopicPlaceholder: 'p. ej. architecture/api-design',
-        dispositionTopicHint: 'Opcional. La puerta de confianza lo usa para decidir la autonomía (continuar / supervisado / retener). Déjalo vacío para requerir aprobación antes de cada ejecución.',
+        dispositionTopicHint: 'Opcional. La puerta de confianza lo usa para decidir la autonomía (continuar / supervisado / retener). Si lo dejas vacío o escribes un tema que la puerta no reconoce, la tarea se retiene para aprobación antes de cada ejecución.',
         fieldGateAction: 'Decisión de la puerta',
         fieldGateBucket: 'Confianza',
         fieldGateReason: 'Motivo de la puerta',
@@ -1080,6 +1080,17 @@ export const es: TranslationStructure = {
         reject: 'Rechazar',
         approveConfirm: '¿Aprobar esta tarea? Se ejecutará en su nivel de puerta.',
         rejectConfirm: '¿Rechazar esta tarea? Se marcará como muerta.',
+        gateActionProceed: 'Ejecutar de forma autónoma',
+        gateActionProceedSupervised: 'Ejecutar (supervisado)',
+        gateActionEscalate: 'Preguntar antes de iniciar',
+        gateActionHold: 'En espera de aprobación',
+        gateBucketHighTrust: 'Alta confianza',
+        gateBucketModifyProne: 'A menudo ajustado',
+        gateBucketMixed: 'Mixto',
+        gateBucketOverrideProne: 'A menudo anulado',
+        gateBucketThin: 'Datos insuficientes',
+        resolveGateFailed: 'No se pudo resolver',
+        resolveGateFailedMessage: 'Esta tarea ya no espera tu decisión: es posible que ya se haya resuelto o cambiado.',
     },
 
     cron: {
@@ -1111,7 +1122,7 @@ export const es: TranslationStructure = {
         allowedToolsHint: 'Restringe el agente a estas herramientas. Déjalo vacío para el valor predeterminado del preajuste.',
         fieldDispositionTopic: 'Tema de disposición',
         dispositionTopicPlaceholder: 'p. ej. architecture/api-design',
-        dispositionTopicHint: 'Opcional. La puerta de confianza lo usa para decidir la autonomía (continuar / supervisado / retener). Déjalo vacío para requerir aprobación antes de cada ejecución.',
+        dispositionTopicHint: 'Opcional. La puerta de confianza lo usa para decidir la autonomía (continuar / supervisado / retener). Si lo dejas vacío o escribes un tema que la puerta no reconoce, la tarea se retiene para aprobación antes de cada ejecución.',
         submitSuccess: 'Programación creada.',
     },
 
@@ -1146,7 +1157,7 @@ export const es: TranslationStructure = {
         allowedToolsHint: 'Restringe el agente a estas herramientas. Déjalo vacío para el valor predeterminado del preajuste.',
         fieldDispositionTopic: 'Tema de disposición',
         dispositionTopicPlaceholder: 'p. ej. architecture/api-design',
-        dispositionTopicHint: 'Opcional. La puerta de confianza lo usa para decidir la autonomía (continuar / supervisado / retener). Déjalo vacío para requerir aprobación antes de cada ejecución.',
+        dispositionTopicHint: 'Opcional. La puerta de confianza lo usa para decidir la autonomía (continuar / supervisado / retener). Si lo dejas vacío o escribes un tema que la puerta no reconoce, la tarea se retiene para aprobación antes de cada ejecución.',
     },
 
 } as const;
