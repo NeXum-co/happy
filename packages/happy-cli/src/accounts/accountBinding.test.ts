@@ -23,7 +23,7 @@ describe('applyAccountBinding', () => {
     const extraEnv: Record<string, string> = {}
     const r = await applyAccountBinding(extraEnv, { agent: 'claude' },
       { vaultFile: fp, masterKey: key, proxy, mintKey: constKey })
-    expect(r).toEqual({ ok: true, stripApiKey: true })
+    expect(r).toEqual({ ok: true, stripApiKey: true, binding: { routingKey: 'rk-TEST', account: 'work' } })
     expect(extraEnv.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:9999')
     expect(extraEnv.ANTHROPIC_AUTH_TOKEN).toBe('rk-TEST')
     expect(calls).toEqual([{ key: 'rk-TEST', account: 'work', realToken: 'sk-ant-oat01-REAL' }])

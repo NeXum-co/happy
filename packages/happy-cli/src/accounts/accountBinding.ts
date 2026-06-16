@@ -27,7 +27,9 @@ export interface BindingDeps {
   mintKey?: () => string
 }
 
-export type BindingResult = { ok: true; stripApiKey: boolean } | { ok: false; error: string }
+export type BindingResult =
+  | { ok: true; stripApiKey: boolean; binding?: { routingKey: string; account: string } }
+  | { ok: false; error: string }
 
 const PROVIDER = 'claude' // v1: alleen Claude (D-E10-9)
 
@@ -53,5 +55,7 @@ export async function applyAccountBinding(
   deps.proxy.register(routingKey, { account: resolved.name, realToken: resolved.oauthToken })
   extraEnv.ANTHROPIC_BASE_URL = `http://127.0.0.1:${deps.proxy.port}`
   extraEnv.ANTHROPIC_AUTH_TOKEN = routingKey
-  return { ok: true, stripApiKey: true }
+  // Geef de routing-key + account terug zodat de daemon ze op de TrackedSession
+  // bewaart en de sessie later live kan switchen (S3 accountSwitch via remap).
+  return { ok: true, stripApiKey: true, binding: { routingKey, account: resolved.name } }
 }

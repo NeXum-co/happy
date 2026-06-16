@@ -28,4 +28,8 @@ export interface TrackedSession {
   message?: string;
   /** tmux session identifier (format: session:window) */
   tmuxSessionId?: string;
+  /** E10: routing-key waarmee deze sessie via de authProxy aan een account hangt (live-switch via remap). */
+  routingKey?: string;
+  /** E10: het Claude-account waaraan deze sessie momenteel gebonden is. */
+  account?: string;
 }

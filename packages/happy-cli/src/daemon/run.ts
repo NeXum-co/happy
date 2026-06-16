@@ -396,6 +396,9 @@ export async function startDaemon(): Promise<void> {
           return { type: 'error', errorMessage: binding.error };
         }
         const stripApiKey = binding.stripApiKey;
+        // E10/S3: routing-key + account vasthouden zodat de TrackedSession ze draagt
+        // (live-switch via accountSwitch → authProxy.remap). undefined bij passthrough.
+        const accountBinding = binding.binding;
 
         logger.debug(`[DAEMON RUN] Environment variable keys (before expansion) (${Object.keys(extraEnv).length}): ${Object.keys(extraEnv).join(', ')}`);
 
@@ -537,6 +540,8 @@ export async function startDaemon(): Promise<void> {
               pid: tmuxResult.pid, // Real PID from tmux -P flag
               tmuxSessionId: tmuxResult.sessionId,
               directoryCreated,
+              routingKey: accountBinding?.routingKey,
+              account: accountBinding?.account,
               message: directoryCreated
                 ? `The path '${directory}' did not exist. We created a new folder and spawned a new session in tmux session '${tmuxSessionName}'. Use 'tmux attach -t ${tmuxSessionName}' to view the session.`
                 : `Spawned new session in tmux session '${tmuxSessionName}'. Use 'tmux attach -t ${tmuxSessionName}' to view the session.`
@@ -631,6 +636,8 @@ export async function startDaemon(): Promise<void> {
           return spawnTrackedHappyProcess({
             args,
             cwd: directory,
+            routingKey: accountBinding?.routingKey,
+            account: accountBinding?.account,
             env: (() => {
               const childEnv: NodeJS.ProcessEnv = { ...process.env, ...extraEnv };
               // E10: zie tmux-tak — strip de geërfde API-key bij actieve binding.
@@ -663,12 +670,16 @@ export async function startDaemon(): Promise<void> {
       env,
       directoryCreated = false,
       message,
+      routingKey,
+      account,
     }: {
       args: string[];
       cwd: string;
       env: NodeJS.ProcessEnv;
       directoryCreated?: boolean;
       message?: string;
+      routingKey?: string;
+      account?: string;
     }): Promise<SpawnSessionResult> => {
       const happyProcess = spawnHappyCLI(args, {
         cwd,
@@ -693,6 +704,8 @@ export async function startDaemon(): Promise<void> {
         childProcess: happyProcess,
         directoryCreated,
         message,
+        routingKey,
+        account,
       };
 
       pidToTrackedSession.set(happyProcess.pid, trackedSession);
