@@ -93,3 +93,20 @@ export async function setDefaultAccount(filePath: string, provider: string, name
   p.defaultAccount = name
   await saveVault(filePath, v)
 }
+
+export type ResolvedAccount = { name: string; oauthToken: string }
+
+/** Resolve naar { name, oauthToken } of null. Expliciete naam > default. */
+export async function resolveAccount(
+  filePath: string, masterKey: Uint8Array, provider: string, accountName?: string,
+): Promise<ResolvedAccount | null> {
+  const p = (await loadVault(filePath)).providers[provider]
+  if (!p) return null
+  const name = accountName ?? p.defaultAccount ?? undefined
+  if (!name) return null
+  const acct = p.accounts[name]
+  if (!acct) return null
+  const token = decrypt(masterKey, 'dataKey', decodeBase64(acct.oauthTokenEnc))
+  if (typeof token !== 'string') return null // fail-closed
+  return { name, oauthToken: token }
+}

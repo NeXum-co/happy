@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { vaultMasterKey, loadVault, saveVault, addAccount, listAccounts, removeAccount, setDefaultAccount } from '@/accounts/accountVault'
+import { vaultMasterKey, loadVault, saveVault, addAccount, listAccounts, removeAccount, setDefaultAccount, resolveAccount } from '@/accounts/accountVault'
 import type { Credentials } from '@/persistence'
 import { getRandomBytes } from '@/api/encryption'
 import { mkdtemp, readFile as rf, writeFile } from 'node:fs/promises'
@@ -74,5 +74,35 @@ describe('CRUD', () => {
     expect((await listAccounts(fp, 'claude')).find(a => a.isDefault)?.name).toBe('b')
     await removeAccount(fp, 'claude', 'a')
     expect((await listAccounts(fp, 'claude')).map(a => a.name)).toEqual(['b'])
+  })
+})
+
+describe('resolveAccount', () => {
+  const key = getRandomBytes(32)
+  const newFp = async () => join(await mkdtemp(join(tmpdir(), 'vault-')), 'v.json')
+
+  it('expliciete naam → dat account, token decrypt roundtrip (AC-1)', async () => {
+    const fp = await newFp()
+    await addAccount(fp, key, { provider: 'claude', name: 'work', oauthToken: 'sk-ant-oat01-WORK' })
+    const r = await resolveAccount(fp, key, 'claude', 'work')
+    expect(r).toEqual({ name: 'work', oauthToken: 'sk-ant-oat01-WORK' })
+  })
+
+  it('geen naam → default (AC-3)', async () => {
+    const fp = await newFp()
+    await addAccount(fp, key, { provider: 'claude', name: 'a', oauthToken: 'sk-ant-oat01-A' })
+    await addAccount(fp, key, { provider: 'claude', name: 'b', oauthToken: 'sk-ant-oat01-B', isDefault: true })
+    expect((await resolveAccount(fp, key, 'claude'))?.name).toBe('b')
+  })
+
+  it('onbekend account → null (fail-closed, AC-6)', async () => {
+    const fp = await newFp()
+    expect(await resolveAccount(fp, key, 'claude', 'nope')).toBeNull()
+  })
+
+  it('verkeerde sleutel → decrypt faalt → null (AC-6)', async () => {
+    const fp = await newFp()
+    await addAccount(fp, key, { provider: 'claude', name: 'a', oauthToken: 'sk-ant-oat01-A' })
+    expect(await resolveAccount(fp, getRandomBytes(32), 'claude', 'a')).toBeNull()
   })
 })
