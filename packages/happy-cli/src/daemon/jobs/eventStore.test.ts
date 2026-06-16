@@ -141,4 +141,11 @@ describe('EventStore', () => {
     expect(loaded.timeoutMs).toBeUndefined()
     expect(loaded.allowedTools).toBeUndefined()
   })
+
+  it('round-trips dispositionTopic (pre-existing fix) en account (E10)', () => {
+    store.create(makeSubscription({ id: 'event-meta', dispositionTopic: 'deploy', account: 'work' }))
+    const loaded = store.get('event-meta')!
+    expect(loaded.dispositionTopic).toBe('deploy') // ging vóór de fix verloren → E05-gate undefined
+    expect(loaded.account).toBe('work')
+  })
 })

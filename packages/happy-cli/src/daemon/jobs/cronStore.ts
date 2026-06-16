@@ -24,6 +24,8 @@ interface CronRow {
   maxTurns: number | null
   timeoutMs: number | null
   allowedTools: string | null
+  dispositionTopic: string | null
+  account: string | null
   enabled: number
   createdAt: number
 }
@@ -43,6 +45,8 @@ function rowToSchedule(row: CronRow): CronSchedule {
   if (row.maxTurns !== null) schedule.maxTurns = row.maxTurns
   if (row.timeoutMs !== null) schedule.timeoutMs = row.timeoutMs
   if (row.allowedTools !== null) schedule.allowedTools = JSON.parse(row.allowedTools) as string[]
+  if (row.dispositionTopic !== null) schedule.dispositionTopic = row.dispositionTopic
+  if (row.account !== null) schedule.account = row.account
   return schedule
 }
 
@@ -67,10 +71,22 @@ export class CronStore {
         maxTurns INTEGER,
         timeoutMs INTEGER,
         allowedTools TEXT,
+        dispositionTopic TEXT,
+        account TEXT,
         enabled INTEGER NOT NULL,
         createdAt INTEGER NOT NULL
       )
     `)
+    // Idempotent migrations for stores created before these columns existed.
+    // dispositionTopic was set by the builders but never persisted (E05 gate saw
+    // undefined for every cron job → fail-closed hold); account is E10.
+    const cols = this.db.prepare(`PRAGMA table_info(cron_schedules)`).all() as { name: string }[]
+    if (!cols.some(c => c.name === 'dispositionTopic')) {
+      this.db.exec(`ALTER TABLE cron_schedules ADD COLUMN dispositionTopic TEXT`)
+    }
+    if (!cols.some(c => c.name === 'account')) {
+      this.db.exec(`ALTER TABLE cron_schedules ADD COLUMN account TEXT`)
+    }
     // Index the feeder's scan path: each tick lists schedules and skips disabled ones.
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_schedules_enabled ON cron_schedules (enabled)`)
   }
@@ -79,10 +95,10 @@ export class CronStore {
     this.db.prepare(`
       INSERT INTO cron_schedules (
         id, cronExpr, directory, prompt, tier, preset,
-        maxBudgetUsd, maxTurns, timeoutMs, allowedTools, enabled, createdAt
+        maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account, enabled, createdAt
       ) VALUES (
         @id, @cronExpr, @directory, @prompt, @tier, @preset,
-        @maxBudgetUsd, @maxTurns, @timeoutMs, @allowedTools, @enabled, @createdAt
+        @maxBudgetUsd, @maxTurns, @timeoutMs, @allowedTools, @dispositionTopic, @account, @enabled, @createdAt
       )
     `).run({
       id: s.id,
@@ -95,6 +111,8 @@ export class CronStore {
       maxTurns: s.maxTurns ?? null,
       timeoutMs: s.timeoutMs ?? null,
       allowedTools: s.allowedTools !== undefined ? JSON.stringify(s.allowedTools) : null,
+      dispositionTopic: s.dispositionTopic ?? null,
+      account: s.account ?? null,
       enabled: s.enabled ? 1 : 0,
       createdAt: s.createdAt,
     })
