@@ -32,3 +32,18 @@ export async function vaultMasterKey(creds: Credentials): Promise<Uint8Array> {
   const seed = creds.encryption.type === 'legacy' ? creds.encryption.secret : creds.encryption.machineKey
   return deriveKey(seed, 'Happy Accounts', ['vault'])
 }
+
+/** Leest + valideert de vault. Ontbrekend = leeg. Corrupt = throw (fail-closed, AC-6). */
+export async function loadVault(filePath: string): Promise<VaultData> {
+  if (!existsSync(filePath)) return structuredClone(EMPTY_VAULT)
+  const raw = await readFile(filePath, 'utf8')
+  return vaultSchema.parse(JSON.parse(raw)) // throwt op corrupt/onverwacht schema
+}
+
+/** Atomic write (tmp + rename), 0600. */
+export async function saveVault(filePath: string, data: VaultData): Promise<void> {
+  await mkdir(dirname(filePath), { recursive: true })
+  const tmp = `${filePath}.tmp`
+  await writeFile(tmp, JSON.stringify(vaultSchema.parse(data), null, 2), { mode: 0o600 })
+  await rename(tmp, filePath)
+}
