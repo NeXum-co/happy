@@ -71,12 +71,29 @@ mogelijk; de daemon ontsluit de vault en de proxy injecteert het juiste token.
   niet hardcoded op `claude`. De CLI gebruikt nu alleen `claude`, maar het
   schema-niveau blijft generiek.
 
-## Naad naar S3/S4 (nog te bouwen)
+## S3-invarianten (live switch) ✅
 
-- **S3 (live switch):** `authProxy.remap` bestaat al en is getest. S3 bouwt de
-  `accountSwitch`-verb (twee surfaces: HTTP + RPC, BUG-UAT-1-patroon) die `remap`
-  aanroept voor een set sessies + de multi-select migratie-popup. De daemon moet
-  dan `routingKey → sessionId` bijhouden om sessies te adresseren.
+- **`accountSwitch.ts`** — pure `applyAccountSwitch(sessionIds, {account}, deps)`:
+  resolve het doel-account **één keer** (fail-closed bij null → nul remaps, AC-6),
+  dan per sessie `lookupRoutingKey` → `proxy.remap`. Ongebonden sessie → `skipped`,
+  nooit een fout die de batch kapt. Expliciete deps (vaultFile, masterKey, proxy,
+  lookupRoutingKey) → unit-testbaar (4 tests).
+- **`routingKey`/`account` op `TrackedSession`** (`daemon/types.ts`): de daemon bezit
+  de sessie↔routing-key-associatie (de `authProxy` blijft een domme `key→{account,
+  token}`-map, D-E10-14). `applyAccountBinding` geeft de gemunte `routingKey` + account
+  nu **terug** (was: weggegooid); `spawnSession` zet ze op de `TrackedSession` (tmux +
+  non-tmux via de `spawnTrackedHappyProcess`-params). De webhook-merge muteert het
+  bestaande object → ze overleven het toevoegen van `happySessionId`. `resumeSession`
+  (reconnect) krijgt geen binding → geen routing-key (scope-grens, ongemoeid).
+- **`accountSwitch`-verb = twee surfaces** (BUG-UAT-1): HTTP `/account-switch`
+  (`controlServer.ts`) + RPC `account-switch` (`apiMachine.ts`) roepen dezelfde
+  `accountSwitch`-closure in `run.ts` aan. `/list` projecteert nu `account` (voer voor
+  de migratie-popup; de popup-UI zelf is app-werk, S5).
+- **AC-7 onaangetast:** alleen de routing-key (niet het echte token) staat in de
+  sessie-env; `TrackedSession.routingKey` is in-daemon-geheugen (niet-geheime indirectie).
+
+## Naad naar S4 (nog te bouwen)
+
 - **S4 (usage):** de `unified-*` headers komen al ongewijzigd door de proxy (de
   authProxy-test bevestigt dat). S4 voegt de scrape + `usageStore` toe in de
   `upRes`-callback van `authProxy.ts`.
