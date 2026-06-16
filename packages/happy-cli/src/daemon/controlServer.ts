@@ -62,6 +62,7 @@ export function startDaemonControlServer({
   cancelJob,
   resolveGate,
   accountSwitch,
+  getUsage,
   listJobs,
   getJob,
   patchJobCost,
@@ -83,6 +84,7 @@ export function startDaemonControlServer({
   cancelJob: (jobId: string) => boolean;
   resolveGate: (jobId: string, decision: 'approve' | 'reject') => Promise<boolean>;
   accountSwitch: (sessionIds: string[], account: string) => Promise<{ ok: boolean; remapped?: string[]; skipped?: string[]; error?: string }>;
+  getUsage: () => Record<string, { fiveHourUtil: number | null; sevenDayUtil: number | null; seenAt: number | null }>;
   listJobs: (filter?: { status?: JobStatus }) => JobRecordView[];
   getJob: (id: string) => JobRecordView | null;
   patchJobCost: (sessionId: string, costUsd: number) => boolean;
@@ -355,6 +357,25 @@ export function startDaemonControlServer({
       const { sessionIds, account } = request.body;
       logger.debug(`[CONTROL SERVER] Account switch: ${sessionIds.length} sessie(s) → ${account}`);
       return accountSwitch(sessionIds, account);
+    });
+
+    // Usage-read (E10, AC-5): per-account laatst-geziene 5h/7d-utilisatie die de
+    // proxy uit de unified-* headers scrapte. Fail-soft (onbekend → null). Mirrors
+    // the get-usage RPC handler (BUG-UAT-1: beide surfaces).
+    typed.post('/usage', {
+      schema: {
+        response: {
+          200: z.object({
+            usage: z.record(z.string(), z.object({
+              fiveHourUtil: z.number().nullable(),
+              sevenDayUtil: z.number().nullable(),
+              seenAt: z.number().nullable()
+            }))
+          })
+        }
+      }
+    }, async () => {
+      return { usage: getUsage() };
     });
 
     // Resolve a gate-parked autonomous job (E05, D-E05-4). A job parked in

@@ -69,4 +69,16 @@ describe('authProxy', () => {
     await post(proxy.port, 'rk-1')
     expect(up.lastReq().headers['authorization']).toBe('Bearer sk-ant-oat01-B')
   })
+
+  it('onResponse vuurt per response met account + scraped unified-header (S4/AC-5)', async () => {
+    up = await startMockUpstream()
+    const seen: Array<{ account: string; util: unknown }> = []
+    proxy = await startAuthProxy({
+      upstreamHost: '127.0.0.1', upstreamPort: up.port, upstreamProtocol: 'http',
+      onResponse: (account, headers) => seen.push({ account, util: headers['anthropic-ratelimit-unified-5h-utilization'] }),
+    })
+    proxy.register('rk-1', { account: 'work', realToken: 'sk-ant-oat01-REAL' })
+    await post(proxy.port, 'rk-1')
+    expect(seen).toEqual([{ account: 'work', util: '0.42' }])
+  })
 })

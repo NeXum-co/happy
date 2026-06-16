@@ -18,6 +18,7 @@ import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquire
 import { startAuthProxy, type AuthProxy } from '@/accounts/authProxy';
 import { applyAccountBinding } from '@/accounts/accountBinding';
 import { applyAccountSwitch, type SwitchResult } from '@/accounts/accountSwitch';
+import { createUsageStore, type AccountUsage } from '@/accounts/usageStore';
 import { vaultMasterKey } from '@/accounts/accountVault';
 import type { PersistedSession } from '@/persistence';
 
@@ -265,8 +266,12 @@ export async function startDaemon(): Promise<void> {
 
     // E10: localhost-only auth-proxy die per cloud-sessie het echte account-token
     // injecteert. Gestart vóór spawnSession zodat de closure 'm capteert; gestopt
-    // in cleanupAndShutdown. usage-scraping volgt in S4.
-    const authProxy: AuthProxy = await startAuthProxy();
+    // in cleanupAndShutdown. S4: de proxy meldt per response het account + de
+    // upstream-headers aan de usageStore (proxy blijft dom — D-E10-14).
+    const usageStore = createUsageStore();
+    const authProxy: AuthProxy = await startAuthProxy({
+      onResponse: (account, headers) => usageStore.record(account, headers),
+    });
     logger.debug(`[DAEMON RUN] authProxy (E10) luistert op http://127.0.0.1:${authProxy.port}`);
 
     // Spawn a new session (sessionId reserved for future --resume functionality)
@@ -1103,6 +1108,11 @@ export async function startDaemon(): Promise<void> {
       });
     };
 
+    // Usage-read (AC-5): per-account laatst-geziene 5h/7d-utilisatie die de proxy
+    // uit de unified-* headers scrapte. Fail-soft (onbekend → null). Twee surfaces
+    // (HTTP /usage + RPC get-usage, BUG-UAT-1) lezen deze ene snapshot.
+    const getUsage = (): Record<string, AccountUsage> => usageStore.snapshot();
+
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
       getChildren: getCurrentChildren,
@@ -1113,6 +1123,7 @@ export async function startDaemon(): Promise<void> {
       cancelJob,
       resolveGate,
       accountSwitch,
+      getUsage,
       listJobs,
       getJob,
       patchJobCost,
@@ -1194,6 +1205,7 @@ export async function startDaemon(): Promise<void> {
       cancelJob,
       resolveGate,
       accountSwitch,
+      getUsage,
       submitCron,
       listCrons,
       deleteCron,

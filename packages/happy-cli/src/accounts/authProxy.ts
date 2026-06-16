@@ -24,6 +24,9 @@ export interface AuthProxyOptions {
   upstreamHost?: string
   upstreamPort?: number
   upstreamProtocol?: 'http' | 'https'
+  /** S4: per response het account + de upstream-headers melden (usage-scrape). De proxy
+   * blijft dom — de daemon bedraadt dit naar usageStore.record (D-E10-14). */
+  onResponse?: (account: string, headers: http.IncomingHttpHeaders) => void
 }
 
 const OAUTH_BETA = 'oauth-2025-04-20'
@@ -55,6 +58,7 @@ export function startAuthProxy(opts: AuthProxyOptions = {}): Promise<AuthProxy> 
       { hostname: upstreamHost, port: upstreamPort, path: req.url, method: req.method, headers },
       upRes => {
         res.writeHead(upRes.statusCode ?? 502, upRes.headers)
+        opts.onResponse?.(route.account, upRes.headers) // S4: usage-scrape, proxy blijft dom
         upRes.pipe(res) // streaming, geen buffering
       },
     )

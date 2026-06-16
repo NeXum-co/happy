@@ -107,6 +107,8 @@ type MachineRpcHandlers = {
     resolveGate?: (jobId: string, decision: 'approve' | 'reject') => Promise<boolean>;
     /** Live-switch (E10, AC-4): remap a chosen set of running cloud sessions to one account. Fail-closed on the target account. */
     accountSwitch?: (sessionIds: string[], account: string) => Promise<{ ok: boolean; remapped?: string[]; skipped?: string[]; error?: string }>;
+    /** Usage-read (E10, AC-5): per-account last-seen 5h/7d utilisation scraped from the unified-* headers. Fail-soft (unknown → null). */
+    getUsage?: () => Record<string, { fiveHourUtil: number | null; sevenDayUtil: number | null; seenAt: number | null }>;
     /** Create a durable cron schedule from submit-cron params; returns its id. */
     submitCron?: (params: SubmitCronParams) => string;
     /** List all cron schedules as CronScheduleView projections. */
@@ -173,6 +175,7 @@ export class ApiMachineClient {
         cancelJob,
         resolveGate,
         accountSwitch,
+        getUsage,
         submitCron,
         listCrons,
         deleteCron,
@@ -258,6 +261,15 @@ export class ApiMachineClient {
                 const result = await accountSwitch(sessionIds, account);
                 logger.debug(`[API MACHINE] Account switch → ${account}: ok=${result.ok}`);
                 return result;
+            });
+        }
+
+        // Register get-usage handler (E10, AC-5). Returns the per-account last-seen
+        // 5h/7d utilisation the proxy scraped from the unified-* headers. Fail-soft
+        // (unknown → null). Mirrors the HTTP /usage endpoint (BUG-UAT-1: both surfaces).
+        if (getUsage) {
+            this.rpcHandlerManager.registerHandler('get-usage', async () => {
+                return { usage: getUsage() };
             });
         }
 

@@ -92,8 +92,19 @@ mogelijk; de daemon ontsluit de vault en de proxy injecteert het juiste token.
 - **AC-7 onaangetast:** alleen de routing-key (niet het echte token) staat in de
   sessie-env; `TrackedSession.routingKey` is in-daemon-geheugen (niet-geheime indirectie).
 
-## Naad naar S4 (nog te bouwen)
+## S4-invarianten (usage) ✅
 
-- **S4 (usage):** de `unified-*` headers komen al ongewijzigd door de proxy (de
-  authProxy-test bevestigt dat). S4 voegt de scrape + `usageStore` toe in de
-  `upRes`-callback van `authProxy.ts`.
+- **`usageStore.ts`** — pure module (geen daemon/proxy-import): per-account
+  `{ fiveHourUtil, sevenDayUtil, seenAt }` (utilisatie als fractie 0..1). `record`
+  parset de `unified-5h/7d-utilization` headers, `snapshot` geeft een kopie.
+  `now` injecteerbaar voor deterministische tests.
+- **Proxy blijft dom** (D-E10-14): `authProxy` importeert `usageStore` NIET. Het krijgt
+  een optionele `onResponse(account, headers)`-callback (in de `upRes`-callback); de
+  daemon bedraadt die naar `usageStore.record` (`run.ts`). De proxy weet niets van de store.
+- **Fail-soft** (D-E10-6): ontbrekende/niet-numerieke header → veld blijft `null`; een
+  eerder-geziene waarde wordt nooit overschreven door een latere response zonder de
+  header; géén signaal → géén phantom-entry. Nooit een verzonnen getal.
+- **Twee read-surfaces** (BUG-UAT-1): HTTP `/usage` (`controlServer.ts`) + RPC
+  `get-usage` (`apiMachine.ts`) lezen dezelfde `usageStore.snapshot()` via de
+  `getUsage`-closure in `run.ts` → `{ usage: Record<account, AccountUsage> }`.
+- **AC-7 ongemoeid:** usage = percentages (groen), geen tokens; niets nieuws in de sessie-env.
