@@ -768,6 +768,109 @@ export async function forkAndSpawn(
     return spawnResult;
 }
 
+// ─── E10 multi-subscription account ops ───────────────────────────────────
+// Thin machineRPC wrappers over the daemon's account-management/usage/switch
+// surface (happy-cli src/api/apiMachine.ts). Each verb also exists as an HTTP
+// control-endpoint (two surfaces, BUG-UAT-1); the app uses the RPC path. The
+// real OAuth tokens never reach the app — list-accounts returns no token, and
+// add-account's token rides the machine-encrypted channel into the vault.
+
+/** One vault account as projected by the daemon (D-E10-12: single defaultAccount pointer → isDefault). Never carries a token. */
+export interface AccountInfo {
+    name: string;
+    isDefault: boolean;
+    addedAt: number;
+}
+
+/** Per-account last-seen utilisation scraped from the unified-* headers (D-E10-6). Fractions 0..1; null = unknown (fail-soft). */
+export interface AccountUsage {
+    fiveHourUtil: number | null;
+    sevenDayUtil: number | null;
+    seenAt: number | null;
+}
+
+/** A running session with its live account, keyed by happySessionId (the id the app already knows). Source: the daemon's TrackedSession (fresh after remap), not server-synced metadata. */
+export interface SessionAccountInfo {
+    startedBy: string;
+    happySessionId: string;
+    pid: number;
+    account?: string;
+}
+
+/** Result of a live account-switch (AC-4). Fail-closed: bad target → ok:false with zero remaps. Unbound/terminal sessions land in `skipped`. */
+export interface AccountSwitchResult {
+    ok: boolean;
+    remapped?: string[];
+    skipped?: string[];
+    error?: string;
+}
+
+/** List the accounts in a machine's vault. Throws on RPC failure (callers wrap in useHappyAction). */
+export async function machineListAccounts(machineId: string): Promise<AccountInfo[]> {
+    const result = await apiSocket.machineRPC<{ accounts: AccountInfo[] }, {}>(
+        machineId,
+        'list-accounts',
+        {},
+    );
+    return result.accounts;
+}
+
+/** Add an account to a machine's vault. `token` is a `claude setup-token` value — encrypted into the vault, never logged. */
+export async function machineAddAccount(machineId: string, name: string, token: string, isDefault?: boolean): Promise<void> {
+    await apiSocket.machineRPC<{ ok: true }, { name: string; token: string; isDefault?: boolean }>(
+        machineId,
+        'add-account',
+        { name, token, isDefault },
+    );
+}
+
+/** Set the provider's default account (D-E10-3/13: an empty spawn uses the default). */
+export async function machineSetDefaultAccount(machineId: string, name: string): Promise<void> {
+    await apiSocket.machineRPC<{ ok: true }, { name: string }>(
+        machineId,
+        'set-default-account',
+        { name },
+    );
+}
+
+/** Remove an account from a machine's vault. */
+export async function machineRemoveAccount(machineId: string, name: string): Promise<void> {
+    await apiSocket.machineRPC<{ ok: true }, { name: string }>(
+        machineId,
+        'remove-account',
+        { name },
+    );
+}
+
+/** List running sessions with their live per-session account (feeds the migration popup). */
+export async function machineListSessions(machineId: string): Promise<SessionAccountInfo[]> {
+    const result = await apiSocket.machineRPC<{ children: SessionAccountInfo[] }, {}>(
+        machineId,
+        'list',
+        {},
+    );
+    return result.children;
+}
+
+/** Read per-account usage (AC-5). Fail-soft: missing account → no entry, missing util → null. */
+export async function machineGetUsage(machineId: string): Promise<Record<string, AccountUsage>> {
+    const result = await apiSocket.machineRPC<{ usage: Record<string, AccountUsage> }, {}>(
+        machineId,
+        'get-usage',
+        {},
+    );
+    return result.usage;
+}
+
+/** Live-switch a chosen set of running sessions to one account via the proxy (no respawn, AC-4). */
+export async function machineAccountSwitch(machineId: string, sessionIds: string[], account: string): Promise<AccountSwitchResult> {
+    return await apiSocket.machineRPC<AccountSwitchResult, { sessionIds: string[]; account: string }>(
+        machineId,
+        'account-switch',
+        { sessionIds, account },
+    );
+}
+
 // Export types for external use
 export type {
     SessionBashRequest,
