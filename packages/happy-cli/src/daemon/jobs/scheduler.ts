@@ -212,6 +212,7 @@ export class JobScheduler {
         initialPrompt: job.prompt,
         environmentVariables: this.tierEnv(job, effectiveTier),
         sessionName: 'job-' + job.id,
+        account: job.account,
       }
 
       let result: SpawnSessionResult
@@ -367,6 +368,7 @@ interface SubmitJobParams {
   timeoutMs?: number
   allowedTools?: string[]
   dispositionTopic?: string
+  account?: string
 }
 
 /**
@@ -391,5 +393,6 @@ export function buildJobFromSubmit(params: SubmitJobParams, now: number, id: str
   if (params.maxBudgetUsd !== undefined) job.maxBudgetUsd = params.maxBudgetUsd
   if (params.maxTurns !== undefined) job.maxTurns = params.maxTurns
   if (params.dispositionTopic !== undefined) job.dispositionTopic = params.dispositionTopic
+  if (params.account !== undefined) job.account = params.account
   return job
 }

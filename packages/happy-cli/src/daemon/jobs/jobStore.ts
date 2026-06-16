@@ -43,6 +43,7 @@ interface JobRow {
   gateBucket: string | null
   gateReason: string | null
   gateResolved: number | null
+  account: string | null
   createdAt: number
 }
 
@@ -77,6 +78,7 @@ function rowToRecord(row: JobRow): JobRecord {
   if (row.gateBucket !== null) record.gateBucket = row.gateBucket as JobRecord['gateBucket']
   if (row.gateReason !== null) record.gateReason = row.gateReason
   if (row.gateResolved !== null) record.gateResolved = row.gateResolved === 1
+  if (row.account !== null) record.account = row.account
   return record
 }
 
@@ -118,6 +120,7 @@ export class JobStore {
         gateBucket TEXT,
         gateReason TEXT,
         gateResolved INTEGER,
+        account TEXT,
         createdAt INTEGER NOT NULL
       )
     `)
@@ -143,6 +146,10 @@ export class JobStore {
     if (!cols.some(c => c.name === 'gateResolved')) {
       this.db.exec(`ALTER TABLE jobs ADD COLUMN gateResolved INTEGER`)
     }
+    // Idempotent migration (E10): add the account column to a store created before it existed.
+    if (!cols.some(c => c.name === 'account')) {
+      this.db.exec(`ALTER TABLE jobs ADD COLUMN account TEXT`)
+    }
     // Indexes for the hot query paths: status filters (list), sessionId lookups
     // (findBySessionId / cost reporting), and the claim ordering (status + createdAt).
     this.db.exec(`
@@ -160,13 +167,13 @@ export class JobStore {
         status, attempts, maxAttempts, sessionId, sessionPid, scheduledAt, claimedAt,
         timeoutAt, finishedAt, exitReason, costUsd, maxBudgetUsd, maxTurns,
         gitHeadBefore, gitHeadAfter, dispositionTopic, gateAction, gateBucket,
-        gateReason, gateResolved, createdAt
+        gateReason, gateResolved, account, createdAt
       ) VALUES (
         @id, @triggerType, @triggerMetadata, @tier, @preset, @directory, @prompt,
         @status, @attempts, @maxAttempts, @sessionId, @sessionPid, @scheduledAt, @claimedAt,
         @timeoutAt, @finishedAt, @exitReason, @costUsd, @maxBudgetUsd, @maxTurns,
         @gitHeadBefore, @gitHeadAfter, @dispositionTopic, @gateAction, @gateBucket,
-        @gateReason, @gateResolved, @createdAt
+        @gateReason, @gateResolved, @account, @createdAt
       )
     `).run({
       id: job.id,
@@ -196,6 +203,7 @@ export class JobStore {
       gateBucket: job.gateBucket ?? null,
       gateReason: job.gateReason ?? null,
       gateResolved: job.gateResolved ? 1 : null,
+      account: job.account ?? null,
       createdAt: job.createdAt,
     })
   }
@@ -208,13 +216,13 @@ export class JobStore {
         status, attempts, maxAttempts, sessionId, sessionPid, scheduledAt, claimedAt,
         timeoutAt, finishedAt, exitReason, costUsd, maxBudgetUsd, maxTurns,
         gitHeadBefore, gitHeadAfter, dispositionTopic, gateAction, gateBucket,
-        gateReason, gateResolved, createdAt
+        gateReason, gateResolved, account, createdAt
       ) VALUES (
         @id, @triggerType, @triggerMetadata, @tier, @preset, @directory, @prompt,
         @status, @attempts, @maxAttempts, @sessionId, @sessionPid, @scheduledAt, @claimedAt,
         @timeoutAt, @finishedAt, @exitReason, @costUsd, @maxBudgetUsd, @maxTurns,
         @gitHeadBefore, @gitHeadAfter, @dispositionTopic, @gateAction, @gateBucket,
-        @gateReason, @gateResolved, @createdAt
+        @gateReason, @gateResolved, @account, @createdAt
       )
     `).run({
       id: job.id,
@@ -244,6 +252,7 @@ export class JobStore {
       gateBucket: job.gateBucket ?? null,
       gateReason: job.gateReason ?? null,
       gateResolved: job.gateResolved ? 1 : null,
+      account: job.account ?? null,
       createdAt: job.createdAt,
     })
     return result.changes === 1
@@ -326,7 +335,7 @@ export class JobStore {
       'status', 'attempts', 'maxAttempts', 'sessionId', 'sessionPid', 'scheduledAt', 'claimedAt',
       'timeoutAt', 'finishedAt', 'exitReason', 'costUsd', 'maxBudgetUsd', 'maxTurns',
       'gitHeadBefore', 'gitHeadAfter', 'dispositionTopic', 'gateAction', 'gateBucket',
-      'gateReason', 'gateResolved', 'createdAt',
+      'gateReason', 'gateResolved', 'account', 'createdAt',
     ]
     const present = columns.filter(c => c in patch)
     if (present.length === 0) return

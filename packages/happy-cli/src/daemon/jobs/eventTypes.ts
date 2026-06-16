@@ -21,6 +21,7 @@ export interface EventSubscription {
   timeoutMs?: number;
   allowedTools?: string[];
   dispositionTopic?: string;        // E05: topic for the confidence gate on each fired job
+  account?: string;                 // E10: Claude-account waarop een gefirede cloud-job draait
   enabled: boolean;                 // default true
   createdAt: number;                // epoch ms
 }

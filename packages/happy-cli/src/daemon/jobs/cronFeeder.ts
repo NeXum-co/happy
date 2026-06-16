@@ -66,6 +66,7 @@ export function buildCronJob(schedule: CronSchedule, occurrenceMs: number, now: 
   if (schedule.maxTurns !== undefined) job.maxTurns = schedule.maxTurns
   if (schedule.timeoutMs !== undefined) job.timeoutAt = now + schedule.timeoutMs
   if (schedule.dispositionTopic !== undefined) job.dispositionTopic = schedule.dispositionTopic
+  if (schedule.account !== undefined) job.account = schedule.account
   return job
 }
 
@@ -81,6 +82,7 @@ export interface SubmitCronParams {
   timeoutMs?: number
   allowedTools?: string[]
   dispositionTopic?: string
+  account?: string
 }
 
 /**
@@ -104,6 +106,7 @@ export function buildCronFromSubmit(params: SubmitCronParams, now: number, id: s
   if (params.timeoutMs !== undefined) schedule.timeoutMs = params.timeoutMs
   if (params.allowedTools !== undefined) schedule.allowedTools = params.allowedTools
   if (params.dispositionTopic !== undefined) schedule.dispositionTopic = params.dispositionTopic
+  if (params.account !== undefined) schedule.account = params.account
   return schedule
 }
 

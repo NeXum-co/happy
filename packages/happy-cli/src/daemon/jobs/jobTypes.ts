@@ -41,5 +41,6 @@ export interface JobRecord {
   gateBucket?: DispositionBucket; // E05: the matched disposition bucket
   gateReason?: string;            // E05: human-readable gate reason (embeds matched topic/domain)
   gateResolved?: boolean;    // E05: true once Joshua approved a parked job (tick skips re-gating)
+  account?: string;          // E10: Claude-account waarop een cloud-job draait (leeg → default)
   createdAt: number;
 }

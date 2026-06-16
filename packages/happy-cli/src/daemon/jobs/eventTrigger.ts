@@ -81,6 +81,7 @@ export function buildEventJob(
   if (sub.maxTurns !== undefined) job.maxTurns = sub.maxTurns
   if (sub.timeoutMs !== undefined) job.timeoutAt = now + sub.timeoutMs
   if (sub.dispositionTopic !== undefined) job.dispositionTopic = sub.dispositionTopic
+  if (sub.account !== undefined) job.account = sub.account
   return job
 }
 
@@ -97,6 +98,7 @@ export interface SubmitEventSubscriptionParams {
   timeoutMs?: number
   allowedTools?: string[]
   dispositionTopic?: string
+  account?: string
 }
 
 /**
@@ -125,5 +127,6 @@ export function buildEventSubscriptionFromSubmit(
   if (params.timeoutMs !== undefined) sub.timeoutMs = params.timeoutMs
   if (params.allowedTools !== undefined) sub.allowedTools = params.allowedTools
   if (params.dispositionTopic !== undefined) sub.dispositionTopic = params.dispositionTopic
+  if (params.account !== undefined) sub.account = params.account
   return sub
 }

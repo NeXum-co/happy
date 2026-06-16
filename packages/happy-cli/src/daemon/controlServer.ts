@@ -273,6 +273,7 @@ export function startDaemonControlServer({
           timeoutMs: z.number().optional(),
           allowedTools: z.array(z.string()).optional(),
           dispositionTopic: z.string().optional(),
+          account: z.string().optional(),
         }),
         response: {
           200: z.object({
@@ -406,6 +407,7 @@ export function startDaemonControlServer({
           timeoutMs: z.number().optional(),
           allowedTools: z.array(z.string()).optional(),
           dispositionTopic: z.string().optional(),
+          account: z.string().optional(),
         }),
         response: {
           200: z.object({
@@ -478,6 +480,7 @@ export function startDaemonControlServer({
           timeoutMs: z.number().optional(),
           allowedTools: z.array(z.string()).optional(),
           dispositionTopic: z.string().optional(),
+          account: z.string().optional(),
         }),
         response: {
           200: z.object({

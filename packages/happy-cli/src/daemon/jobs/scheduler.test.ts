@@ -386,6 +386,16 @@ describe('JobScheduler pre-spawn gate (E05)', () => {
     expect(loaded.gateBucket).toBe('high-trust')
   })
 
+  it('E10: runJob geeft job.account door aan SpawnSessionOptions.account', async () => {
+    // gateResolved:true skipt de E05-gate (anders parkeert de job i.p.v. spawnen);
+    // preset:'cloud-x' houdt isLocal=false zodat de intentie (cloud-account) zuiver is.
+    store.create(makeJob({ id: 'acc', directory: dir, gateResolved: true, preset: 'cloud-x', account: 'work' }))
+    const { calls, spawn } = trackedSpawn()
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn })
+    await scheduler.tick()
+    expect(calls[0]?.account).toBe('work')
+  })
+
   it('hold (override-prone): parks in needs-attention, never spawns, exitReason gate:', async () => {
     store.create(makeJob({ id: 'g-hold', tier: 'supervised', directory: dir, dispositionTopic: 'arch/override' }))
     const { calls, spawn } = trackedSpawn()

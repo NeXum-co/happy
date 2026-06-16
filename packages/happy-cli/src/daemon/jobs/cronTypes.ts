@@ -18,6 +18,7 @@ export interface CronSchedule {
   timeoutMs?: number;
   allowedTools?: string[];
   dispositionTopic?: string; // E05: topic for the confidence gate on each fired job
+  account?: string;          // E10: Claude-account waarop een gefirede cloud-job draait
   enabled: boolean;
   createdAt: number;        // epoch ms
 }
