@@ -105,6 +105,8 @@ type MachineRpcHandlers = {
     cancelJob?: (jobId: string) => boolean;
     /** Resolve a gate-parked job (E05): 'approve' runs it, 'reject' drives it to dead. Returns whether it was resolved. */
     resolveGate?: (jobId: string, decision: 'approve' | 'reject') => Promise<boolean>;
+    /** Live-switch (E10, AC-4): remap a chosen set of running cloud sessions to one account. Fail-closed on the target account. */
+    accountSwitch?: (sessionIds: string[], account: string) => Promise<{ ok: boolean; remapped?: string[]; skipped?: string[]; error?: string }>;
     /** Create a durable cron schedule from submit-cron params; returns its id. */
     submitCron?: (params: SubmitCronParams) => string;
     /** List all cron schedules as CronScheduleView projections. */
@@ -170,6 +172,7 @@ export class ApiMachineClient {
         getJob,
         cancelJob,
         resolveGate,
+        accountSwitch,
         submitCron,
         listCrons,
         deleteCron,
@@ -240,6 +243,21 @@ export class ApiMachineClient {
                 const cancelled = cancelJob(jobId);
                 logger.debug(`[API MACHINE] Cancel job ${jobId}: ${cancelled}`);
                 return { cancelled };
+            });
+        }
+
+        // Register account-switch handler (E10, AC-4). Live-remaps a chosen set of
+        // running cloud sessions to one account via the authProxy (no respawn).
+        // Fail-closed on the target account. Mirrors the HTTP /account-switch endpoint.
+        if (accountSwitch) {
+            this.rpcHandlerManager.registerHandler('account-switch', async (params: any) => {
+                const { sessionIds, account } = params || {};
+                if (!Array.isArray(sessionIds) || sessionIds.some((s: unknown) => typeof s !== 'string'))
+                    throw new Error('sessionIds must be string[]');
+                if (typeof account !== 'string' || account.length === 0) throw new Error('account is required');
+                const result = await accountSwitch(sessionIds, account);
+                logger.debug(`[API MACHINE] Account switch → ${account}: ok=${result.ok}`);
+                return result;
             });
         }
 

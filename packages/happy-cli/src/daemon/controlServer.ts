@@ -61,6 +61,7 @@ export function startDaemonControlServer({
   stopJob,
   cancelJob,
   resolveGate,
+  accountSwitch,
   listJobs,
   getJob,
   patchJobCost,
@@ -81,6 +82,7 @@ export function startDaemonControlServer({
   stopJob: (sessionId: string) => boolean;
   cancelJob: (jobId: string) => boolean;
   resolveGate: (jobId: string, decision: 'approve' | 'reject') => Promise<boolean>;
+  accountSwitch: (sessionIds: string[], account: string) => Promise<{ ok: boolean; remapped?: string[]; skipped?: string[]; error?: string }>;
   listJobs: (filter?: { status?: JobStatus }) => JobRecordView[];
   getJob: (id: string) => JobRecordView | null;
   patchJobCost: (sessionId: string, costUsd: number) => boolean;
@@ -153,7 +155,8 @@ export function startDaemonControlServer({
             children: z.array(z.object({
               startedBy: z.string(),
               happySessionId: z.string(),
-              pid: z.number()
+              pid: z.number(),
+              account: z.string().optional()
             }))
           })
         }
@@ -167,7 +170,8 @@ export function startDaemonControlServer({
           .map(child => ({
             startedBy: child.startedBy,
             happySessionId: child.happySessionId!,
-            pid: child.pid
+            pid: child.pid,
+            account: child.account
           }))
       }
     });
@@ -327,6 +331,30 @@ export function startDaemonControlServer({
       logger.debug(`[CONTROL SERVER] Cancel job request: ${jobId}`);
       const cancelled = cancelJob(jobId);
       return { cancelled };
+    });
+
+    // Live-switch (E10, AC-4): remap een gekozen set lopende cloud-sessies naar één
+    // account in de authProxy — geen respawn. Fail-closed op het doel-account (AC-6).
+    // Mirrors the account-switch RPC handler (BUG-UAT-1: beide surfaces).
+    typed.post('/account-switch', {
+      schema: {
+        body: z.object({
+          sessionIds: z.array(z.string()),
+          account: z.string()
+        }),
+        response: {
+          200: z.object({
+            ok: z.boolean(),
+            remapped: z.array(z.string()).optional(),
+            skipped: z.array(z.string()).optional(),
+            error: z.string().optional()
+          })
+        }
+      }
+    }, async (request) => {
+      const { sessionIds, account } = request.body;
+      logger.debug(`[CONTROL SERVER] Account switch: ${sessionIds.length} sessie(s) → ${account}`);
+      return accountSwitch(sessionIds, account);
     });
 
     // Resolve a gate-parked autonomous job (E05, D-E05-4). A job parked in

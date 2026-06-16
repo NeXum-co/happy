@@ -17,6 +17,7 @@ import { spawnHappyCLI } from '@/utils/spawnHappyCLI';
 import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readPersistedSessions, persistSession, readCredentials } from '@/persistence';
 import { startAuthProxy, type AuthProxy } from '@/accounts/authProxy';
 import { applyAccountBinding } from '@/accounts/accountBinding';
+import { applyAccountSwitch, type SwitchResult } from '@/accounts/accountSwitch';
 import { vaultMasterKey } from '@/accounts/accountVault';
 import type { PersistedSession } from '@/persistence';
 
@@ -1086,6 +1087,22 @@ export async function startDaemon(): Promise<void> {
     const resolveGate = (jobId: string, decision: 'approve' | 'reject'): Promise<boolean> =>
       jobScheduler.resolveGate(jobId, decision);
 
+    // Live-switch (AC-4): remap een gekozen set lopende cloud-sessies naar één
+    // account in de authProxy — geen respawn. Fail-closed op het doel-account
+    // (AC-6): doel niet ontsleutelbaar → nul remaps. Een ongebonden sessie (geen
+    // routing-key) komt in `skipped`. Twee surfaces (HTTP + RPC, BUG-UAT-1) roepen
+    // deze ene closure aan.
+    const accountSwitch = async (sessionIds: string[], account: string): Promise<SwitchResult> => {
+      const creds = await readCredentials();
+      if (!creds) return { ok: false, error: 'geen credentials — switch geweigerd' };
+      return applyAccountSwitch(sessionIds, { account }, {
+        vaultFile: configuration.accountsVaultFile,
+        masterKey: await vaultMasterKey(creds),
+        proxy: authProxy,
+        lookupRoutingKey: (sid) => findTrackedSessionById(sid)?.routingKey,
+      });
+    };
+
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
       getChildren: getCurrentChildren,
@@ -1095,6 +1112,7 @@ export async function startDaemon(): Promise<void> {
       stopJob,
       cancelJob,
       resolveGate,
+      accountSwitch,
       listJobs,
       getJob,
       patchJobCost,
@@ -1175,6 +1193,7 @@ export async function startDaemon(): Promise<void> {
       getJob,
       cancelJob,
       resolveGate,
+      accountSwitch,
       submitCron,
       listCrons,
       deleteCron,
