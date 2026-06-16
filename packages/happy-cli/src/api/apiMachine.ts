@@ -109,6 +109,14 @@ type MachineRpcHandlers = {
     accountSwitch?: (sessionIds: string[], account: string) => Promise<{ ok: boolean; remapped?: string[]; skipped?: string[]; error?: string }>;
     /** Usage-read (E10, AC-5): per-account last-seen 5h/7d utilisation scraped from the unified-* headers. Fail-soft (unknown → null). */
     getUsage?: () => Record<string, { fiveHourUtil: number | null; sevenDayUtil: number | null; seenAt: number | null }>;
+    /** List sessions with their live account (E10, S5). Mirrors HTTP /list — keyed by happySessionId for the migration popup. */
+    listSessions?: () => { startedBy: string; happySessionId: string; pid: number; account?: string }[];
+    /** Account-management (E10, S5, D-E10-17) over the encrypted vault. list-accounts never leaks a token. */
+    listAccounts?: () => Promise<{ name: string; isDefault: boolean; addedAt: number }[]>;
+    /** Add an account from a machine-side `claude setup-token` paste; token encrypted into the vault, never logged. */
+    addAccount?: (name: string, token: string, isDefault?: boolean) => Promise<void>;
+    setDefaultAccount?: (name: string) => Promise<void>;
+    removeAccount?: (name: string) => Promise<void>;
     /** Create a durable cron schedule from submit-cron params; returns its id. */
     submitCron?: (params: SubmitCronParams) => string;
     /** List all cron schedules as CronScheduleView projections. */
@@ -176,6 +184,11 @@ export class ApiMachineClient {
         resolveGate,
         accountSwitch,
         getUsage,
+        listSessions,
+        listAccounts,
+        addAccount,
+        setDefaultAccount,
+        removeAccount,
         submitCron,
         listCrons,
         deleteCron,
@@ -270,6 +283,52 @@ export class ApiMachineClient {
         if (getUsage) {
             this.rpcHandlerManager.registerHandler('get-usage', async () => {
                 return { usage: getUsage() };
+            });
+        }
+
+        // Register list handler (E10, S5). Mirrors HTTP /list: sessions with their
+        // live account, keyed by happySessionId, so the app can group the migration
+        // popup per account. The daemon's TrackedSession is the fresh source (remap
+        // can change it) — not server-synced metadata.
+        if (listSessions) {
+            this.rpcHandlerManager.registerHandler('list', async () => {
+                return { children: listSessions() };
+            });
+        }
+
+        // Register account-management handlers (E10, S5, D-E10-17) over the encrypted
+        // vault. Mirror the HTTP endpoints (BUG-UAT-1). list-accounts never leaks a
+        // token; add-account takes a secret token (machine-side `claude setup-token`
+        // paste) that is encrypted into the vault and NEVER logged (security.md).
+        if (listAccounts) {
+            this.rpcHandlerManager.registerHandler('list-accounts', async () => {
+                return { accounts: await listAccounts() };
+            });
+        }
+        if (addAccount) {
+            this.rpcHandlerManager.registerHandler('add-account', async (params: any) => {
+                const { name, token, isDefault } = params || {};
+                if (typeof name !== 'string' || name.length === 0) throw new Error('name is required');
+                if (typeof token !== 'string' || token.length === 0) throw new Error('token is required');
+                await addAccount(name, token, isDefault === true);
+                logger.debug(`[API MACHINE] Add account: ${name} (default=${isDefault === true})`); // geen token
+                return { ok: true };
+            });
+        }
+        if (setDefaultAccount) {
+            this.rpcHandlerManager.registerHandler('set-default-account', async (params: any) => {
+                const { name } = params || {};
+                if (typeof name !== 'string' || name.length === 0) throw new Error('name is required');
+                await setDefaultAccount(name);
+                return { ok: true };
+            });
+        }
+        if (removeAccount) {
+            this.rpcHandlerManager.registerHandler('remove-account', async (params: any) => {
+                const { name } = params || {};
+                if (typeof name !== 'string' || name.length === 0) throw new Error('name is required');
+                await removeAccount(name);
+                return { ok: true };
             });
         }
 

@@ -19,7 +19,7 @@ import { startAuthProxy, type AuthProxy } from '@/accounts/authProxy';
 import { applyAccountBinding } from '@/accounts/accountBinding';
 import { applyAccountSwitch, type SwitchResult } from '@/accounts/accountSwitch';
 import { createUsageStore, type AccountUsage } from '@/accounts/usageStore';
-import { vaultMasterKey } from '@/accounts/accountVault';
+import { vaultMasterKey, listAccounts, addAccount, removeAccount, setDefaultAccount, type AccountInfo } from '@/accounts/accountVault';
 import type { PersistedSession } from '@/persistence';
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stopDaemon } from './controlClient';
@@ -1113,9 +1113,35 @@ export async function startDaemon(): Promise<void> {
     // (HTTP /usage + RPC get-usage, BUG-UAT-1) lezen deze ene snapshot.
     const getUsage = (): Record<string, AccountUsage> => usageStore.snapshot();
 
+    // Account-management-surface (S5, D-E10-17) over de bestaande vault-CRUD. Twee
+    // surfaces (HTTP + RPC, BUG-UAT-1) roepen deze closures aan zodat de app de
+    // accounts kan lezen/beheren. `add-account` neemt een geheim token (van een
+    // machine-side `claude setup-token`) en versleutelt het de vault in — het token
+    // wordt nóóit gelogd (security.md). `list-accounts` lekt geen token (alleen metadata).
+    const listAccountsVerb = (): Promise<AccountInfo[]> =>
+      listAccounts(configuration.accountsVaultFile, 'claude');
+    const addAccountVerb = async (name: string, token: string, isDefault?: boolean): Promise<void> => {
+      const creds = await readCredentials();
+      if (!creds) throw new Error('geen credentials — add-account geweigerd');
+      await addAccount(configuration.accountsVaultFile, await vaultMasterKey(creds),
+        { provider: 'claude', name, oauthToken: token, isDefault });
+    };
+    const setDefaultAccountVerb = (name: string): Promise<void> =>
+      setDefaultAccount(configuration.accountsVaultFile, 'claude', name);
+    const removeAccountVerb = (name: string): Promise<void> =>
+      removeAccount(configuration.accountsVaultFile, 'claude', name);
+
+    // Sessie-projectie (gedeeld door HTTP /list én RPC list, BUG-UAT-1). Levert de
+    // app de live per-sessie-account-map (gekeyd op happySessionId) voor de
+    // migratie-popup; de daemon-TrackedSession is de verse bron (remap kan 'm wijzigen).
+    const listSessions = (): { startedBy: string; happySessionId: string; pid: number; account?: string }[] =>
+      getCurrentChildren()
+        .filter(child => child.happySessionId !== undefined)
+        .map(child => ({ startedBy: child.startedBy, happySessionId: child.happySessionId!, pid: child.pid, account: child.account }));
+
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
-      getChildren: getCurrentChildren,
+      listSessions,
       stopSession,
       spawnSession,
       submitJob,
@@ -1124,6 +1150,10 @@ export async function startDaemon(): Promise<void> {
       resolveGate,
       accountSwitch,
       getUsage,
+      listAccounts: listAccountsVerb,
+      addAccount: addAccountVerb,
+      setDefaultAccount: setDefaultAccountVerb,
+      removeAccount: removeAccountVerb,
       listJobs,
       getJob,
       patchJobCost,
@@ -1206,6 +1236,11 @@ export async function startDaemon(): Promise<void> {
       resolveGate,
       accountSwitch,
       getUsage,
+      listAccounts: listAccountsVerb,
+      addAccount: addAccountVerb,
+      setDefaultAccount: setDefaultAccountVerb,
+      removeAccount: removeAccountVerb,
+      listSessions,
       submitCron,
       listCrons,
       deleteCron,

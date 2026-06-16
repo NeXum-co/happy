@@ -9,7 +9,7 @@ import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-
 import { logger } from '@/ui/logger';
 import { Metadata } from '@/api/types';
 import { decodeBase64 } from '@/api/encryption';
-import { TrackedSession, SessionEncryptionData } from './types';
+import { SessionEncryptionData } from './types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
 import type { SubmitJobParams } from '@/api/apiMachine';
 import type { JobStatus } from './jobs/jobTypes';
@@ -54,7 +54,7 @@ const eventSubscriptionViewSchema = z.object({
 });
 
 export function startDaemonControlServer({
-  getChildren,
+  listSessions,
   stopSession,
   spawnSession,
   submitJob,
@@ -63,6 +63,10 @@ export function startDaemonControlServer({
   resolveGate,
   accountSwitch,
   getUsage,
+  listAccounts,
+  addAccount,
+  setDefaultAccount,
+  removeAccount,
   listJobs,
   getJob,
   patchJobCost,
@@ -76,7 +80,7 @@ export function startDaemonControlServer({
   requestShutdown,
   onHappySessionWebhook
 }: {
-  getChildren: () => TrackedSession[];
+  listSessions: () => { startedBy: string; happySessionId: string; pid: number; account?: string }[];
   stopSession: (sessionId: string) => boolean;
   spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
   submitJob: (params: SubmitJobParams) => string;
@@ -85,6 +89,10 @@ export function startDaemonControlServer({
   resolveGate: (jobId: string, decision: 'approve' | 'reject') => Promise<boolean>;
   accountSwitch: (sessionIds: string[], account: string) => Promise<{ ok: boolean; remapped?: string[]; skipped?: string[]; error?: string }>;
   getUsage: () => Record<string, { fiveHourUtil: number | null; sevenDayUtil: number | null; seenAt: number | null }>;
+  listAccounts: () => Promise<{ name: string; isDefault: boolean; addedAt: number }[]>;
+  addAccount: (name: string, token: string, isDefault?: boolean) => Promise<void>;
+  setDefaultAccount: (name: string) => Promise<void>;
+  removeAccount: (name: string) => Promise<void>;
   listJobs: (filter?: { status?: JobStatus }) => JobRecordView[];
   getJob: (id: string) => JobRecordView | null;
   patchJobCost: (sessionId: string, costUsd: number) => boolean;
@@ -164,18 +172,9 @@ export function startDaemonControlServer({
         }
       }
     }, async () => {
-      const children = getChildren();
+      const children = listSessions();
       logger.debug(`[CONTROL SERVER] Listing ${children.length} sessions`);
-      return { 
-        children: children
-          .filter(child => child.happySessionId !== undefined)
-          .map(child => ({
-            startedBy: child.startedBy,
-            happySessionId: child.happySessionId!,
-            pid: child.pid,
-            account: child.account
-          }))
-      }
+      return { children };
     });
 
     // Stop specific session
@@ -376,6 +375,61 @@ export function startDaemonControlServer({
       }
     }, async () => {
       return { usage: getUsage() };
+    });
+
+    // Account-management (E10, S5, D-E10-17) over de versleutelde vault. Mirrors the
+    // RPC handlers (BUG-UAT-1: beide surfaces). `/list-accounts` lekt geen token;
+    // `/add-account` neemt een geheim token dat versleuteld de vault in gaat — niet gelogd.
+    typed.post('/list-accounts', {
+      schema: {
+        response: {
+          200: z.object({
+            accounts: z.array(z.object({
+              name: z.string(),
+              isDefault: z.boolean(),
+              addedAt: z.number()
+            }))
+          })
+        }
+      }
+    }, async () => {
+      return { accounts: await listAccounts() };
+    });
+
+    typed.post('/add-account', {
+      schema: {
+        body: z.object({
+          name: z.string().min(1),
+          token: z.string().min(1),
+          isDefault: z.boolean().optional()
+        }),
+        response: { 200: z.object({ ok: z.boolean() }) }
+      }
+    }, async (request) => {
+      const { name, token, isDefault } = request.body;
+      logger.debug(`[CONTROL SERVER] Add account: ${name} (default=${isDefault ?? false})`); // geen token
+      await addAccount(name, token, isDefault);
+      return { ok: true };
+    });
+
+    typed.post('/set-default-account', {
+      schema: {
+        body: z.object({ name: z.string().min(1) }),
+        response: { 200: z.object({ ok: z.boolean() }) }
+      }
+    }, async (request) => {
+      await setDefaultAccount(request.body.name);
+      return { ok: true };
+    });
+
+    typed.post('/remove-account', {
+      schema: {
+        body: z.object({ name: z.string().min(1) }),
+        response: { 200: z.object({ ok: z.boolean() }) }
+      }
+    }, async (request) => {
+      await removeAccount(request.body.name);
+      return { ok: true };
     });
 
     // Resolve a gate-parked autonomous job (E05, D-E05-4). A job parked in

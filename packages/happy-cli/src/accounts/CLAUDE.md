@@ -108,3 +108,20 @@ mogelijk; de daemon ontsluit de vault en de proxy injecteert het juiste token.
   `get-usage` (`apiMachine.ts`) lezen dezelfde `usageStore.snapshot()` via de
   `getUsage`-closure in `run.ts` → `{ usage: Record<account, AccountUsage> }`.
 - **AC-7 ongemoeid:** usage = percentages (groen), geen tokens; niets nieuws in de sessie-env.
+
+## S5.1-invarianten (app-management-surface) ✅
+
+- **Account-management op twee surfaces** (BUG-UAT-1, D-E10-17): HTTP (`controlServer.ts`) +
+  RPC (`apiMachine.ts`) over de bestaande `accountVault`-CRUD via dunne closures in `run.ts`:
+  `list-accounts`, `add-account` (`{name, token, isDefault?}`), `set-default-account` (`{name}`),
+  `remove-account` (`{name}`). De closures hergebruiken `vaultMasterKey(creds)` +
+  `configuration.accountsVaultFile` (zelfde vorm als de `accountSwitch`-closure).
+- **`list` is nu óók een RPC** (was HTTP-only): een gedeelde `listSessions`-closure in `run.ts`
+  projecteert `{happySessionId, startedBy, pid, account?}`; zowel HTTP `/list` als RPC `list`
+  roepen 'm aan. Levert de app de live per-sessie-account-map (gekeyd op `happySessionId`) voor
+  de migratie-popup. De daemon-`TrackedSession` is de verse bron (remap kan 'm wijzigen) —
+  géén account in server-gesyncte sessie-metadata.
+- **`add-account` token-hygiëne** (security.md): het geplakte `setup-token` reist over het
+  machine-encrypted RPC-kanaal en gaat versleuteld de vault in; het token wordt **nóóit gelogd**
+  (de debug-regel noemt alleen naam + default-flag). `list-accounts` lekt geen token —
+  `AccountInfo` heeft typstructureel geen token-veld.
