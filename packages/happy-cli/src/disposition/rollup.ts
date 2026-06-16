@@ -10,8 +10,15 @@ import { join } from 'node:path';
 import { logger } from '@/ui/logger';
 import type { DispositionRollup } from './types';
 
+/** Where the harness generator writes the rollup; overridable for tests. */
 export const DEFAULT_ROLLUP_PATH = join(homedir(), '.claude', 'memory', 'personal', 'disposition-rollup.json');
 
+/**
+ * Read and validate the disposition rollup.
+ * @param path JSON path (defaults to {@link DEFAULT_ROLLUP_PATH}).
+ * @returns the parsed rollup, or `null` on any read/parse/shape failure so the
+ *          gate fails closed (D-E05-5) — callers must treat `null` as "hold".
+ */
 export function loadRollup(path: string = DEFAULT_ROLLUP_PATH): DispositionRollup | null {
   let raw: string;
   try {

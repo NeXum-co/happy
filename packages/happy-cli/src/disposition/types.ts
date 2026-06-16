@@ -8,9 +8,11 @@
 export type DispositionBucket =
   | 'thin' | 'override-prone' | 'high-trust' | 'modify-prone' | 'mixed';
 
+/** The four autonomy actions the gate maps each bucket to (D-E05-1). */
 export type GateAction = 'proceed' | 'proceed-supervised' | 'escalate' | 'hold';
 
 export interface DispositionEntry {
+  // accept / modify / override / defer counts; n = total signals (n<2 ⇒ thin).
   a: number; m: number; o: number; d: number; n: number;
   bucket: DispositionBucket;
 }

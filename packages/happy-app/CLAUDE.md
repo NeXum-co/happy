@@ -417,3 +417,11 @@ const MyComponent = () => {
 - `sources/hooks/useVisibleSessionListViewData.ts` — fleet list ordering: needs-you band, project groups and active sessions on top; inactive sessions collapsed under an "Earlier (N)" archive-toggle driven by the `hideInactiveSessions` setting. "Archived" just means `session.active === false` — there is no separate archived state.
 - `sources/sync/fleetLayout.ts` — needs-you predicate: remote `agentState.requests` OR a fresh `localRequest`. A localRequest older than `LOCAL_REQUEST_TTL_MS` (30 min) is ignored — an interactive deny in the Claude TUI fires no clearing signal (D-E02-13). Keep the constant in sync with happy-cli `src/claude/utils/localAttention.ts`; separate packages, it cannot be shared.
 - Archive confirm (12/6): `sources/app/(app)/session/[id]/info.tsx` archives only after a `Modal.alert` confirm with `t('sessionInfo.archiveSessionConfirm')` (destructive style). Keep this confirm — archiving kills the CLI process (`sessionKill`, with `sessionArchive` as force-fallback when the process is already dead).
+
+### E05 gate (run-views)
+
+The E05 confidence gate (gate core in happy-cli `src/disposition/`) surfaces on the run screens:
+
+- `sources/app/(app)/runs/new.tsx` — the optional **`dispositionTopic`** field (e.g. `architecture/api-design`). Empty or unrecognized ⇒ the gate holds the job for approval before each run.
+- `sources/app/(app)/runs/[jobId].tsx` — shows the gate verdict (`gateAction` / `gateBucket` / `gateReason`) via the localized `gateActionLabel`/`gateBucketLabel` mappers (raw enums are internal, UX-002). **UX-006:** once `gateResolved` is set the held verdict is history — show only the topic, not the "why held" rows. A `gate:*`-parked job offers approve/reject (`machineResolveGate`); approve runs it at its gated tier, reject drives it to dead.
+- `sources/sync/runOps.ts` — the `JobRecordView` mirror (gate fields included). Source of truth = happy-cli `src/daemon/jobs/jobView.ts`; keep them in lockstep.

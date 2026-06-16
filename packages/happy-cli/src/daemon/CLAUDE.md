@@ -22,7 +22,7 @@ Control Flow:
    - State persistence: writes PID, version, HTTP port to daemon.state.json
    - HTTP server: starts on random port for local CLI control (list, stop, spawn)
    - WebSocket: establishes persistent connection to backend via `ApiMachineClient`
-   - RPC registration: exposes `spawn-happy-session`, `stop-session`, `requestShutdown`, and the autonomous-job handlers (`submit-job`, `stop-job`, `cancel-job`, `list-jobs`, `get-job`, `submit-cron`, `list-crons`, `delete-cron`, `submit-event-subscription`, `list-event-subscriptions`, `delete-event-subscription`, `trigger-event` — see `jobs/CLAUDE.md`)
+   - RPC registration: exposes `spawn-happy-session`, `stop-session`, `requestShutdown`, and the autonomous-job handlers (`submit-job`, `stop-job`, `cancel-job`, `resolve-gate`, `list-jobs`, `get-job`, `submit-cron`, `list-crons`, `delete-cron`, `submit-event-subscription`, `list-event-subscriptions`, `delete-event-subscription`, `trigger-event` — see `jobs/CLAUDE.md`)
    - Heartbeat loop: every 60s (or HAPPY_DAEMON_HEARTBEAT_INTERVAL) checks for version updates and prunes dead sessions
 5. Awaits shutdown promise which resolves when:
    - OS signal received (SIGINT/SIGTERM)
@@ -117,6 +117,7 @@ job/cron/event subsystem.
 - `/submit-job` - create a durable pending job
 - `GET /jobs` (`?status=`) - list jobs; `GET /jobs/:id` - one job
 - `/stop-job` - kill a running job's session; `/cancel-job` - terminate a non-running job
+- `/resolve-gate` - approve/reject an E05 gate-parked job (see `jobs/CLAUDE.md`)
 - `/submit-cron`, `/crons`, `/delete-cron` - cron schedule CRUD
 - `/submit-event-subscription`, `/event-subscriptions`, `/delete-event-subscription` - event subscription CRUD
 - `/trigger-event` - deliver an event (the git post-commit hook POSTs here)

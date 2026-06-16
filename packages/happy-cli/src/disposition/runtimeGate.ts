@@ -22,6 +22,12 @@ const AUTO_APPROVE_TOOLS = new Set<string>([
   'Read', 'Glob', 'Grep', 'NotebookRead', 'TodoWrite', 'BashOutput',
 ]);
 
+/**
+ * @returns `true` only when `toolName` is on the read-only safe-list AND the
+ *          topic resolves to a high-trust bucket. Any unknown tool, non-high-trust
+ *          topic, or missing rollup returns `false` → the caller forwards the
+ *          escalation to Joshua (fail-closed, D-E05-5/8).
+ */
 export function shouldAutoApprove(toolName: string, topic: string | null | undefined, rollup: DispositionRollup | null): boolean {
   if (!AUTO_APPROVE_TOOLS.has(toolName)) return false;
   return evaluate(topic, rollup).bucket === 'high-trust';
