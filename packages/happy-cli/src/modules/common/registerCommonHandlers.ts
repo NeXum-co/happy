@@ -145,6 +145,8 @@ export interface SpawnSessionOptions {
     forkedFromMessageId?: string;
     /** Autonomous-job seed prompt; injected as the first user message at spawn (D-E04-11). */
     initialPrompt?: string;
+    /** E10: Claude-account uit de vault waarop deze cloud-sessie z'n inference draait. Leeg → default-account (als geconfigureerd). */
+    account?: string;
 }
 
 export type SpawnSessionResult =

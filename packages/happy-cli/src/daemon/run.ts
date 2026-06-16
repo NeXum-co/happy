@@ -14,7 +14,10 @@ import { startCaffeinate, stopCaffeinate } from '@/utils/caffeinate';
 import packageJson from '../../package.json';
 import { getEnvironmentInfo } from '@/ui/doctor';
 import { spawnHappyCLI } from '@/utils/spawnHappyCLI';
-import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readPersistedSessions, persistSession } from '@/persistence';
+import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readPersistedSessions, persistSession, readCredentials } from '@/persistence';
+import { startAuthProxy, type AuthProxy } from '@/accounts/authProxy';
+import { applyAccountBinding } from '@/accounts/accountBinding';
+import { vaultMasterKey } from '@/accounts/accountVault';
 import type { PersistedSession } from '@/persistence';
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stopDaemon } from './controlClient';
@@ -259,6 +262,12 @@ export async function startDaemon(): Promise<void> {
       }
     };
 
+    // E10: localhost-only auth-proxy die per cloud-sessie het echte account-token
+    // injecteert. Gestart vóór spawnSession zodat de closure 'm capteert; gestopt
+    // in cleanupAndShutdown. usage-scraping volgt in S4.
+    const authProxy: AuthProxy = await startAuthProxy();
+    logger.debug(`[DAEMON RUN] authProxy (E10) luistert op http://127.0.0.1:${authProxy.port}`);
+
     // Spawn a new session (sessionId reserved for future --resume functionality)
     const spawnSession = async (options: SpawnSessionOptions): Promise<SpawnSessionResult> => {
       logger.debugLargeJson('[DAEMON RUN] Spawning session', options);
@@ -375,6 +384,19 @@ export async function startDaemon(): Promise<void> {
         if (options.resumeClaudeSessionId) {
           extraEnv.HAPPY_FORK_CLAUDE_SESSION_ID = options.resumeClaudeSessionId;
         }
+
+        // E10: bind deze cloud-spawn aan een account (engaged-only, fail-closed).
+        // Niet-claude/local-preset spawns en een lege vault passeren ongemoeid.
+        const accountCreds = await readCredentials();
+        const binding = accountCreds
+          ? await applyAccountBinding(extraEnv, { agent: options.agent, account: options.account },
+              { vaultFile: configuration.accountsVaultFile, masterKey: await vaultMasterKey(accountCreds), proxy: authProxy })
+          : { ok: true as const, stripApiKey: false };
+        if (!binding.ok) {
+          return { type: 'error', errorMessage: binding.error };
+        }
+        const stripApiKey = binding.stripApiKey;
+
         logger.debug(`[DAEMON RUN] Environment variable keys (before expansion) (${Object.keys(extraEnv).length}): ${Object.keys(extraEnv).join(', ')}`);
 
         // Expand ${VAR} references from daemon's process.env
@@ -491,6 +513,10 @@ export async function startDaemon(): Promise<void> {
           // Add extra environment variables (these should already be filtered)
           Object.assign(tmuxEnv, extraEnv);
 
+          // E10: strip ANTHROPIC_API_KEY zodra account-binding actief is, anders
+          // overruled een geërfde key stil de routing-key (proxy wordt omzeild).
+          if (stripApiKey) delete tmuxEnv.ANTHROPIC_API_KEY;
+
           const tmuxResult = await tmux.spawnInTmux([fullCommand], {
             sessionName: tmuxSessionName,
             windowName: windowName,
@@ -605,10 +631,12 @@ export async function startDaemon(): Promise<void> {
           return spawnTrackedHappyProcess({
             args,
             cwd: directory,
-            env: {
-              ...process.env,
-              ...extraEnv
-            },
+            env: (() => {
+              const childEnv: NodeJS.ProcessEnv = { ...process.env, ...extraEnv };
+              // E10: zie tmux-tak — strip de geërfde API-key bij actieve binding.
+              if (stripApiKey) delete childEnv.ANTHROPIC_API_KEY;
+              return childEnv;
+            })(),
             directoryCreated,
             message: messageParts.length > 0 ? messageParts.join(' ') : undefined,
           });
@@ -1304,6 +1332,7 @@ export async function startDaemon(): Promise<void> {
 
       apiMachine.shutdown();
       await stopControlServer();
+      authProxy.stop();
       await cleanupDaemonState();
       await stopCaffeinate();
       await releaseDaemonLock(daemonLockHandle);
