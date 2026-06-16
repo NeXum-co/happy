@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { vaultMasterKey, loadVault, saveVault } from '@/accounts/accountVault'
+import { vaultMasterKey, loadVault, saveVault, addAccount, listAccounts, removeAccount, setDefaultAccount } from '@/accounts/accountVault'
 import type { Credentials } from '@/persistence'
 import { getRandomBytes } from '@/api/encryption'
 import { mkdtemp, readFile as rf, writeFile } from 'node:fs/promises'
@@ -43,5 +43,36 @@ describe('loadVault/saveVault', () => {
     const fp = join(dir, 'accounts.vault.json')
     await writeFile(fp, '{ niet-geldig')
     await expect(loadVault(fp)).rejects.toThrow()
+  })
+})
+
+describe('CRUD', () => {
+  const key = getRandomBytes(32)
+  const newFp = async () => join(await mkdtemp(join(tmpdir(), 'vault-')), 'v.json')
+
+  it('add → list toont metadata, token niet plaintext in bestand (AC-1/AC-7)', async () => {
+    const fp = await newFp()
+    await addAccount(fp, key, { provider: 'claude', name: 'work', oauthToken: 'sk-ant-oat01-SECRET', isDefault: true })
+    const list = await listAccounts(fp, 'claude')
+    expect(list.map(a => a.name)).toEqual(['work'])
+    expect(list[0].isDefault).toBe(true)
+    const onDisk = await rf(fp, 'utf8')
+    expect(onDisk).not.toContain('sk-ant-oat01-SECRET') // versleuteld
+  })
+
+  it('eerste account wordt automatisch default', async () => {
+    const fp = await newFp()
+    await addAccount(fp, key, { provider: 'claude', name: 'a', oauthToken: 'sk-ant-oat01-A' })
+    expect((await listAccounts(fp, 'claude'))[0].isDefault).toBe(true)
+  })
+
+  it('setDefault wisselt de default; remove ruimt op', async () => {
+    const fp = await newFp()
+    await addAccount(fp, key, { provider: 'claude', name: 'a', oauthToken: 'sk-ant-oat01-A' })
+    await addAccount(fp, key, { provider: 'claude', name: 'b', oauthToken: 'sk-ant-oat01-B' })
+    await setDefaultAccount(fp, 'claude', 'b')
+    expect((await listAccounts(fp, 'claude')).find(a => a.isDefault)?.name).toBe('b')
+    await removeAccount(fp, 'claude', 'a')
+    expect((await listAccounts(fp, 'claude')).map(a => a.name)).toEqual(['b'])
   })
 })

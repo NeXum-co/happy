@@ -47,3 +47,49 @@ export async function saveVault(filePath: string, data: VaultData): Promise<void
   await writeFile(tmp, JSON.stringify(vaultSchema.parse(data), null, 2), { mode: 0o600 })
   await rename(tmp, filePath)
 }
+
+export type AccountInfo = { name: string; isDefault: boolean; addedAt: number }
+
+function ensureProvider(v: VaultData, provider: string) {
+  v.providers[provider] ??= { defaultAccount: null, accounts: {} }
+  return v.providers[provider]
+}
+
+export async function addAccount(
+  filePath: string, masterKey: Uint8Array,
+  opts: { provider: string; name: string; oauthToken: string; isDefault?: boolean },
+): Promise<void> {
+  const v = await loadVault(filePath)
+  const p = ensureProvider(v, opts.provider)
+  p.accounts[opts.name] = {
+    oauthTokenEnc: encodeBase64(encrypt(masterKey, 'dataKey', opts.oauthToken)),
+    addedAt: Date.now(),
+  }
+  if (opts.isDefault || !p.defaultAccount) p.defaultAccount = opts.name
+  await saveVault(filePath, v)
+}
+
+export async function listAccounts(filePath: string, provider: string): Promise<AccountInfo[]> {
+  const p = (await loadVault(filePath)).providers[provider]
+  if (!p) return []
+  return Object.entries(p.accounts).map(([name, a]) => ({
+    name, isDefault: p.defaultAccount === name, addedAt: a.addedAt,
+  }))
+}
+
+export async function removeAccount(filePath: string, provider: string, name: string): Promise<void> {
+  const v = await loadVault(filePath)
+  const p = v.providers[provider]
+  if (!p?.accounts[name]) return
+  delete p.accounts[name]
+  if (p.defaultAccount === name) p.defaultAccount = Object.keys(p.accounts)[0] ?? null
+  await saveVault(filePath, v)
+}
+
+export async function setDefaultAccount(filePath: string, provider: string, name: string): Promise<void> {
+  const v = await loadVault(filePath)
+  const p = v.providers[provider]
+  if (!p?.accounts[name]) throw new Error(`onbekend account ${provider}/${name}`)
+  p.defaultAccount = name
+  await saveVault(filePath, v)
+}
