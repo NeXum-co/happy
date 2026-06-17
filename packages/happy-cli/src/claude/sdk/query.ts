@@ -52,6 +52,14 @@ export function buildSdkOptions(opts: QueryOptions | undefined): Options {
         // mode — verified on 0.2.96 and 0.3.143; the isolation default is SDK design,
         // not version-specific), so phone-driven turns would silently run without
         // the user's harness while local mode keeps it. See E01 slice-1 proof.
+        //
+        // Forcing these sources is intentional parity, not a leak: local autonomous
+        // jobs always loaded the user harness, so remote/SDK turns — including
+        // bypassPermissions autonomous jobs — must match, or the same job would
+        // behave differently depending on where it was triggered. The trust boundary
+        // for autonomous execution is the E05 confidence gate (src/disposition/),
+        // NOT SDK setting-source isolation; isolation here would only create a
+        // false sense of containment while breaking harness parity.
         settingSources: ['user', 'project', 'local'],
         strictMcpConfig: opts?.strictMcpConfig,
         sessionId: undefined,
