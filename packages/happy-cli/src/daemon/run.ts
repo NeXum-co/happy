@@ -275,6 +275,16 @@ export async function startDaemon(): Promise<void> {
     });
     logger.debug(`[DAEMON RUN] authProxy (E10) luistert op http://127.0.0.1:${authProxy.port}`);
 
+    // E10 (QUAL-001): release the proxy routing-key — which holds a DECRYPTED
+    // account token in memory — the moment a bound session is gone. Without this
+    // the proxy's routes-Map grows monotonically for the daemon's whole lifetime
+    // and keeps plaintext tokens of exited sessions (and of later removed/rotated
+    // accounts) around until restart. A resumed session gets NO binding (scope-
+    // grens S2, D-E10-16), so cleaning on exit can never strand a live session.
+    const releaseProxyBinding = (session?: { routingKey?: string }) => {
+      if (session?.routingKey) authProxy.unregister(session.routingKey);
+    };
+
     // Spawn a new session (sessionId reserved for future --resume functionality)
     const spawnSession = async (options: SpawnSessionOptions): Promise<SpawnSessionResult> => {
       logger.debugLargeJson('[DAEMON RUN] Spawning session', options);
@@ -882,6 +892,7 @@ export async function startDaemon(): Promise<void> {
             }
           }
 
+          releaseProxyBinding(session);
           pidToTrackedSession.delete(pid);
           logger.debug(`[DAEMON RUN] Removed session ${sessionId} from tracking`);
           return true;
@@ -901,6 +912,7 @@ export async function startDaemon(): Promise<void> {
       } else {
         logger.debug(`[DAEMON RUN] Removing exited process PID ${pid} from tracking`);
       }
+      releaseProxyBinding(session);
       pidToTrackedSession.delete(pid);
     };
 
@@ -1162,7 +1174,9 @@ export async function startDaemon(): Promise<void> {
         // Groepeer per doel-account → één accountSwitch per groep.
         const byTarget = new Map<string, string[]>();
         for (const { sessionId, toAccount } of plan) {
-          (byTarget.get(toAccount) ?? byTarget.set(toAccount, []).get(toAccount)!).push(sessionId);
+          let group = byTarget.get(toAccount);
+          if (!group) byTarget.set(toAccount, group = []);
+          group.push(sessionId);
         }
         for (const [toAccount, sessionIds] of byTarget) {
           const result = await accountSwitch(sessionIds, toAccount);
@@ -1341,13 +1355,14 @@ export async function startDaemon(): Promise<void> {
       }
 
       // Prune stale sessions
-      for (const [pid, _] of pidToTrackedSession.entries()) {
+      for (const [pid, session] of pidToTrackedSession.entries()) {
         try {
           // Check if process is still alive (signal 0 doesn't kill, just checks)
           process.kill(pid, 0);
         } catch (error) {
           // Process is dead, remove from tracking
           logger.debug(`[DAEMON RUN] Removing stale session with PID ${pid} (process no longer exists)`);
+          releaseProxyBinding(session);
           pidToTrackedSession.delete(pid);
         }
       }
