@@ -7,6 +7,7 @@ import { Typography } from '@/constants/Typography';
 import { encodeBase64 } from '@/encryption/base64';
 import { generateAuthKeyPair, authQRStart } from '@/auth/authQRStart';
 import { authQRWait } from '@/auth/authQRWait';
+import { isWebInsecureContext } from '@/auth/secureContext';
 import { layout } from '@/components/layout';
 import { Modal } from '@/modal';
 import { t } from '@/text';
@@ -80,6 +81,12 @@ export default function Restore() {
     useEffect(() => {
         const startQRAuth = async () => {
             try {
+                if (isWebInsecureContext()) {
+                    Modal.alert(t('common.error'), t('connect.secureContextRequired'));
+                    setIsWaitingForAuth(false);
+                    return;
+                }
+
                 setIsWaitingForAuth(true);
 
                 // Send authentication request
