@@ -738,6 +738,10 @@ function buildEnvVars(envDir: string, serverPort: number, expoPort: number): Rec
     const projectDir = path.join(envDir, "project");
 
     return {
+        // Resolve workspace bins (tsx, etc.) without depending on the caller's PATH —
+        // integration runs launched via the vitest binary directly don't get node_modules/.bin.
+        PATH: `${path.join(REPO_ROOT, "node_modules", ".bin")}${path.delimiter}${process.env.PATH ?? ""}`,
+
         // Server
         HANDY_MASTER_SECRET: "happy-dev-secret",
         PORT: String(serverPort),
