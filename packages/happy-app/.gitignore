@@ -4,3 +4,9 @@
 
 expo-env.d.ts
 # @end expo-cli
+
+# E2E (Playwright)
+dist-e2e/
+e2e-report/
+test-results/
+playwright/.cache/
