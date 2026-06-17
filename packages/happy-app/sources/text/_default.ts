@@ -100,6 +100,8 @@ export const en = {
         enterSecretKey: 'Please enter a secret key',
         invalidSecretKey: 'Invalid secret key. Please check and try again.',
         secureContextRequired: 'Account restore needs a secure connection (HTTPS). Open the app via HTTPS or localhost and try again.',
+        qrLinkInstructions: '1. Open Happy on your mobile device\n2. Go to Settings → Account\n3. Tap "Link New Device"\n4. Scan this QR code',
+        restoreWithSecretKey: 'Restore with Secret Key Instead',
         enterUrlManually: 'Enter URL manually',
     },
 

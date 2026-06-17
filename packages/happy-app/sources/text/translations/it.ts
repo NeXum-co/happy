@@ -100,6 +100,8 @@ export const it: TranslationStructure = {
         enterSecretKey: 'Inserisci la chiave segreta',
         invalidSecretKey: 'Chiave segreta non valida. Controlla e riprova.',
         secureContextRequired: 'Il ripristino dell\'account richiede una connessione sicura (HTTPS). Apri l\'app tramite HTTPS o localhost e riprova.',
+        qrLinkInstructions: '1. Apri Happy sul tuo dispositivo mobile\n2. Vai su Impostazioni → Account\n3. Tocca "Collega nuovo dispositivo"\n4. Scansiona questo codice QR',
+        restoreWithSecretKey: 'Ripristina con la chiave segreta',
         enterUrlManually: 'Inserisci URL manualmente',
     },
 

@@ -102,6 +102,8 @@ export const zhHant: TranslationStructure = {
         enterSecretKey: '請輸入金鑰',
         invalidSecretKey: '無效的金鑰，請檢查後重試。',
         secureContextRequired: '還原帳戶需要安全連線（HTTPS）。請透過 HTTPS 或 localhost 開啟應用程式後再試一次。',
+        qrLinkInstructions: '1. 在行動裝置上開啟 Happy\n2. 前往設定 → 帳戶\n3. 點擊「連結新裝置」\n4. 掃描此 QR 碼',
+        restoreWithSecretKey: '改用金鑰還原',
         enterUrlManually: '手動輸入 URL',
     },
 

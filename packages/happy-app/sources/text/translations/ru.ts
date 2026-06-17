@@ -81,6 +81,8 @@ export const ru: TranslationStructure = {
         enterSecretKey: 'Пожалуйста, введите секретный ключ',
         invalidSecretKey: 'Неверный секретный ключ. Проверьте и попробуйте снова.',
         secureContextRequired: 'Для восстановления аккаунта требуется защищённое соединение (HTTPS). Откройте приложение через HTTPS или localhost и попробуйте снова.',
+        qrLinkInstructions: '1. Откройте Happy на мобильном устройстве\n2. Перейдите в Настройки → Аккаунт\n3. Нажмите «Привязать новое устройство»\n4. Отсканируйте этот QR-код',
+        restoreWithSecretKey: 'Восстановить по секретному ключу',
         enterUrlManually: 'Ввести URL вручную',
     },
 

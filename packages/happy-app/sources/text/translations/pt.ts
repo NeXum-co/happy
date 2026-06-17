@@ -101,6 +101,8 @@ export const pt: TranslationStructure = {
         enterSecretKey: 'Por favor, insira uma chave secreta',
         invalidSecretKey: 'Chave secreta inválida. Verifique e tente novamente.',
         secureContextRequired: 'A restauração da conta requer uma conexão segura (HTTPS). Abra o aplicativo via HTTPS ou localhost e tente novamente.',
+        qrLinkInstructions: '1. Abra o Happy no seu dispositivo móvel\n2. Vá em Configurações → Conta\n3. Toque em "Vincular novo dispositivo"\n4. Escaneie este código QR',
+        restoreWithSecretKey: 'Restaurar com chave secreta',
         enterUrlManually: 'Inserir URL manualmente',
     },
 

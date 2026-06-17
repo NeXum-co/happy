@@ -11,7 +11,7 @@ import { ru } from './translations/ru';
 import { zhHans } from './translations/zh-Hans';
 import { zhHant } from './translations/zh-Hant';
 
-const bundles: Record<string, { connect: { restoreInstructions?: unknown } }> = {
+const bundles: Record<string, { connect: { restoreInstructions?: unknown; qrLinkInstructions?: unknown; restoreWithSecretKey?: unknown } }> = {
     _default: defaultTranslations,
     en,
     ca,
@@ -29,6 +29,26 @@ describe('connect.restoreInstructions completeness', () => {
     for (const [name, bundle] of Object.entries(bundles)) {
         it(`${name} has a non-empty connect.restoreInstructions`, () => {
             const value = bundle.connect.restoreInstructions;
+            expect(typeof value).toBe('string');
+            expect((value as string).trim().length).toBeGreaterThan(0);
+        });
+    }
+});
+
+describe('connect.qrLinkInstructions completeness', () => {
+    for (const [name, bundle] of Object.entries(bundles)) {
+        it(`${name} has a non-empty connect.qrLinkInstructions`, () => {
+            const value = bundle.connect.qrLinkInstructions;
+            expect(typeof value).toBe('string');
+            expect((value as string).trim().length).toBeGreaterThan(0);
+        });
+    }
+});
+
+describe('connect.restoreWithSecretKey completeness', () => {
+    for (const [name, bundle] of Object.entries(bundles)) {
+        it(`${name} has a non-empty connect.restoreWithSecretKey`, () => {
+            const value = bundle.connect.restoreWithSecretKey;
             expect(typeof value).toBe('string');
             expect((value as string).trim().length).toBeGreaterThan(0);
         });

@@ -101,6 +101,8 @@ export const ca: TranslationStructure = {
         enterSecretKey: 'Introdueix la teva clau secreta',
         invalidSecretKey: 'Clau secreta no vàlida. Comprova-ho i torna-ho a provar.',
         secureContextRequired: 'Restaurar el compte requereix una connexió segura (HTTPS). Obre l\'aplicació mitjançant HTTPS o localhost i torna-ho a provar.',
+        qrLinkInstructions: '1. Obre Happy al teu dispositiu mòbil\n2. Ves a Configuració → Compte\n3. Toca "Vincula un dispositiu nou"\n4. Escaneja aquest codi QR',
+        restoreWithSecretKey: 'Restaura amb la clau secreta',
         enterUrlManually: 'Introdueix l\'URL manualment',
     },
 

@@ -112,6 +112,8 @@ export const pl: TranslationStructure = {
         enterSecretKey: 'Proszę wprowadzić klucz tajny',
         invalidSecretKey: 'Nieprawidłowy klucz tajny. Sprawdź i spróbuj ponownie.',
         secureContextRequired: 'Przywrócenie konta wymaga bezpiecznego połączenia (HTTPS). Otwórz aplikację przez HTTPS lub localhost i spróbuj ponownie.',
+        qrLinkInstructions: '1. Otwórz Happy na urządzeniu mobilnym\n2. Przejdź do Ustawienia → Konto\n3. Dotknij "Połącz nowe urządzenie"\n4. Zeskanuj ten kod QR',
+        restoreWithSecretKey: 'Przywróć kluczem tajnym',
         enterUrlManually: 'Wprowadź URL ręcznie',
     },
 

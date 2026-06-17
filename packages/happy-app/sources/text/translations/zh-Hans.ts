@@ -103,6 +103,8 @@ export const zhHans: TranslationStructure = {
         enterSecretKey: '请输入密钥',
         invalidSecretKey: '无效的密钥，请检查后重试。',
         secureContextRequired: '恢复账户需要安全连接（HTTPS）。请通过 HTTPS 或 localhost 打开应用后重试。',
+        qrLinkInstructions: '1. 在移动设备上打开 Happy\n2. 前往设置 → 账户\n3. 点击"关联新设备"\n4. 扫描此二维码',
+        restoreWithSecretKey: '改用密钥恢复',
         enterUrlManually: '手动输入 URL',
     },
 
