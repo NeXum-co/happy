@@ -3,38 +3,30 @@
 Committed, repeatable web-E2E. Built first for the E10 multi-subscription screens; the harness is
 generic (reusable for E02 fleet / E08 screens).
 
-## How it works
+## How it works (self-contained — no real account, no live relay)
 
-1. `pnpm e2e:export` produces a static web build in `dist-e2e/` (`expo export`, dev variant, relay
-   baked to `EXPO_PUBLIC_HAPPY_SERVER_URL`).
+1. `pnpm e2e:export` produces a static web build in `dist-e2e/` (`expo export`, dev variant).
 2. `playwright.config.ts` serves `dist-e2e/` on **:8099** (dependency-free `static-server.mjs`, SPA
-   fallback) — never the live `:8081`.
-3. Fixtures (`e2e/fixtures/app.ts`) inject at runtime, before any app script:
-   - the relay URL via `window.__HAPPY_CONFIG__.serverUrl`,
-   - the app auth credential via `localStorage['auth_credentials']`.
-4. `globalSetup` boots an **isolated test daemon** (own `HAPPY_HOME_DIR`, seeded **dummy** accounts,
-   a fresh machine on the relay) so the account screens get real-but-safe RPC data. Skipped when no
-   credential is present (then only the credential-free smoke runs).
+   fallback) — never the live app `:8081`.
+3. `globalSetup` stands up a **fully isolated backend** and seeds it deterministically:
+   - `support/isolatedRelay.ts` boots a throwaway `happy-server` (PGlite, own DATA_DIR in `tmpdir`)
+     on **:3099** — never the live relay `:3005`.
+   - `support/seedAccount.ts` mints a **synthetic account** headlessly (`POST /v1/auth` with a fresh
+     tweetnacl signing key; no QR) and a random 32-byte masterSecret → credential `{token, secret}`.
+   - `startTestDaemon` (own `HAPPY_HOME_DIR`) registers a machine on :3099 and seeds **dummy** vault
+     accounts for the E10 account screens.
+   - `support/seedSessions.ts` seeds a deterministic **fleet**: encrypted-metadata sessions across
+     projects, needs-you (remote `requests` via the `update-state` socket), local-attention
+     (`localRequest`), idle, and archived (for the "Earlier (N)" collapse) — all decryptable by the
+     app via legacy(masterSecret).
+4. Fixtures (`e2e/fixtures/app.ts`) inject the relay URL (`window.__HAPPY_CONFIG__.serverUrl`, read
+   from `.auth/relay.json`) and the synthetic credential (`localStorage['auth_credentials']`) before
+   any app script — so the app boots authed against :3099 and renders the seeded fleet.
+5. `globalTeardown` stops the daemon and the relay and removes the throwaway DATA_DIR.
 
-## Credential (local only — never committed)
-
-The daemon's `~/.happy/access.key` is the *dataKey* variant; its masterSecret is one-way-derived and
-**cannot** be reconstructed, so the suite needs a real logged-in app credential `{token, secret}`
-(the app uses a legacy single-masterSecret scheme — the test daemon's `access.key` is rebuilt in
-legacy form from this credential so app↔daemon machine encryption interoperates).
-
-**Automated (recommended):**
-```bash
-pnpm e2e:cred           # extracts auth_credentials from your local Chrome/Chromium into e2e/.auth/
-```
-It reads your own browser's localStorage leveldb on disk, picks the credential the relay accepts, and
-writes `e2e/.auth/credentials.json` (gitignored, value never printed).
-
-**Manual fallback:** open the web client where you're logged in → DevTools → Application → Local
-Storage → copy the `auth_credentials` JSON → save it as `e2e/.auth/credentials.json`
-(`{ "token": "...", "secret": "..." }`), or export `HAPPY_E2E_TOKEN` / `HAPPY_E2E_SECRET`.
-
-Without it, the suite runs only `boot.spec.ts` (credential-free smoke) and skips the authed specs.
+No browser credential, no `pnpm e2e:cred`, no dependency on Joshua's real account — every run is
+hermetic and deterministic. `support/credentials.ts` exposes the seeded fleet shape via `loadFleet()`
+so specs can assert exact session identities.
 
 ## Run
 
@@ -48,7 +40,11 @@ Report: `e2e-report/`. Traces/screenshots retained on failure.
 
 ## Invariants (do not break)
 
-- Never touch the live `~/.happy` daemon/vault — the test daemon uses its own `HAPPY_HOME_DIR`.
-- Never serve on `:8081` — this harness uses `:8099`.
-- Never echo/commit secrets (`auth_credentials`, tokens). `e2e/.auth/` is gitignored.
-- Seeded accounts use **dummy** tokens — the screens only show metadata; usage is fail-soft "unknown".
+- Never touch the live relay `:3005` or the live `~/.happy` daemon/vault — the harness uses an
+  isolated relay on `:3099` (throwaway PGlite DATA_DIR in `tmpdir`) and the test daemon's own
+  `HAPPY_HOME_DIR`. `isolatedRelay.ts` hard-refuses port 3005.
+- Never serve the app on `:8081` — this harness uses `:8099`.
+- Detached process groups, killed by recorded pgid on teardown — never `pkill` by name.
+- Never echo/commit secrets. `e2e/.auth/` (relay.json, credentials.json, fleet.json) is gitignored.
+- Seeded vault accounts use **dummy** tokens — the screens only show metadata; usage is fail-soft
+  "unknown". Seeded sessions carry synthetic encrypted metadata/agentState only.

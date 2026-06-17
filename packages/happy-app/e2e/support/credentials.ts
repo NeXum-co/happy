@@ -8,6 +8,7 @@ export interface AppCredentials {
 
 const CRED_FILE = join(__dirname, '..', '.auth', 'credentials.json');
 const MACHINE_FILE = join(__dirname, '..', '.auth', 'machine.json');
+const RELAY_FILE = join(__dirname, '..', '.auth', 'relay.json');
 
 /**
  * Load a real app auth credential ({token, secret}) for the committed E2E suite.
@@ -33,9 +34,42 @@ export function loadCredentials(): AppCredentials | null {
     return null;
 }
 
-/** Relay base URL the app should talk to (defaults to the local relay). */
+/**
+ * Relay base URL the app + test daemon should talk to. Source of truth is the isolated relay URL
+ * written by globalSetup (.auth/relay.json), so the whole suite is self-contained. Falls back to env,
+ * then the live local relay (legacy).
+ */
 export function serverUrl(): string {
-    return process.env.EXPO_PUBLIC_HAPPY_SERVER_URL || 'http://localhost:3005';
+    if (process.env.EXPO_PUBLIC_HAPPY_SERVER_URL) return process.env.EXPO_PUBLIC_HAPPY_SERVER_URL;
+    if (existsSync(RELAY_FILE)) {
+        try {
+            const raw = JSON.parse(readFileSync(RELAY_FILE, 'utf8'));
+            if (raw && typeof raw.url === 'string') return raw.url;
+        } catch {}
+    }
+    return 'http://localhost:3005';
+}
+
+const FLEET_FILE = join(__dirname, '..', '.auth', 'fleet.json');
+
+export interface SeededFleetFile {
+    homeDir: string;
+    sessions: { tag: string; project: string; id: string; archived: boolean }[];
+    needsYouRemoteTag: string;
+    localAttentionTag: string;
+    idleTag: string;
+    archivedTags: string[];
+    projects: string[];
+}
+
+/** The seeded fleet shape written by globalSetup (seedSessions). Null when setup did not run. */
+export function loadFleet(): SeededFleetFile | null {
+    if (existsSync(FLEET_FILE)) {
+        try {
+            return JSON.parse(readFileSync(FLEET_FILE, 'utf8')) as SeededFleetFile;
+        } catch {}
+    }
+    return null;
 }
 
 /** The isolated test daemon's machineId, written by globalSetup. Null until Slice B runs. */
