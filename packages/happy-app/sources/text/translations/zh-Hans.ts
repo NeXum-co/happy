@@ -908,6 +908,15 @@ export const zhHans: TranslationStructure = {
         migrateFailed: '无法切换所选会话。',
         migrateDoneTitle: '会话已迁移',
         sessionPid: ({ pid }: { pid: number }) => `PID ${pid}`,
+        burnPolicy: {
+            title: '消耗策略',
+            enable: '自动切换账户',
+            threshold: ({ pct }: { pct: number }) => `使用达到 ${pct}% 时切换`,
+            order: '消耗顺序',
+            hint: '当某个账户达到阈值时，新建和正在运行的云会话会切换到下一个有余量的账户。重新排序账户以设置优先级。',
+            moveUp: '上移',
+            moveDown: '下移',
+        },
     },
 
     message: {

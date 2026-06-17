@@ -908,6 +908,15 @@ export const ja: TranslationStructure = {
         migrateFailed: '選択したセッションを切り替えられませんでした。',
         migrateDoneTitle: 'セッションを移行しました',
         sessionPid: ({ pid }: { pid: number }) => `PID ${pid}`,
+        burnPolicy: {
+            title: 'バーンポリシー',
+            enable: 'アカウントを自動切り替え',
+            threshold: ({ pct }: { pct: number }) => `${pct}% 使用で切り替え`,
+            order: '消費順序',
+            hint: 'アカウントがしきい値に達すると、新規および実行中のクラウドセッションは空きのある次のアカウントに移ります。アカウントを並べ替えて優先順位を設定します。',
+            moveUp: '上へ',
+            moveDown: '下へ',
+        },
     },
 
     message: {

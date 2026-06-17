@@ -923,6 +923,15 @@ export const pl: TranslationStructure = {
         migrateFailed: 'Nie udało się przełączyć wybranych sesji.',
         migrateDoneTitle: 'Sesje przeniesione',
         sessionPid: ({ pid }: { pid: number }) => `PID ${pid}`,
+        burnPolicy: {
+            title: 'Zasada przełączania',
+            enable: 'Automatyczne przełączanie kont',
+            threshold: ({ pct }: { pct: number }) => `Przełącz przy ${pct}% wykorzystania`,
+            order: 'Kolejność przełączania',
+            hint: 'Gdy konto osiągnie próg, nowe i trwające sesje w chmurze przechodzą na kolejne konto z dostępnym limitem. Zmień kolejność kont, aby ustawić priorytet.',
+            moveUp: 'W górę',
+            moveDown: 'W dół',
+        },
     },
 
     message: {

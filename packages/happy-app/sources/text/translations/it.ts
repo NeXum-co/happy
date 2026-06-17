@@ -909,6 +909,15 @@ export const it: TranslationStructure = {
         migrateFailed: 'Impossibile spostare le sessioni selezionate.',
         migrateDoneTitle: 'Sessioni migrate',
         sessionPid: ({ pid }: { pid: number }) => `PID ${pid}`,
+        burnPolicy: {
+            title: 'Politica di consumo',
+            enable: 'Cambia account automaticamente',
+            threshold: ({ pct }: { pct: number }) => `Cambia al ${pct}% utilizzato`,
+            order: 'Ordine di consumo',
+            hint: 'Quando un account raggiunge la soglia, le sessioni cloud nuove e in corso passano all\'account successivo con spazio disponibile. Riordina gli account per impostare la priorità.',
+            moveUp: 'Su',
+            moveDown: 'Giù',
+        },
     },
 
     message: {

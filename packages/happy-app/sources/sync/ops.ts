@@ -878,6 +878,32 @@ export async function machineAccountSwitch(machineId: string, sessionIds: string
     );
 }
 
+/** Burn-policy config (S6, AC-8): burn-order + threshold (fraction 0..1). enabled=false → no auto-switch. */
+export interface BurnPolicyConfig {
+    enabled: boolean;
+    order: string[];
+    thresholdPct: number;
+}
+
+/** Read the machine's burn-policy (S6). */
+export async function machineGetBurnPolicy(machineId: string): Promise<BurnPolicyConfig> {
+    const result = await apiSocket.machineRPC<{ policy: BurnPolicyConfig }, {}>(
+        machineId,
+        'get-burn-policy',
+        {},
+    );
+    return result.policy;
+}
+
+/** Persist the machine's burn-policy (S6). Server validates the shape. */
+export async function machineSetBurnPolicy(machineId: string, config: BurnPolicyConfig): Promise<void> {
+    await apiSocket.machineRPC<{ ok: true }, BurnPolicyConfig>(
+        machineId,
+        'set-burn-policy',
+        config,
+    );
+}
+
 // Export types for external use
 export type {
     SessionBashRequest,

@@ -911,6 +911,15 @@ export const ca: TranslationStructure = {
         migrateFailed: 'No s\'han pogut canviar les sessions seleccionades.',
         migrateDoneTitle: 'Sessions migrades',
         sessionPid: ({ pid }: { pid: number }) => `PID ${pid}`,
+        burnPolicy: {
+            title: 'Política de consum',
+            enable: 'Canvia de compte automàticament',
+            threshold: ({ pct }: { pct: number }) => `Canvia al ${pct}% utilitzat`,
+            order: 'Ordre de consum',
+            hint: 'Quan un compte arriba al llindar, les sessions al núvol noves i en curs passen al compte següent amb marge. Reordena els comptes per definir la prioritat.',
+            moveUp: 'Amunt',
+            moveDown: 'Avall',
+        },
     },
 
     message: {

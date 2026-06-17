@@ -1,10 +1,12 @@
-import React, { memo, useState, useCallback } from 'react';
-import { View, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { memo, useState, useCallback, useMemo } from 'react';
+import { View, ActivityIndicator, RefreshControl, Pressable } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { Text } from '@/components/StyledText';
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from 'expo-router';
 import { Item } from '@/components/Item';
 import { ItemGroup } from '@/components/ItemGroup';
 import { ItemList } from '@/components/ItemList';
+import { Switch } from '@/components/Switch';
 import { UsageBar } from '@/components/usage/UsageBar';
 import { Ionicons } from '@expo/vector-icons';
 import { Modal } from '@/modal';
@@ -15,11 +17,16 @@ import {
     machineGetUsage,
     machineSetDefaultAccount,
     machineRemoveAccount,
+    machineGetBurnPolicy,
+    machineSetBurnPolicy,
     type AccountInfo,
     type AccountUsage,
+    type BurnPolicyConfig,
 } from '@/sync/ops';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
+
+const DEFAULT_BURN_POLICY: BurnPolicyConfig = { enabled: false, order: [], thresholdPct: 0.9 };
 
 // E10 multi-subscription — per-machine accounts screen (D-E10-17). Lists the
 // vault accounts on this machine's daemon, shows per-account 5h/7d usage
@@ -33,19 +40,48 @@ export default memo(function MachineAccountsScreen() {
     const machine = useMachine(machineId!);
     const [accounts, setAccounts] = useState<AccountInfo[]>([]);
     const [usage, setUsage] = useState<Record<string, AccountUsage>>({});
+    const [policy, setPolicy] = useState<BurnPolicyConfig>(DEFAULT_BURN_POLICY);
     const [loaded, setLoaded] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     const load = useCallback(async () => {
         if (!machineId) return;
-        const [accs, use] = await Promise.all([
+        const [accs, use, pol] = await Promise.all([
             machineListAccounts(machineId),
             machineGetUsage(machineId).catch(() => ({})), // usage is fail-soft (D-E10-6)
+            machineGetBurnPolicy(machineId).catch(() => DEFAULT_BURN_POLICY),
         ]);
         setAccounts(accs);
         setUsage(use);
+        setPolicy(pol);
         setLoaded(true);
     }, [machineId]);
+
+    // Persist the burn-policy optimistically; on RPC failure revert by reloading (S6).
+    const persistPolicy = useCallback(async (next: BurnPolicyConfig) => {
+        setPolicy(next);
+        try {
+            await machineSetBurnPolicy(machineId!, next);
+        } catch (e) {
+            Modal.alert(t('common.error'), e instanceof Error ? e.message : 'Unknown error');
+            await load();
+        }
+    }, [machineId, load]);
+
+    // Burn order = configured order (filtered to existing accounts) + any remaining accounts appended.
+    const orderedNames = useMemo(() => {
+        const inOrder = policy.order.filter(n => accounts.some(a => a.name === n));
+        const rest = accounts.map(a => a.name).filter(n => !inOrder.includes(n));
+        return [...inOrder, ...rest];
+    }, [policy.order, accounts]);
+
+    const moveAccount = useCallback((index: number, dir: -1 | 1) => {
+        const next = [...orderedNames];
+        const j = index + dir;
+        if (j < 0 || j >= next.length) return;
+        [next[index], next[j]] = [next[j], next[index]];
+        persistPolicy({ ...policy, order: next });
+    }, [orderedNames, policy, persistPolicy]);
 
     // Refetch on focus so a freshly-added account (from the add screen) shows up.
     useFocusEffect(useCallback(() => { load().catch(() => setLoaded(true)); }, [load]));
@@ -160,6 +196,73 @@ export default memo(function MachineAccountsScreen() {
                     </ItemGroup>
                 )}
 
+                {loaded && accounts.length > 0 && (
+                    <ItemGroup title={t('subscriptions.burnPolicy.title')} footer={t('subscriptions.burnPolicy.hint')}>
+                        <Item
+                            title={t('subscriptions.burnPolicy.enable')}
+                            icon={<Ionicons name="flame-outline" size={29} color={theme.colors.textSecondary} />}
+                            rightElement={
+                                <Switch
+                                    value={policy.enabled}
+                                    onValueChange={(v) => persistPolicy({ ...policy, enabled: v, order: orderedNames })}
+                                />
+                            }
+                            showChevron={false}
+                            showDivider={policy.enabled}
+                        />
+                        {policy.enabled && (
+                            <>
+                                <View style={styles.sliderRow}>
+                                    <Text style={[styles.sliderLabel, { color: theme.colors.text }]}>
+                                        {t('subscriptions.burnPolicy.threshold', { pct: Math.round(policy.thresholdPct * 100) })}
+                                    </Text>
+                                    <Slider
+                                        minimumValue={0}
+                                        maximumValue={1}
+                                        step={0.05}
+                                        value={policy.thresholdPct}
+                                        onValueChange={(v) => setPolicy(p => ({ ...p, thresholdPct: v }))}
+                                        onSlidingComplete={(v) => persistPolicy({ ...policy, thresholdPct: v, order: orderedNames })}
+                                        minimumTrackTintColor={theme.colors.text}
+                                        maximumTrackTintColor={theme.colors.divider}
+                                    />
+                                </View>
+                                <Text style={[styles.orderHeading, { color: theme.colors.textSecondary }]}>
+                                    {t('subscriptions.burnPolicy.order')}
+                                </Text>
+                                {orderedNames.map((name, index) => (
+                                    <Item
+                                        key={name}
+                                        title={`${index + 1}. ${name}`}
+                                        showChevron={false}
+                                        showDivider={index < orderedNames.length - 1}
+                                        rightElement={
+                                            <View style={styles.reorderButtons}>
+                                                <Pressable
+                                                    accessibilityLabel={t('subscriptions.burnPolicy.moveUp')}
+                                                    disabled={index === 0}
+                                                    onPress={() => moveAccount(index, -1)}
+                                                    style={styles.reorderButton}
+                                                >
+                                                    <Ionicons name="chevron-up" size={22} color={index === 0 ? theme.colors.divider : theme.colors.text} />
+                                                </Pressable>
+                                                <Pressable
+                                                    accessibilityLabel={t('subscriptions.burnPolicy.moveDown')}
+                                                    disabled={index === orderedNames.length - 1}
+                                                    onPress={() => moveAccount(index, 1)}
+                                                    style={styles.reorderButton}
+                                                >
+                                                    <Ionicons name="chevron-down" size={22} color={index === orderedNames.length - 1 ? theme.colors.divider : theme.colors.text} />
+                                                </Pressable>
+                                            </View>
+                                        }
+                                    />
+                                ))}
+                            </>
+                        )}
+                    </ItemGroup>
+                )}
+
                 {loaded && (
                     <ItemGroup>
                         <Item
@@ -187,5 +290,28 @@ const styles = StyleSheet.create((theme) => ({
     usageUnknown: {
         fontSize: 13,
         fontStyle: 'italic',
+    },
+    sliderRow: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+    },
+    sliderLabel: {
+        fontSize: 15,
+        marginBottom: 4,
+    },
+    orderHeading: {
+        fontSize: 13,
+        textTransform: 'uppercase',
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 4,
+    },
+    reorderButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    reorderButton: {
+        paddingHorizontal: 6,
+        paddingVertical: 4,
     },
 }));

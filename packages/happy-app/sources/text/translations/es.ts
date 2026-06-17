@@ -911,6 +911,15 @@ export const es: TranslationStructure = {
         migrateFailed: 'No se pudieron cambiar las sesiones seleccionadas.',
         migrateDoneTitle: 'Sesiones migradas',
         sessionPid: ({ pid }: { pid: number }) => `PID ${pid}`,
+        burnPolicy: {
+            title: 'Política de consumo',
+            enable: 'Cambiar de cuenta automáticamente',
+            threshold: ({ pct }: { pct: number }) => `Cambiar al ${pct}% usado`,
+            order: 'Orden de consumo',
+            hint: 'Cuando una cuenta alcanza el umbral, las sesiones en la nube nuevas y en curso pasan a la siguiente cuenta con margen. Reordena las cuentas para definir la prioridad.',
+            moveUp: 'Subir',
+            moveDown: 'Bajar',
+        },
     },
 
     message: {

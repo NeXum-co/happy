@@ -907,6 +907,15 @@ export const zhHant: TranslationStructure = {
         migrateFailed: '無法切換所選工作階段。',
         migrateDoneTitle: '工作階段已遷移',
         sessionPid: ({ pid }: { pid: number }) => `PID ${pid}`,
+        burnPolicy: {
+            title: '消耗策略',
+            enable: '自動切換帳戶',
+            threshold: ({ pct }: { pct: number }) => `使用達到 ${pct}% 時切換`,
+            order: '消耗順序',
+            hint: '當某個帳戶達到閾值時，新建和執行中的雲端工作階段會切換到下一個有餘量的帳戶。重新排序帳戶以設定優先順序。',
+            moveUp: '上移',
+            moveDown: '下移',
+        },
     },
 
     message: {

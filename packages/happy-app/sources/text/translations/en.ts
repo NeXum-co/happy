@@ -925,6 +925,15 @@ export const en: TranslationStructure = {
         migrateFailed: 'Could not switch the selected sessions.',
         migrateDoneTitle: 'Sessions migrated',
         sessionPid: ({ pid }: { pid: number }) => `PID ${pid}`,
+        burnPolicy: {
+            title: 'Burn policy',
+            enable: 'Auto-switch accounts',
+            threshold: ({ pct }: { pct: number }) => `Switch at ${pct}% used`,
+            order: 'Burn order',
+            hint: 'When an account reaches the threshold, new and running cloud sessions move to the next account with room. Reorder accounts to set the priority.',
+            moveUp: 'Move up',
+            moveDown: 'Move down',
+        },
     },
 
     message: {

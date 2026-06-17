@@ -910,6 +910,15 @@ export const pt: TranslationStructure = {
         migrateFailed: 'Não foi possível trocar as sessões selecionadas.',
         migrateDoneTitle: 'Sessões migradas',
         sessionPid: ({ pid }: { pid: number }) => `PID ${pid}`,
+        burnPolicy: {
+            title: 'Política de consumo',
+            enable: 'Alternar contas automaticamente',
+            threshold: ({ pct }: { pct: number }) => `Alternar com ${pct}% usado`,
+            order: 'Ordem de consumo',
+            hint: 'Quando uma conta atinge o limite, as sessões na nuvem novas e em andamento passam para a próxima conta com espaço. Reordene as contas para definir a prioridade.',
+            moveUp: 'Para cima',
+            moveDown: 'Para baixo',
+        },
     },
 
     message: {
