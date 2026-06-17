@@ -289,6 +289,12 @@ export const zhHant: TranslationStructure = {
             namePlaceholder: '工作階段名稱（選填）',
             start: '開始工作階段',
         },
+        account: {
+            default: '預設帳戶',
+            defaultBadge: '預設',
+            pickerTitle: '訂閱帳戶',
+            searchPlaceholder: '搜尋帳戶...',
+        },
     },
 
     sessionHistory: {

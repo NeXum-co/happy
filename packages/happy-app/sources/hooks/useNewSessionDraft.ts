@@ -17,6 +17,7 @@ interface NewSessionDraftState {
     input: string;
     selectedMachineId: string | null;
     selectedPath: string | null;
+    selectedAccount: string | null;
     agentType: NewSessionAgentType;
     permissionMode: PermissionModeKey;
     modelMode: string;
@@ -26,6 +27,7 @@ interface NewSessionDraftState {
     setInput: (input: string) => void;
     setMachineId: (id: string | null) => void;
     setPath: (path: string | null) => void;
+    setAccount: (account: string | null) => void;
     setAgentType: (agent: NewSessionAgentType) => void;
     setPermissionMode: (mode: PermissionModeKey) => void;
     setModelMode: (mode: string) => void;
@@ -38,6 +40,7 @@ function persist(state: NewSessionDraftState) {
         input: state.input,
         selectedMachineId: state.selectedMachineId,
         selectedPath: state.selectedPath,
+        selectedAccount: state.selectedAccount,
         agentType: state.agentType,
         permissionMode: state.permissionMode,
         modelMode: state.modelMode,
@@ -53,6 +56,7 @@ export const useNewSessionDraft = create<NewSessionDraftState>()((set, get) => (
     input: initial?.input ?? '',
     selectedMachineId: initial?.selectedMachineId ?? null,
     selectedPath: initial?.selectedPath ?? null,
+    selectedAccount: initial?.selectedAccount ?? null,
     agentType: initial?.agentType ?? 'claude',
     permissionMode: initial?.permissionMode ?? 'default',
     modelMode: initial?.modelMode ?? 'default',
@@ -60,8 +64,11 @@ export const useNewSessionDraft = create<NewSessionDraftState>()((set, get) => (
     worktreeKey: initial?.worktreeKey ?? null,
 
     setInput: (input) => { set({ input }); persist(get()); },
-    setMachineId: (id) => { set({ selectedMachineId: id, selectedPath: null, worktreeKey: null }); persist(get()); },
+    // Account is per-machine (each daemon owns its own vault), so a machine
+    // change resets the chosen account just like it resets path/worktree.
+    setMachineId: (id) => { set({ selectedMachineId: id, selectedPath: null, worktreeKey: null, selectedAccount: null }); persist(get()); },
     setPath: (path) => { set({ selectedPath: path, worktreeKey: null }); persist(get()); },
+    setAccount: (account) => { set({ selectedAccount: account }); persist(get()); },
     setAgentType: (agent) => { set({ agentType: agent }); persist(get()); },
     setPermissionMode: (mode) => { set({ permissionMode: mode }); persist(get()); },
     setModelMode: (mode) => { set({ modelMode: mode }); persist(get()); },

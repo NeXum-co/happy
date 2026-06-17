@@ -275,6 +275,12 @@ export const ru: TranslationStructure = {
             namePlaceholder: 'Название сессии (необязательно)',
             start: 'Запустить сессию',
         },
+        account: {
+            default: 'Аккаунт по умолчанию',
+            defaultBadge: 'по умолчанию',
+            pickerTitle: 'Аккаунт подписки',
+            searchPlaceholder: 'поиск аккаунтов...',
+        },
     },
 
     sessionHistory: {

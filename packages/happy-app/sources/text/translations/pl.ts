@@ -306,6 +306,12 @@ export const pl: TranslationStructure = {
             namePlaceholder: 'Nazwa sesji (opcjonalnie)',
             start: 'Rozpocznij sesję',
         },
+        account: {
+            default: 'Domyślne konto',
+            defaultBadge: 'domyślne',
+            pickerTitle: 'Konto subskrypcji',
+            searchPlaceholder: 'szukaj kont...',
+        },
     },
 
     sessionHistory: {

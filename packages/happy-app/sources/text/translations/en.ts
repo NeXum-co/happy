@@ -303,6 +303,12 @@ export const en: TranslationStructure = {
             namePlaceholder: 'Session name (optional)',
             start: 'Start session',
         },
+        account: {
+            default: 'Default account',
+            defaultBadge: 'default',
+            pickerTitle: 'Subscription account',
+            searchPlaceholder: 'search accounts...',
+        },
     },
 
     sessionHistory: {

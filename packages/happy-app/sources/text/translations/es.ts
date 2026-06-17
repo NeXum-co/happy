@@ -289,6 +289,12 @@ export const es: TranslationStructure = {
             namePlaceholder: 'Nombre de la sesión (opcional)',
             start: 'Comenzar sesión',
         },
+        account: {
+            default: 'Cuenta predeterminada',
+            defaultBadge: 'predeterminada',
+            pickerTitle: 'Cuenta de suscripción',
+            searchPlaceholder: 'buscar cuentas...',
+        },
     },
 
     sessionHistory: {

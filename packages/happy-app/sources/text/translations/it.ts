@@ -287,6 +287,12 @@ export const it: TranslationStructure = {
             namePlaceholder: 'Nome della sessione (opzionale)',
             start: 'Avvia sessione',
         },
+        account: {
+            default: 'Account predefinito',
+            defaultBadge: 'predefinito',
+            pickerTitle: 'Account abbonamento',
+            searchPlaceholder: 'cerca account...',
+        },
     },
 
     sessionHistory: {

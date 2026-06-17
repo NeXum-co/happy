@@ -290,6 +290,12 @@ export const ja: TranslationStructure = {
             namePlaceholder: 'セッション名（任意）',
             start: 'セッションを開始',
         },
+        account: {
+            default: 'デフォルトアカウント',
+            defaultBadge: 'デフォルト',
+            pickerTitle: 'サブスクリプションアカウント',
+            searchPlaceholder: 'アカウントを検索...',
+        },
     },
 
     sessionHistory: {

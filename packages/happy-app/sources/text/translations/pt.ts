@@ -288,6 +288,12 @@ export const pt: TranslationStructure = {
             namePlaceholder: 'Nome da sessão (opcional)',
             start: 'Iniciar sessão',
         },
+        account: {
+            default: 'Conta padrão',
+            defaultBadge: 'padrão',
+            pickerTitle: 'Conta de assinatura',
+            searchPlaceholder: 'pesquisar contas...',
+        },
     },
 
     sessionHistory: {

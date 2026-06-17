@@ -155,6 +155,12 @@ export interface SpawnSessionOptions {
     parentSessionId?: string;
     /** Happy message id used as the rewind point (only set for "duplicate"). */
     forkedFromMessageId?: string;
+    /**
+     * E10: Claude subscription account (vault name) this cloud session runs its
+     * inference on. Only meaningful for the `claude` agent; empty/undefined →
+     * the daemon binds the vault default (D-E10-3/13).
+     */
+    account?: string;
 }
 
 // Options for forking a Claude session on a machine
@@ -192,7 +198,7 @@ export interface ResumeSessionOptions {
  */
 export async function machineSpawnNewSession(options: SpawnSessionOptions): Promise<SpawnSessionResult> {
 
-    const { machineId, directory, profile, sessionName, approvedNewDirectoryCreation = false, token, agent, resumeClaudeSessionId, parentSessionId, forkedFromMessageId } = options;
+    const { machineId, directory, profile, sessionName, approvedNewDirectoryCreation = false, token, agent, resumeClaudeSessionId, parentSessionId, forkedFromMessageId, account } = options;
 
     try {
         const result = await apiSocket.machineRPC<SpawnSessionResult, {
@@ -206,10 +212,11 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
             resumeClaudeSessionId?: string,
             parentSessionId?: string,
             forkedFromMessageId?: string,
+            account?: string,
         }>(
             machineId,
             'spawn-happy-session',
-            { type: 'spawn-in-directory', directory, profile, sessionName, approvedNewDirectoryCreation, token, agent, resumeClaudeSessionId, parentSessionId, forkedFromMessageId }
+            { type: 'spawn-in-directory', directory, profile, sessionName, approvedNewDirectoryCreation, token, agent, resumeClaudeSessionId, parentSessionId, forkedFromMessageId, account }
         );
         return result;
     } catch (error) {

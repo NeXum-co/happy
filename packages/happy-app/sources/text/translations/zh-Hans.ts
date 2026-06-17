@@ -290,6 +290,12 @@ export const zhHans: TranslationStructure = {
             namePlaceholder: '会话名称（可选）',
             start: '开始会话',
         },
+        account: {
+            default: '默认账户',
+            defaultBadge: '默认',
+            pickerTitle: '订阅账户',
+            searchPlaceholder: '搜索账户...',
+        },
     },
 
     sessionHistory: {

@@ -289,6 +289,12 @@ export const ca: TranslationStructure = {
             namePlaceholder: 'Nom de la sessió (opcional)',
             start: 'Inicia la sessió',
         },
+        account: {
+            default: 'Compte predeterminat',
+            defaultBadge: 'predeterminat',
+            pickerTitle: 'Compte de subscripció',
+            searchPlaceholder: 'cerca comptes...',
+        },
     },
 
     sessionHistory: {

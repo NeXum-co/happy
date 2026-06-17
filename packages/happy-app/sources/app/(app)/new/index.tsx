@@ -35,7 +35,7 @@ import { useAllMachines, useSessions, useSetting, storage } from '@/sync/storage
 import type { NewSessionAgentType } from '@/sync/persistence';
 import { sync } from '@/sync/sync';
 import { isMachineOnline } from '@/utils/machineUtils';
-import { machineSpawnNewSession } from '@/sync/ops';
+import { machineSpawnNewSession, machineListAccounts, type AccountInfo } from '@/sync/ops';
 import { createWorktree, listWorktrees } from '@/utils/worktree';
 import { resolveAbsolutePath } from '@/utils/pathUtils';
 import { formatPathRelativeToHome, formatLastSeen } from '@/utils/sessionUtils';
@@ -75,7 +75,7 @@ const ALL_AGENTS: { key: AgentKey; label: string }[] = [
 
 type PickerItem = { key: string; label: string; subtitle?: string; dimmed?: boolean };
 
-type PickerType = 'machine' | 'path' | 'worktree';
+type PickerType = 'machine' | 'path' | 'worktree' | 'account';
 
 type PermissionStyle = { color: string; icon: 'play-forward' | 'pause' };
 
@@ -524,6 +524,8 @@ function NewSessionScreen() {
         setMachineId: s.setMachineId,
         selectedPath: s.selectedPath,
         setPath: s.setPath,
+        selectedAccount: s.selectedAccount,
+        setAccount: s.setAccount,
         agentType: s.agentType,
         setAgentType: s.setAgentType,
         permissionMode: s.permissionMode,
@@ -542,6 +544,8 @@ function NewSessionScreen() {
     const setSelectedMachineId = draft.setMachineId;
     const selectedPath = draft.selectedPath;
     const setSelectedPath = draft.setPath;
+    const selectedAccount = draft.selectedAccount;
+    const setSelectedAccount = draft.setAccount;
     const [worktreeKey, setWorktreeKey] = React.useState<string>(
         draft.worktreeKey ?? (draft.sessionType === 'worktree' ? '__new__' : '__none__')
     );
@@ -686,6 +690,40 @@ function NewSessionScreen() {
             setWorktreeKey('__none__');
         }
     }, [worktreeItems, worktreeKey]);
+
+    // E10: per-machine Claude subscription accounts (vault). Only relevant for
+    // the cloud `claude` agent; the picker lets the user route this session's
+    // inference to a chosen account (empty → daemon binds the vault default).
+    // Fail-soft: an RPC error just leaves the list empty (Default-only picker).
+    const [accounts, setAccounts] = React.useState<AccountInfo[]>([]);
+    React.useEffect(() => {
+        if (!selectedMachineId || selectedAgent !== 'claude' || !selectedMachine || !isMachineOnline(selectedMachine)) {
+            setAccounts([]);
+            return;
+        }
+        let cancelled = false;
+        machineListAccounts(selectedMachineId)
+            .then(list => { if (!cancelled) setAccounts(list); })
+            .catch(() => { if (!cancelled) setAccounts([]); });
+        return () => { cancelled = true; };
+    }, [selectedMachineId, selectedAgent, selectedMachine]);
+
+    const accountItems = React.useMemo<PickerItem[]>(() => (
+        accounts.map(a => ({
+            key: a.name,
+            label: a.name,
+            subtitle: a.isDefault ? t('newSession.account.defaultBadge') : undefined,
+        }))
+    ), [accounts]);
+
+    const ACCOUNT_DEFAULT_FIXED_ITEMS = React.useMemo<PickerItem[]>(() => ([
+        { key: ACCOUNT_DEFAULT_KEY, label: t('newSession.account.default') },
+    ]), []);
+
+    // The account picker only applies to the cloud claude agent, and only once
+    // the machine actually has accounts in its vault — otherwise hide the row.
+    const showAccount = selectedAgent === 'claude' && accounts.length > 0;
+    const accountLabel = selectedAccount ?? t('newSession.account.default');
 
     // Filter available agents based on CLI availability from machine metadata
     const availableAgents = React.useMemo(() => {
@@ -843,10 +881,12 @@ function NewSessionScreen() {
                 return { title: 'Machine', items: machineItems, selectedKey: selectedMachineId, searchPlaceholder: 'search machines...' };
             case 'worktree':
                 return { title: 'Worktree', fixedItems: WORKTREE_FIXED_ITEMS, items: worktreeItems, selectedKey: worktreeKey, searchPlaceholder: 'search worktrees...' };
+            case 'account':
+                return { title: t('newSession.account.pickerTitle'), fixedItems: ACCOUNT_DEFAULT_FIXED_ITEMS, items: accountItems, selectedKey: selectedAccount ?? ACCOUNT_DEFAULT_KEY, searchPlaceholder: t('newSession.account.searchPlaceholder') };
             default:
                 return null;
         }
-    }, [activePicker, machineItems, selectedMachineId, worktreeKey, worktreeItems]);
+    }, [activePicker, machineItems, selectedMachineId, worktreeKey, worktreeItems, accountItems, ACCOUNT_DEFAULT_FIXED_ITEMS, selectedAccount]);
 
     const handlePickerSelect = React.useCallback((key: string) => {
         switch (activePicker) {
@@ -856,9 +896,12 @@ function NewSessionScreen() {
             case 'worktree':
                 setWorktreeKey(key);
                 break;
+            case 'account':
+                setSelectedAccount(key === ACCOUNT_DEFAULT_KEY ? null : key);
+                break;
         }
         setActivePicker(null);
-    }, [activePicker, setSelectedMachineId, setWorktreeKey]);
+    }, [activePicker, setSelectedMachineId, setWorktreeKey, setSelectedAccount]);
 
     // Spawn session handler
     const handleSend = React.useCallback(async (approvedNewDirectoryCreation: boolean = false) => {
@@ -895,6 +938,9 @@ function NewSessionScreen() {
                 directory: spawnDirectory,
                 approvedNewDirectoryCreation,
                 agent: selectedAgent,
+                // Account binding is cloud-claude-only; other agents ignore it.
+                // Empty → daemon binds the vault default (D-E10-3/13).
+                account: selectedAgent === 'claude' ? selectedAccount ?? undefined : undefined,
             });
 
             switch (result.type) {
@@ -955,7 +1001,7 @@ function NewSessionScreen() {
         } finally {
             setIsSpawning(false);
         }
-    }, [selectedMachineId, selectedMachine, selectedPath, selectedAgent, router, navigateToSession, currentPermission.key, currentModelKey, currentEffort?.key, effectiveAgentDefaults.permissionMode, effectiveAgentDefaults.modelMode, effectiveAgentDefaults.effortLevel, worktreeKey]);
+    }, [selectedMachineId, selectedMachine, selectedPath, selectedAgent, selectedAccount, router, navigateToSession, currentPermission.key, currentModelKey, currentEffort?.key, effectiveAgentDefaults.permissionMode, effectiveAgentDefaults.modelMode, effectiveAgentDefaults.effortLevel, worktreeKey]);
 
     const canSend = selectedMachineId && selectedMachine && isMachineOnline(selectedMachine) && !isSpawning;
 
@@ -1185,6 +1231,19 @@ function NewSessionScreen() {
                                             <MaterialCommunityIcons name="tree" size={15} color={theme.colors.textSecondary} />
                                             <Text style={styles.configLabel} numberOfLines={1}>
                                                 {worktreeLabel}
+                                            </Text>
+                                        </Pressable>
+                                    )}
+
+                                    {/* Account row (E10) — cloud claude only, when the vault has accounts */}
+                                    {showAccount && (
+                                        <Pressable
+                                            style={(p) => [styles.configRow, p.pressed && styles.configRowPressed]}
+                                            onPress={() => togglePicker('account')}
+                                        >
+                                            <Ionicons name="card-outline" size={15} color={theme.colors.textSecondary} />
+                                            <Text style={styles.configLabel} numberOfLines={1}>
+                                                {accountLabel}
                                             </Text>
                                         </Pressable>
                                     )}
@@ -1492,6 +1551,10 @@ const WORKTREE_FIXED_ITEMS: PickerItem[] = [
     { key: '__none__', label: 'no worktree' },
     { key: '__new__', label: 'new worktree' },
 ];
+
+// E10: sentinel for "no explicit account" in the account picker → the daemon
+// binds the vault default (D-E10-3/13). Stored as null in the draft.
+const ACCOUNT_DEFAULT_KEY = '__default__';
 
 const styles = StyleSheet.create((theme) => ({
     container: {
