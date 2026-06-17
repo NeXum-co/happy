@@ -96,6 +96,7 @@ export const en = {
 
     connect: {
         restoreAccount: 'Restore Account',
+        restoreInstructions: 'Enter your secret key to restore access to your account.',
         enterSecretKey: 'Please enter a secret key',
         invalidSecretKey: 'Invalid secret key. Please check and try again.',
         secureContextRequired: 'Account restore needs a secure connection (HTTPS). Open the app via HTTPS or localhost and try again.',

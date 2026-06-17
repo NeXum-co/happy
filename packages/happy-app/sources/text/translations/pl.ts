@@ -108,6 +108,7 @@ export const pl: TranslationStructure = {
 
     connect: {
         restoreAccount: 'Przywróć konto',
+        restoreInstructions: 'Wprowadź klucz tajny, aby przywrócić dostęp do swojego konta.',
         enterSecretKey: 'Proszę wprowadzić klucz tajny',
         invalidSecretKey: 'Nieprawidłowy klucz tajny. Sprawdź i spróbuj ponownie.',
         secureContextRequired: 'Przywrócenie konta wymaga bezpiecznego połączenia (HTTPS). Otwórz aplikację przez HTTPS lub localhost i spróbuj ponownie.',
