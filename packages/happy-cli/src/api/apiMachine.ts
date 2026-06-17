@@ -117,6 +117,10 @@ type MachineRpcHandlers = {
     addAccount?: (name: string, token: string, isDefault?: boolean) => Promise<void>;
     setDefaultAccount?: (name: string) => Promise<void>;
     removeAccount?: (name: string) => Promise<void>;
+    /** Burn-policy (E10, S6, AC-8): read the configurable burn-order + threshold. */
+    getBurnPolicy?: () => Promise<{ enabled: boolean; order: string[]; thresholdPct: number }>;
+    /** Burn-policy (E10, S6): persist the burn-order + threshold (validated). */
+    setBurnPolicy?: (config: { enabled: boolean; order: string[]; thresholdPct: number }) => Promise<void>;
     /** Create a durable cron schedule from submit-cron params; returns its id. */
     submitCron?: (params: SubmitCronParams) => string;
     /** List all cron schedules as CronScheduleView projections. */
@@ -189,6 +193,8 @@ export class ApiMachineClient {
         addAccount,
         setDefaultAccount,
         removeAccount,
+        getBurnPolicy,
+        setBurnPolicy,
         submitCron,
         listCrons,
         deleteCron,
@@ -328,6 +334,29 @@ export class ApiMachineClient {
                 const { name } = params || {};
                 if (typeof name !== 'string' || name.length === 0) throw new Error('name is required');
                 await removeAccount(name);
+                return { ok: true };
+            });
+        }
+
+        // Register burn-policy handlers (E10, S6, AC-8). Mirror the HTTP endpoints
+        // (BUG-UAT-1). set-burn-policy validates the shape (enabled bool, order array
+        // of non-empty strings, thresholdPct finite in [0,1]) before persisting.
+        if (getBurnPolicy) {
+            this.rpcHandlerManager.registerHandler('get-burn-policy', async () => {
+                return { policy: await getBurnPolicy() };
+            });
+        }
+        if (setBurnPolicy) {
+            this.rpcHandlerManager.registerHandler('set-burn-policy', async (params: any) => {
+                const { enabled, order, thresholdPct } = params || {};
+                if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean');
+                if (!Array.isArray(order) || order.some(n => typeof n !== 'string' || n.length === 0)) {
+                    throw new Error('order must be an array of non-empty strings');
+                }
+                if (typeof thresholdPct !== 'number' || !Number.isFinite(thresholdPct) || thresholdPct < 0 || thresholdPct > 1) {
+                    throw new Error('thresholdPct must be a number in [0,1]');
+                }
+                await setBurnPolicy({ enabled, order, thresholdPct });
                 return { ok: true };
             });
         }

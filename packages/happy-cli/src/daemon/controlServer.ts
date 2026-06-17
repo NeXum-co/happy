@@ -67,6 +67,8 @@ export function startDaemonControlServer({
   addAccount,
   setDefaultAccount,
   removeAccount,
+  getBurnPolicy,
+  setBurnPolicy,
   listJobs,
   getJob,
   patchJobCost,
@@ -93,6 +95,8 @@ export function startDaemonControlServer({
   addAccount: (name: string, token: string, isDefault?: boolean) => Promise<void>;
   setDefaultAccount: (name: string) => Promise<void>;
   removeAccount: (name: string) => Promise<void>;
+  getBurnPolicy: () => Promise<{ enabled: boolean; order: string[]; thresholdPct: number }>;
+  setBurnPolicy: (config: { enabled: boolean; order: string[]; thresholdPct: number }) => Promise<void>;
   listJobs: (filter?: { status?: JobStatus }) => JobRecordView[];
   getJob: (id: string) => JobRecordView | null;
   patchJobCost: (sessionId: string, costUsd: number) => boolean;
@@ -429,6 +433,26 @@ export function startDaemonControlServer({
       }
     }, async (request) => {
       await removeAccount(request.body.name);
+      return { ok: true };
+    });
+
+    // Burn-policy (E10, S6, AC-8): instelbare burn-volgorde + drempel. Mirrors the
+    // get-burn-policy/set-burn-policy RPC handlers (BUG-UAT-1: beide surfaces).
+    const burnPolicyBody = z.object({
+      enabled: z.boolean(),
+      order: z.array(z.string().min(1)),
+      thresholdPct: z.number().min(0).max(1)
+    });
+    typed.post('/get-burn-policy', {
+      schema: { response: { 200: z.object({ policy: burnPolicyBody }) } }
+    }, async () => {
+      return { policy: await getBurnPolicy() };
+    });
+
+    typed.post('/set-burn-policy', {
+      schema: { body: burnPolicyBody, response: { 200: z.object({ ok: z.boolean() }) } }
+    }, async (request) => {
+      await setBurnPolicy(request.body);
       return { ok: true };
     });
 

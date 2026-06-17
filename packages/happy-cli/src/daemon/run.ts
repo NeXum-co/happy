@@ -19,7 +19,8 @@ import { startAuthProxy, type AuthProxy } from '@/accounts/authProxy';
 import { applyAccountBinding } from '@/accounts/accountBinding';
 import { applyAccountSwitch, type SwitchResult } from '@/accounts/accountSwitch';
 import { createUsageStore, type AccountUsage } from '@/accounts/usageStore';
-import { vaultMasterKey, listAccounts, addAccount, removeAccount, setDefaultAccount, type AccountInfo } from '@/accounts/accountVault';
+import { vaultMasterKey, listAccounts, addAccount, removeAccount, setDefaultAccount, getBurnPolicy, setBurnPolicy, type AccountInfo } from '@/accounts/accountVault';
+import { planBurnRemap, type BurnPolicyConfig } from '@/accounts/burnPolicy';
 import type { PersistedSession } from '@/persistence';
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stopDaemon } from './controlClient';
@@ -393,13 +394,19 @@ export async function startDaemon(): Promise<void> {
 
         // E10: bind deze cloud-spawn aan een account (engaged-only, fail-closed).
         // Niet-claude/local-preset spawns en een lege vault passeren ongemoeid.
+        // S6: zonder expliciete keuze stuurt de burn-policy (config + live usage) de
+        // account-keuze; álle accounts vol → warn + default-fallback (D-E10-19).
         const accountCreds = await readCredentials();
         const binding = accountCreds
           ? await applyAccountBinding(extraEnv, { agent: options.agent, account: options.account },
-              { vaultFile: configuration.accountsVaultFile, masterKey: await vaultMasterKey(accountCreds), proxy: authProxy })
+              { vaultFile: configuration.accountsVaultFile, masterKey: await vaultMasterKey(accountCreds), proxy: authProxy,
+                burnPolicy: await getBurnPolicy(configuration.accountsVaultFile, 'claude'), usage: usageStore.snapshot() })
           : { ok: true as const, stripApiKey: false };
         if (!binding.ok) {
           return { type: 'error', errorMessage: binding.error };
+        }
+        if (binding.ok && binding.warning) {
+          logger.warn(`[DAEMON RUN] ${binding.warning}`);
         }
         const stripApiKey = binding.stripApiKey;
         // E10/S3: routing-key + account vasthouden zodat de TrackedSession ze draagt
@@ -1131,6 +1138,45 @@ export async function startDaemon(): Promise<void> {
     const removeAccountVerb = (name: string): Promise<void> =>
       removeAccount(configuration.accountsVaultFile, 'claude', name);
 
+    // Burn-policy (S6, AC-8, D-E10-8): instelbare burn-volgorde + drempel. Twee
+    // surfaces (HTTP + RPC, BUG-UAT-1) lezen/schrijven de config op de vault.
+    const getBurnPolicyVerb = (): Promise<BurnPolicyConfig> =>
+      getBurnPolicy(configuration.accountsVaultFile, 'claude');
+    const setBurnPolicyVerb = (config: BurnPolicyConfig): Promise<void> =>
+      setBurnPolicy(configuration.accountsVaultFile, 'claude', config);
+
+    // Monitor-tick (S6, D-E10-20): verschuift lopende cloud-sessies waarvan het
+    // account de drempel raakt naar het volgende account met ruimte (via de S3-
+    // accountSwitch-machinerie; geen respawn). Pure planner planBurnRemap beslist;
+    // hier alleen de daemon-glue. Throwt nooit (zoals reaper): fout → volgende tick.
+    const runBurnMonitorOnce = async (): Promise<void> => {
+      try {
+        const policy = await getBurnPolicy(configuration.accountsVaultFile, 'claude');
+        if (!policy.enabled) return;
+        const sessions = getCurrentChildren()
+          .filter(s => s.happySessionId !== undefined && s.account !== undefined)
+          .map(s => ({ sessionId: s.happySessionId!, account: s.account! }));
+        if (sessions.length === 0) return;
+        const plan = planBurnRemap(sessions, usageStore.snapshot(), policy);
+        if (plan.length === 0) return;
+        // Groepeer per doel-account → één accountSwitch per groep.
+        const byTarget = new Map<string, string[]>();
+        for (const { sessionId, toAccount } of plan) {
+          (byTarget.get(toAccount) ?? byTarget.set(toAccount, []).get(toAccount)!).push(sessionId);
+        }
+        for (const [toAccount, sessionIds] of byTarget) {
+          const result = await accountSwitch(sessionIds, toAccount);
+          if (result.ok) {
+            logger.info(`[DAEMON RUN] burn-monitor: ${result.remapped?.length ?? 0} sessie(s) → '${toAccount}' (drempel ${Math.round(policy.thresholdPct * 100)}%)`);
+          } else {
+            logger.warn(`[DAEMON RUN] burn-monitor: remap → '${toAccount}' faalde: ${result.error}`);
+          }
+        }
+      } catch (error) {
+        logger.warn('[DAEMON RUN] burn-monitor tick faalde (overgeslagen tot de volgende heartbeat)', error);
+      }
+    };
+
     // Sessie-projectie (gedeeld door HTTP /list én RPC list, BUG-UAT-1). Levert de
     // app de live per-sessie-account-map (gekeyd op happySessionId) voor de
     // migratie-popup; de daemon-TrackedSession is de verse bron (remap kan 'm wijzigen).
@@ -1154,6 +1200,8 @@ export async function startDaemon(): Promise<void> {
       addAccount: addAccountVerb,
       setDefaultAccount: setDefaultAccountVerb,
       removeAccount: removeAccountVerb,
+      getBurnPolicy: getBurnPolicyVerb,
+      setBurnPolicy: setBurnPolicyVerb,
       listJobs,
       getJob,
       patchJobCost,
@@ -1240,6 +1288,8 @@ export async function startDaemon(): Promise<void> {
       addAccount: addAccountVerb,
       setDefaultAccount: setDefaultAccountVerb,
       removeAccount: removeAccountVerb,
+      getBurnPolicy: getBurnPolicyVerb,
+      setBurnPolicy: setBurnPolicyVerb,
       listSessions,
       submitCron,
       listCrons,
@@ -1304,6 +1354,10 @@ export async function startDaemon(): Promise<void> {
 
       // Archive server-active sessions whose host process died (see daemon/reaper.ts)
       await runReaperOnce(reaperDeps);
+
+      // E10/S6: burn-monitor — remap lopende sessies van een (bijna-)uitgeput
+      // account naar het volgende met ruimte (D-E10-20). No-op als de policy uit is.
+      await runBurnMonitorOnce();
 
       // Check if daemon needs update by detecting whether `dist/index.mjs` was
       // replaced on disk since the daemon started (npm install rewrites the file).

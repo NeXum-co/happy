@@ -9,6 +9,8 @@
  */
 import { encodeBase64, getRandomBytes } from '@/api/encryption'
 import { listAccounts, resolveAccount } from '@/accounts/accountVault'
+import { chooseBurnAccount, type BurnPolicyConfig } from '@/accounts/burnPolicy'
+import type { AccountUsage } from '@/accounts/usageStore'
 
 export interface BindingProxy {
   readonly port: number
@@ -25,10 +27,13 @@ export interface BindingDeps {
   masterKey: Uint8Array
   proxy: BindingProxy
   mintKey?: () => string
+  /** S6: burn-policy + laatst-geziene usage; samen sturen ze de account-keuze als er geen expliciete is. */
+  burnPolicy?: BurnPolicyConfig
+  usage?: Record<string, AccountUsage>
 }
 
 export type BindingResult =
-  | { ok: true; stripApiKey: boolean; binding?: { routingKey: string; account: string } }
+  | { ok: true; stripApiKey: boolean; binding?: { routingKey: string; account: string }; warning?: string }
   | { ok: false; error: string }
 
 const PROVIDER = 'claude' // v1: alleen Claude (D-E10-9)
@@ -45,9 +50,22 @@ export async function applyAccountBinding(
   const hasAccounts = (await listAccounts(deps.vaultFile, PROVIDER)).length > 0
   if (!explicit && !hasAccounts) return { ok: true, stripApiKey: false } // multi-subscriptie niet in gebruik
 
-  const resolved = await resolveAccount(deps.vaultFile, deps.masterKey, PROVIDER, explicit)
+  // S6: zonder expliciete keuze + actieve burn-policy → kies het eerste account
+  // onder de drempel. Álle accounts vol → escaleer: warn + val terug op de default
+  // (D-E10-19, niet weigeren). Een expliciete keuze slaat de policy over.
+  let chosen = explicit
+  let warning: string | undefined
+  if (!explicit && deps.burnPolicy?.enabled) {
+    const decision = chooseBurnAccount(deps.usage ?? {}, deps.burnPolicy)
+    if (decision.kind === 'selected') chosen = decision.account
+    else if (decision.kind === 'escalate') {
+      warning = `burn-policy: geen account onder de drempel (${Math.round(deps.burnPolicy.thresholdPct * 100)}%) — terugval op het default-account`
+    }
+  }
+
+  const resolved = await resolveAccount(deps.vaultFile, deps.masterKey, PROVIDER, chosen)
   if (!resolved) {
-    const which = explicit ? `account '${explicit}'` : 'default account'
+    const which = chosen ? `account '${chosen}'` : 'default account'
     return { ok: false, error: `kan ${which} (${PROVIDER}) niet ontsleutelen — spawn geweigerd (fail-closed)` }
   }
 
@@ -57,5 +75,5 @@ export async function applyAccountBinding(
   extraEnv.ANTHROPIC_AUTH_TOKEN = routingKey
   // Geef de routing-key + account terug zodat de daemon ze op de TrackedSession
   // bewaart en de sessie later live kan switchen (S3 accountSwitch via remap).
-  return { ok: true, stripApiKey: true, binding: { routingKey, account: resolved.name } }
+  return { ok: true, stripApiKey: true, binding: { routingKey, account: resolved.name }, warning }
 }

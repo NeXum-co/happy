@@ -95,3 +95,70 @@ describe('applyAccountBinding', () => {
     expect(r.ok).toBe(false)
   })
 })
+
+describe('applyAccountBinding — burn-policy (S6, AC-8)', () => {
+  const usage = (fiveHourUtil: number | null) => ({ fiveHourUtil, sevenDayUtil: null, seenAt: 1000 })
+
+  it('policy aan + eerste account vol → bindt aan het tweede (selected)', async () => {
+    const key = getRandomBytes(32)
+    const fp = await newFp()
+    await addAccount(fp, key, { provider: 'claude', name: 'a', oauthToken: 'sk-ant-oat01-A', isDefault: true })
+    await addAccount(fp, key, { provider: 'claude', name: 'b', oauthToken: 'sk-ant-oat01-B' })
+    const { proxy, calls } = fakeProxy()
+    const r = await applyAccountBinding({}, { agent: 'claude' }, {
+      vaultFile: fp, masterKey: key, proxy, mintKey: constKey,
+      burnPolicy: { enabled: true, order: ['a', 'b'], thresholdPct: 0.9 },
+      usage: { a: usage(0.95), b: usage(0.10) },
+    })
+    expect(r.ok && r.binding?.account).toBe('b')
+    expect(calls[0].account).toBe('b')
+    if (r.ok) expect(r.warning).toBeUndefined()
+  })
+
+  it('policy aan + álle accounts vol → bindt aan default + warning (D-E10-19, niet ok:false)', async () => {
+    const key = getRandomBytes(32)
+    const fp = await newFp()
+    await addAccount(fp, key, { provider: 'claude', name: 'a', oauthToken: 'sk-ant-oat01-A', isDefault: true })
+    await addAccount(fp, key, { provider: 'claude', name: 'b', oauthToken: 'sk-ant-oat01-B' })
+    const { proxy, calls } = fakeProxy()
+    const r = await applyAccountBinding({}, { agent: 'claude' }, {
+      vaultFile: fp, masterKey: key, proxy, mintKey: constKey,
+      burnPolicy: { enabled: true, order: ['a', 'b'], thresholdPct: 0.9 },
+      usage: { a: usage(0.95), b: usage(0.92) },
+    })
+    expect(r.ok).toBe(true)
+    expect(r.ok && r.binding?.account).toBe('a') // default-fallback
+    if (r.ok) expect(r.warning).toMatch(/burn-policy/i)
+    expect(calls[0].account).toBe('a')
+  })
+
+  it('expliciet account slaat de policy over (geen burn-selectie)', async () => {
+    const key = getRandomBytes(32)
+    const fp = await newFp()
+    await addAccount(fp, key, { provider: 'claude', name: 'a', oauthToken: 'sk-ant-oat01-A', isDefault: true })
+    await addAccount(fp, key, { provider: 'claude', name: 'b', oauthToken: 'sk-ant-oat01-B' })
+    const { proxy, calls } = fakeProxy()
+    const r = await applyAccountBinding({}, { agent: 'claude', account: 'a' }, {
+      vaultFile: fp, masterKey: key, proxy, mintKey: constKey,
+      burnPolicy: { enabled: true, order: ['a', 'b'], thresholdPct: 0.9 },
+      usage: { a: usage(0.95), b: usage(0.10) }, // a vol, maar expliciet gekozen
+    })
+    expect(r.ok && r.binding?.account).toBe('a')
+    expect(calls[0].account).toBe('a')
+  })
+
+  it('policy uit → default-fallback ongewijzigd (geen burn)', async () => {
+    const key = getRandomBytes(32)
+    const fp = await newFp()
+    await addAccount(fp, key, { provider: 'claude', name: 'a', oauthToken: 'sk-ant-oat01-A', isDefault: true })
+    await addAccount(fp, key, { provider: 'claude', name: 'b', oauthToken: 'sk-ant-oat01-B' })
+    const { proxy, calls } = fakeProxy()
+    const r = await applyAccountBinding({}, { agent: 'claude' }, {
+      vaultFile: fp, masterKey: key, proxy, mintKey: constKey,
+      burnPolicy: { enabled: false, order: ['a', 'b'], thresholdPct: 0.9 },
+      usage: { a: usage(0.95), b: usage(0.10) },
+    })
+    expect(r.ok && r.binding?.account).toBe('a') // default, policy uit
+    expect(calls[0].account).toBe('a')
+  })
+})

@@ -125,3 +125,29 @@ mogelijk; de daemon ontsluit de vault en de proxy injecteert het juiste token.
   machine-encrypted RPC-kanaal en gaat versleuteld de vault in; het token wordt **nóóit gelogd**
   (de debug-regel noemt alleen naam + default-flag). `list-accounts` lekt geen token —
   `AccountInfo` heeft typstructureel geen token-veld.
+
+## S6-invarianten (burnPolicy) ✅
+
+- **`burnPolicy.ts`** — twee **pure** beslis-functies (geen daemon/proxy/IO-import, deps als
+  argument, deterministisch — zoals `usageStore`/`accountSwitch`):
+  - `chooseBurnAccount(usage, config)` → spawn-time keuze: eerste account in `order` met ruimte
+    (`util < thresholdPct`), of `escalate` als álle vol, of `inactive` (policy uit / lege order).
+  - `planBurnRemap(sessions, usage, config)` → lopende sessies waarvan het account de drempel
+    raakt verschuiven naar het eerste account met ruimte (alleen als dat verschilt — geen thrashing).
+  - `util(account) = max(fiveHourUtil ?? 0, sevenDayUtil ?? 0)` — **`null`-usage telt als ruimte**
+    (0%), nooit als uitputting (fail-soft, D-E10-6). We blokkeren nooit op afwezige data.
+- **Config op de vault** (`accountVault.ts`): `providers[provider].burnPolicy?` (optioneel → bestaande
+  vaults blijven valide). `getBurnPolicy` geeft de uit-default `{enabled:false, order:[], thresholdPct:0.9}`
+  als ze afwezig is; `setBurnPolicy` schrijft atomic. Drempel = fractie 0..1.
+- **Spawn-binding** (D-E10-14, één chokepoint): `applyAccountBinding` krijgt `burnPolicy` + `usage` als
+  optionele deps. Zónder expliciet `opts.account` + policy aan → `chooseBurnAccount`: `selected` →
+  bind dat account; `escalate` → **default-fallback + `warning`** (D-E10-19, géén `ok:false` — de
+  spawn faalt niet, de daemon `logger.warn`'t de warning). Een expliciet account slaat de policy over.
+  Fail-closed (AC-6) blijft enkel voor een verkeerd/onontsleutelbaar account.
+- **Monitor** (D-E10-20): `runBurnMonitorOnce` in `run.ts` draait op het heartbeat-interval (naast de
+  reaper), **alleen als de policy aanstaat**: `planBurnRemap(account-bound sessies, usageStore.snapshot(),
+  policy)` → per doel-account één `accountSwitch` (= S3-remap, geen respawn). **Throwt nooit** (try/catch,
+  volgende tick). No-op bij lege plan → geen log-spam; de "alle vol"-zichtbaarheid zit op het spawn-pad.
+- **Twee surfaces** (BUG-UAT-1): `get-burn-policy`/`set-burn-policy` op HTTP (`controlServer.ts`) + RPC
+  (`apiMachine.ts`) via de `getBurnPolicyVerb`/`setBurnPolicyVerb`-closures. `set-burn-policy` valideert
+  de shape (enabled bool, order non-empty strings, thresholdPct finite in [0,1]).
