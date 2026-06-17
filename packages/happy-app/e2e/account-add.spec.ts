@@ -16,11 +16,13 @@ test.describe('account-add screen @e2e @security', () => {
         await expect(name).toBeVisible();
         await expect(token).toBeVisible();
 
-        // The token field is multiline + secureTextEntry. On native that masks; on web (secondary
-        // platform) RN-Web renders multiline as a <textarea>, which cannot mask — so the setup-token
-        // is visible as typed on web. Documented platform limitation (see e2e-results / handover).
+        // D-E10-21: the token field is multiline only on native; on web it is a single-line
+        // secureTextEntry, which RN-Web renders as <input type="password"> — real masking on web
+        // (the setup-token is sensitive, AC-7 token-hygiene).
         const tag = await token.evaluate((el) => el.tagName.toLowerCase());
-        expect(tag, 'web renders the multiline token field as a textarea (no masking on web)').toBe('textarea');
+        expect(tag, 'web renders the token field as a single-line input (masked)').toBe('input');
+        const inputType = await token.evaluate((el) => (el as HTMLInputElement).type);
+        expect(inputType, 'web token input is type=password (masked)').toBe('password');
 
         // Empty submit -> name-required validation error (Modal.alert), no navigation.
         await authedPage.getByText('Add account', { exact: true }).last().click();

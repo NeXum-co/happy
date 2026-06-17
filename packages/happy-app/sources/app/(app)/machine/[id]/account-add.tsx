@@ -1,5 +1,5 @@
 import React, { memo, useState, useCallback } from 'react';
-import { View, TextInput, ScrollView } from 'react-native';
+import { View, TextInput, ScrollView, Platform } from 'react-native';
 import { Text } from '@/components/StyledText';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { ItemGroup } from '@/components/ItemGroup';
@@ -70,14 +70,14 @@ export default memo(function AccountAddScreen() {
                 <View style={styles.field}>
                     <Text style={styles.label}>{t('subscriptions.tokenLabel')}</Text>
                     <TextInput
-                        style={[styles.input, styles.tokenInput]}
+                        style={[styles.input, Platform.OS !== 'web' && styles.tokenInput]}
                         value={token}
                         onChangeText={setToken}
                         placeholder={t('subscriptions.tokenPlaceholder')}
                         placeholderTextColor={theme.colors.textSecondary}
                         autoCapitalize="none"
                         autoCorrect={false}
-                        multiline
+                        multiline={Platform.OS !== 'web'}
                         secureTextEntry
                     />
                 </View>
