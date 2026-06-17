@@ -17,15 +17,33 @@ import type { Metadata } from '@/api/types';
 import type { PersistedSession } from '@/persistence';
 import type { SessionListItem } from '@/api/api';
 
+/** A session heartbeats every 2s; active within this window ⇒ alive (F2 guard). */
+export const REAPER_ALIVE_GRACE_MS = 30_000;
+/** No heartbeat for this long ⇒ host is gone even if its (reused) PID looks alive (F1 net). */
+export const REAPER_STALE_AFTER_MS = 120_000;
+
 /**
- * Pure archive decision: only archive when the server still claims the
- * session is active AND we know its host PID AND that PID is dead.
- * No PID known → never guess.
+ * Pure archive decision. Archive only a session the server still claims is
+ * active AND that is provably gone. Liveness is corroborated with the session's
+ * heartbeat (`activeAt`) so the PID probe alone cannot mislead us:
+ *  - Fresh heartbeat (< grace) ⇒ alive, never archive — even if metadata still
+ *    carries a stale, now-dead hostPid from before a resume-in-place (F2).
+ *  - Known PID that is dead ⇒ archive (the fast, common path).
+ *  - No heartbeat for too long (> stale) ⇒ archive even if the old PID now looks
+ *    alive through OS PID reuse (F1 safety net).
+ * No PID known → never guess on the PID, but a long-stale session is still gone.
  */
-export function shouldArchive(s: { serverActive: boolean; hostPid?: number }, pidAlive: (pid: number) => boolean): boolean {
+export function shouldArchive(
+  s: { serverActive: boolean; hostPid?: number; activeAt: number },
+  pidAlive: (pid: number) => boolean,
+  now: number,
+): boolean {
   if (!s.serverActive) return false;
-  if (!s.hostPid) return false; // geen pid bekend → niet gokken
-  return !pidAlive(s.hostPid);
+  const sinceActive = now - s.activeAt;
+  if (sinceActive < REAPER_ALIVE_GRACE_MS) return false; // heartbeating → alive (F2)
+  if (!s.hostPid) return false; // geen pid bekend → niet gokken op de pid
+  if (!pidAlive(s.hostPid)) return true; // host pid is provably gone
+  return sinceActive > REAPER_STALE_AFTER_MS; // reused-pid safety net (F1)
 }
 
 /**
@@ -78,7 +96,7 @@ export async function runReaperOnce(deps: ReaperDeps): Promise<void> {
         continue;
       }
 
-      if (shouldArchive({ serverActive: server.active, hostPid: metadata?.hostPid }, pidAlive)) {
+      if (shouldArchive({ serverActive: server.active, hostPid: metadata?.hostPid, activeAt: server.activeAt }, pidAlive, Date.now())) {
         const archived = await deps.deactivateSession(sessionId);
         if (archived) {
           logger.debug(`[REAPER] Session ${sessionId} active on server but hostPid ${metadata?.hostPid} is dead — archive succeeded`);
