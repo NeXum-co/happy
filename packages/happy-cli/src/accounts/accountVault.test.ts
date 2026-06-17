@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { vaultMasterKey, loadVault, saveVault, addAccount, listAccounts, removeAccount, setDefaultAccount, resolveAccount } from '@/accounts/accountVault'
+import { vaultMasterKey, loadVault, saveVault, addAccount, listAccounts, removeAccount, setDefaultAccount, resolveAccount, getBurnPolicy, setBurnPolicy } from '@/accounts/accountVault'
 import type { Credentials } from '@/persistence'
 import { getRandomBytes } from '@/api/encryption'
 import { mkdtemp, readFile as rf, writeFile } from 'node:fs/promises'
@@ -104,5 +104,36 @@ describe('resolveAccount', () => {
     const fp = await newFp()
     await addAccount(fp, key, { provider: 'claude', name: 'a', oauthToken: 'sk-ant-oat01-A' })
     expect(await resolveAccount(fp, getRandomBytes(32), 'claude', 'a')).toBeNull()
+  })
+})
+
+describe('burnPolicy config (S6)', () => {
+  const key = getRandomBytes(32)
+  const newFp = async () => join(await mkdtemp(join(tmpdir(), 'vault-')), 'v.json')
+
+  it('default (uit) als nog niet ingesteld', async () => {
+    const fp = await newFp()
+    expect(await getBurnPolicy(fp, 'claude')).toEqual({ enabled: false, order: [], thresholdPct: 0.9 })
+  })
+
+  it('roundtrip set → get', async () => {
+    const fp = await newFp()
+    const policy = { enabled: true, order: ['a', 'b'], thresholdPct: 0.8 }
+    await setBurnPolicy(fp, 'claude', policy)
+    expect(await getBurnPolicy(fp, 'claude')).toEqual(policy)
+  })
+
+  it('burn-policy raakt accounts/default niet', async () => {
+    const fp = await newFp()
+    await addAccount(fp, key, { provider: 'claude', name: 'a', oauthToken: 'sk-ant-oat01-A' })
+    await setBurnPolicy(fp, 'claude', { enabled: true, order: ['a'], thresholdPct: 0.85 })
+    expect((await listAccounts(fp, 'claude')).map(a => a.name)).toEqual(['a'])
+    expect((await resolveAccount(fp, key, 'claude', 'a'))?.oauthToken).toBe('sk-ant-oat01-A')
+  })
+
+  it('backward-compat: een vault zónder burnPolicy-veld laadt nog (en geeft de uit-default)', async () => {
+    const fp = await newFp()
+    await saveVault(fp, { version: 1, providers: { claude: { defaultAccount: 'a', accounts: {} } } })
+    expect(await getBurnPolicy(fp, 'claude')).toEqual({ enabled: false, order: [], thresholdPct: 0.9 })
   })
 })

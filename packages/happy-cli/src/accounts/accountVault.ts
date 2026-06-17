@@ -10,14 +10,22 @@ import * as z from 'zod'
 import { deriveKey } from '@/utils/deriveKey'
 import { encrypt, decrypt, encodeBase64, decodeBase64 } from '@/api/encryption'
 import type { Credentials } from '@/persistence'
+import type { BurnPolicyConfig } from '@/accounts/burnPolicy'
 
 const accountSchema = z.object({
   oauthTokenEnc: z.string().base64(),
   addedAt: z.number(),
 })
+const burnPolicySchema = z.object({
+  enabled: z.boolean(),
+  order: z.array(z.string()),
+  thresholdPct: z.number().min(0).max(1),
+})
 const providerSchema = z.object({
   defaultAccount: z.string().nullish(),
   accounts: z.record(z.string(), accountSchema),
+  // E10 S6: optioneel → bestaande vaults zonder dit veld blijven valide (backward-compat).
+  burnPolicy: burnPolicySchema.optional(),
 })
 export const vaultSchema = z.object({
   version: z.literal(1),
@@ -109,4 +117,19 @@ export async function resolveAccount(
   const token = decrypt(masterKey, 'dataKey', decodeBase64(acct.oauthTokenEnc))
   if (typeof token !== 'string') return null // fail-closed
   return { name, oauthToken: token }
+}
+
+const DEFAULT_BURN_POLICY: BurnPolicyConfig = { enabled: false, order: [], thresholdPct: 0.9 }
+
+/** Burn-policy van een provider, of de uit-default als ze nog niet is ingesteld (S6). */
+export async function getBurnPolicy(filePath: string, provider: string): Promise<BurnPolicyConfig> {
+  const p = (await loadVault(filePath)).providers[provider]
+  return p?.burnPolicy ?? { ...DEFAULT_BURN_POLICY }
+}
+
+/** Schrijf de burn-policy van een provider weg (atomic). */
+export async function setBurnPolicy(filePath: string, provider: string, config: BurnPolicyConfig): Promise<void> {
+  const v = await loadVault(filePath)
+  ensureProvider(v, provider).burnPolicy = config
+  await saveVault(filePath, v)
 }
