@@ -5,9 +5,8 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useAllSessions } from '@/sync/storage';
 import { useAuth } from '@/auth/AuthContext';
 import { getSessionName } from '@/utils/sessionUtils';
-import { getUsageForPeriod, calculateTotals, queryUsage } from '@/sync/apiUsage';
+import { getUsageForPeriod, getPeriodStartTime, calculateTotals, queryUsage } from '@/sync/apiUsage';
 import { computeActivityLayout, ActivityRow, ProjectRollupRow } from '@/sync/activityLayout';
-import { useHappyAction } from '@/hooks/useHappyAction';
 import { ItemList } from '@/components/ItemList';
 import { ItemGroup } from '@/components/ItemGroup';
 import { Item } from '@/components/Item';
@@ -55,40 +54,58 @@ export default React.memo(function ActivityScreen() {
     const [totals, setTotals] = React.useState<{ totalTokens: number; totalCost: number }>({ totalTokens: 0, totalCost: 0 });
     const [usageBySession, setUsageBySession] = React.useState<Map<string, number>>(new Map());
 
-    const [loading, loadData] = useHappyAction(React.useCallback(async () => {
+    const [loading, setLoading] = React.useState(false);
+
+    // Reactive usage load. Keyed on the session ids (not the array identity, which churns on every
+    // metadata tick) and on credentials presence, since the store and credentials hydrate
+    // asynchronously on a cold load. A plain cancellable effect (not useHappyAction) is used on
+    // purpose: useHappyAction drops a call while another is in flight, which would silently skip the
+    // reload that must run once the sessions arrive — leaving every per-session cost at zero.
+    const sessionIdsKey = React.useMemo(() => sessions.map((s) => s.id).join(','), [sessions]);
+    const hasCredentials = !!auth.credentials;
+    React.useEffect(() => {
         const credentials = auth.credentials;
         if (!credentials) {
             return;
         }
+        let cancelled = false;
+        setLoading(true);
+        (async () => {
+            try {
+                const periodResponse = await getUsageForPeriod(credentials, period);
+                const periodTotals = calculateTotals(periodResponse.usage ?? []);
 
-        const periodResponse = await getUsageForPeriod(credentials, period);
-        const periodTotals = calculateTotals(periodResponse.usage ?? []);
-
-        const startTime = periodResponse.usage?.[0]?.timestamp;
-        const perSession = await Promise.all(
-            sessions.map(async (session) => {
-                const response = await queryUsage(credentials, {
-                    sessionId: session.id,
-                    startTime,
-                    endTime: Math.floor(Date.now() / 1000),
-                });
-                const { totalCost } = calculateTotals(response.usage ?? []);
-                return [session.id, totalCost] as const;
-            }),
-        );
-
-        setTotals({ totalTokens: periodTotals.totalTokens, totalCost: periodTotals.totalCost });
-        setUsageBySession(new Map(perSession));
-    }, [auth.credentials, period, sessions]));
-
-    // Re-run when the period changes or the set of sessions changes. The session store hydrates
-    // asynchronously, so on a fresh load `sessions` is initially empty; keying the effect on the
-    // session ids (not the array identity, which churns on every metadata tick) makes the
-    // per-session usage load once the sessions arrive, while avoiding a refetch storm.
-    const sessionIdsKey = React.useMemo(() => sessions.map((s) => s.id).join(','), [sessions]);
-    React.useEffect(() => {
-        loadData();
-    }, [period, sessionIdsKey]);
+                // Use the exact period boundary, not the first returned bucket: the latter assumes
+                // ascending sort and is `undefined` for an empty period (which would otherwise pull
+                // all-time per-session cost, inconsistent with the period total).
+                const startTime = getPeriodStartTime(period);
+                const perSession = await Promise.all(
+                    sessions.map(async (session) => {
+                        const response = await queryUsage(credentials, {
+                            sessionId: session.id,
+                            startTime,
+                            endTime: Math.floor(Date.now() / 1000),
+                        });
+                        const { totalCost } = calculateTotals(response.usage ?? []);
+                        return [session.id, totalCost] as const;
+                    }),
+                );
+                if (cancelled) {
+                    return;
+                }
+                setTotals({ totalTokens: periodTotals.totalTokens, totalCost: periodTotals.totalCost });
+                setUsageBySession(new Map(perSession));
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [period, sessionIdsKey, hasCredentials]);
 
     const titleById = React.useMemo(() => {
         const map = new Map<string, string>();
@@ -159,7 +176,7 @@ export default React.memo(function ActivityScreen() {
             <ItemGroup title={t('activity.perProject')}>
                 {activity.projectRollup.map((row: ProjectRollupRow) => (
                     <Item
-                        key={`${row.machineId}:${row.project}`}
+                        key={JSON.stringify([row.machineId, row.project])}
                         title={basename(row.project)}
                         subtitle={t('activity.sessions', { count: row.count })}
                         detail={`${formatDuration(row.durationMs)} · ${formatCost(row.costUsd)}`}

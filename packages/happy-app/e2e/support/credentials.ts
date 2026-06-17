@@ -60,6 +60,12 @@ export interface SeededFleetFile {
     idleTag: string;
     archivedTags: string[];
     projects: string[];
+    /** Seeded UsageReport expectations (E08 activity-dashboard specs). */
+    usage?: {
+        perTag: Record<string, { tokens: number; cost: number; basename: string }>;
+        totalTokens: number;
+        totalCost: number;
+    };
 }
 
 /** The seeded fleet shape written by globalSetup (seedSessions). Null when setup did not run. */

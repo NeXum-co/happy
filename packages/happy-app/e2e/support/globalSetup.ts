@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { startIsolatedRelay } from './isolatedRelay';
 import { seedAccount } from './seedAccount';
 import { seedSessions } from './seedSessions';
+import { seedUsage } from './seedUsage';
 import { startTestDaemon } from './testDaemon';
 
 // Self-contained web-E2E setup (E10 Slice C). Boots an ISOLATED happy-server (PGlite, port 3099,
@@ -34,7 +35,12 @@ async function globalSetup(_config: FullConfig) {
 
     // 4. Deterministic fleet of sessions for the rich fleet specs.
     const fleet = await seedSessions(url, account.token, account.masterSecret);
-    writeFileSync(FLEET_FILE, JSON.stringify(fleet), 'utf8');
+
+    // 5. Seed UsageReport rows for the active sessions so the activity-dashboard specs (E08) can
+    //    assert exact token/cost totals via /v1/usage/query.
+    const sessionsByTag = Object.fromEntries(fleet.sessions.map((s) => [s.tag, s.id]));
+    const usage = await seedUsage(url, account.token, sessionsByTag);
+    writeFileSync(FLEET_FILE, JSON.stringify({ ...fleet, usage }), 'utf8');
 }
 
 export default globalSetup;

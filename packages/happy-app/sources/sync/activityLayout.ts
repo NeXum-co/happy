@@ -80,7 +80,7 @@ function dayKey(timestamp: number): string {
  *   sessions within a day newest-created first;
  * - duration = (active ? now : activeAt) - createdAt, clamped to >= 0 and
  *   guarded against NaN;
- * - project rollup aggregates rows by `${machineId}:${project}`.
+ * - project rollup aggregates rows by the (machineId, project) pair.
  */
 export function computeActivityLayout(
     sessions: ActivitySessionLike[],
@@ -137,13 +137,18 @@ export function computeActivityLayout(
 
     const byProject = new Map<string, ProjectRollupRow>();
     for (const row of rows) {
-        const key = `${row.machineId}:${row.project}`;
+        // JSON-encode the (machineId, project) pair so a `:` inside a path or a
+        // null component can't make two distinct buckets collide.
+        const key = JSON.stringify([row.machineId, row.project]);
+        // Effective last-active time = end of the session (now for active, activeAt
+        // for inactive), which equals createdAt + durationMs after the clamp above.
+        const rowLastActiveAt = row.createdAt + row.durationMs;
         const existing = byProject.get(key);
         if (existing) {
             existing.count += 1;
             existing.durationMs += row.durationMs;
             existing.costUsd += row.costUsd ?? 0;
-            existing.lastActiveAt = Math.max(existing.lastActiveAt, row.createdAt);
+            existing.lastActiveAt = Math.max(existing.lastActiveAt, rowLastActiveAt);
         } else {
             byProject.set(key, {
                 machineId: row.machineId,
@@ -151,7 +156,7 @@ export function computeActivityLayout(
                 count: 1,
                 durationMs: row.durationMs,
                 costUsd: row.costUsd ?? 0,
-                lastActiveAt: row.createdAt,
+                lastActiveAt: rowLastActiveAt,
             });
         }
     }
