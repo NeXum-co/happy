@@ -16,20 +16,23 @@ generic (reusable for E02 fleet / E08 screens).
    a fresh machine on the relay) so the account screens get real-but-safe RPC data. Skipped when no
    credential is present (then only the credential-free smoke runs).
 
-## One-time credential drop (local only — never committed)
+## Credential (local only — never committed)
 
-The daemon's `~/.happy/access.key` is the *dataKey* variant and is **not** directly usable as the
-app credential. The app needs a real logged-in session credential `{token, secret}`.
+The daemon's `~/.happy/access.key` is the *dataKey* variant; its masterSecret is one-way-derived and
+**cannot** be reconstructed, so the suite needs a real logged-in app credential `{token, secret}`
+(the app uses a legacy single-masterSecret scheme — the test daemon's `access.key` is rebuilt in
+legacy form from this credential so app↔daemon machine encryption interoperates).
 
-Grab it from your already-logged-in web client and drop it into the gitignored fixture:
+**Automated (recommended):**
+```bash
+pnpm e2e:cred           # extracts auth_credentials from your local Chrome/Chromium into e2e/.auth/
+```
+It reads your own browser's localStorage leveldb on disk, picks the credential the relay accepts, and
+writes `e2e/.auth/credentials.json` (gitignored, value never printed).
 
-1. Open the live web client (`:8081`) in a browser where you're logged in.
-2. DevTools → Application → Local Storage → the `auth_credentials` entry. Copy its JSON value.
-3. Save it as `e2e/.auth/credentials.json` (this dir is gitignored):
-   ```json
-   { "token": "...", "secret": "..." }
-   ```
-   Or export `HAPPY_E2E_TOKEN` / `HAPPY_E2E_SECRET` instead.
+**Manual fallback:** open the web client where you're logged in → DevTools → Application → Local
+Storage → copy the `auth_credentials` JSON → save it as `e2e/.auth/credentials.json`
+(`{ "token": "...", "secret": "..." }`), or export `HAPPY_E2E_TOKEN` / `HAPPY_E2E_SECRET`.
 
 Without it, the suite runs only `boot.spec.ts` (credential-free smoke) and skips the authed specs.
 
