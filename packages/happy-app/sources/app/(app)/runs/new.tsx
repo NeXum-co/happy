@@ -37,6 +37,7 @@ function NewRunScreen() {
     const [turns, setTurns] = React.useState('');
     const [timeoutMinutes, setTimeoutMinutes] = React.useState('');
     const [dispositionTopic, setDispositionTopic] = React.useState('');
+    const [untrustedInput, setUntrustedInput] = React.useState(false);
 
     const [submitting, submit] = useHappyAction(async () => {
         if (!onlineMachine) {
@@ -53,6 +54,7 @@ function NewRunScreen() {
             maxTurns: parseOptionalNumber(turns),
             timeoutMs: timeoutMin !== undefined ? timeoutMin * 60000 : undefined,
             dispositionTopic: dispositionTopic.trim() || undefined,
+            untrustedInput: untrustedInput || undefined,
         });
         router.back();
     });
@@ -153,6 +155,27 @@ function NewRunScreen() {
                     placeholderTextColor={theme.colors.textSecondary}
                 />
                 <Text style={styles.hint}>{t('run.dispositionTopicHint')}</Text>
+
+                <Text style={styles.label}>{t('run.fieldUntrustedInput')}</Text>
+                <View style={styles.tierRow}>
+                    <Pressable
+                        style={[styles.tierChip, !untrustedInput && styles.tierChipActive]}
+                        onPress={() => setUntrustedInput(false)}
+                    >
+                        <Text style={[styles.tierChipText, !untrustedInput && styles.tierChipTextActive]}>
+                            {t('common.no')}
+                        </Text>
+                    </Pressable>
+                    <Pressable
+                        style={[styles.tierChip, untrustedInput && styles.tierChipActive]}
+                        onPress={() => setUntrustedInput(true)}
+                    >
+                        <Text style={[styles.tierChipText, untrustedInput && styles.tierChipTextActive]}>
+                            {t('common.yes')}
+                        </Text>
+                    </Pressable>
+                </View>
+                <Text style={styles.hint}>{t('run.untrustedInputHint')}</Text>
 
                 {!onlineMachine && (
                     <Text style={styles.offline}>{t('newSession.machineOffline')}</Text>

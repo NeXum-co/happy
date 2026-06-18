@@ -1159,6 +1159,8 @@ export const pl: TranslationStructure = {
         fieldDispositionTopic: 'Temat dyspozycji',
         dispositionTopicPlaceholder: 'np. architecture/api-design',
         dispositionTopicHint: 'Opcjonalne. Bramka pewności używa tego do określenia autonomii (kontynuuj / nadzorowane / wstrzymaj). Pozostaw puste lub wpisz temat nierozpoznawany przez bramkę, a zadanie zostanie wstrzymane do zatwierdzenia przed każdym uruchomieniem.',
+        fieldUntrustedInput: 'Niezaufane dane wejściowe',
+        untrustedInputHint: 'Ustaw na Tak, gdy zadanie przetwarza treści z niezaufanego źródła (zewnętrzne repozytoria, sieć, dane od osób trzecich). Zadanie poziomu trusted oznaczone jako niezaufane jest wstrzymywane do zatwierdzenia zamiast uruchamiania z pełnymi uprawnieniami.',
         fieldGateAction: 'Decyzja bramki',
         fieldGateBucket: 'Pewność',
         fieldGateReason: 'Powód bramki',
@@ -1209,6 +1211,8 @@ export const pl: TranslationStructure = {
         fieldDispositionTopic: 'Temat dyspozycji',
         dispositionTopicPlaceholder: 'np. architecture/api-design',
         dispositionTopicHint: 'Opcjonalne. Bramka pewności używa tego do określenia autonomii (kontynuuj / nadzorowane / wstrzymaj). Pozostaw puste lub wpisz temat nierozpoznawany przez bramkę, a zadanie zostanie wstrzymane do zatwierdzenia przed każdym uruchomieniem.',
+        fieldUntrustedInput: 'Niezaufane dane wejściowe',
+        untrustedInputHint: 'Ustaw na Tak, gdy zadanie przetwarza treści z niezaufanego źródła (zewnętrzne repozytoria, sieć, dane od osób trzecich). Zadanie poziomu trusted oznaczone jako niezaufane jest wstrzymywane do zatwierdzenia zamiast uruchamiania z pełnymi uprawnieniami.',
         submitSuccess: 'Utworzono harmonogram.',
     },
 
@@ -1244,6 +1248,8 @@ export const pl: TranslationStructure = {
         fieldDispositionTopic: 'Temat dyspozycji',
         dispositionTopicPlaceholder: 'np. architecture/api-design',
         dispositionTopicHint: 'Opcjonalne. Bramka pewności używa tego do określenia autonomii (kontynuuj / nadzorowane / wstrzymaj). Pozostaw puste lub wpisz temat nierozpoznawany przez bramkę, a zadanie zostanie wstrzymane do zatwierdzenia przed każdym uruchomieniem.',
+        fieldUntrustedInput: 'Niezaufane dane wejściowe',
+        untrustedInputHint: 'Ustaw na Tak, gdy zadanie przetwarza treści z niezaufanego źródła (zewnętrzne repozytoria, sieć, dane od osób trzecich). Zadanie poziomu trusted oznaczone jako niezaufane jest wstrzymywane do zatwierdzenia zamiast uruchamiania z pełnymi uprawnieniami.',
     },
 
 } as const;

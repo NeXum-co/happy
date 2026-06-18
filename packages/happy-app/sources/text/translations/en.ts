@@ -1148,6 +1148,8 @@ export const en: TranslationStructure = {
         fieldDispositionTopic: 'Disposition topic',
         dispositionTopicPlaceholder: 'e.g. architecture/api-design',
         dispositionTopicHint: 'Optional. The confidence gate uses this to decide autonomy (proceed / supervised / hold). Leave it empty — or enter a topic the gate doesn’t recognize — and the job is held for your approval before each run.',
+        fieldUntrustedInput: 'Untrusted input',
+        untrustedInputHint: 'Set to Yes when this job processes content from an untrusted source (external repos, the web, third-party data). A trusted-tier job marked untrusted is held for your approval instead of running with full permissions.',
         fieldGateAction: 'Gate decision',
         fieldGateBucket: 'Confidence',
         fieldGateReason: 'Gate reason',
@@ -1198,6 +1200,8 @@ export const en: TranslationStructure = {
         fieldDispositionTopic: 'Disposition topic',
         dispositionTopicPlaceholder: 'e.g. architecture/api-design',
         dispositionTopicHint: 'Optional. The confidence gate uses this to decide autonomy (proceed / supervised / hold). Leave it empty — or enter a topic the gate doesn’t recognize — and the job is held for your approval before each run.',
+        fieldUntrustedInput: 'Untrusted input',
+        untrustedInputHint: 'Set to Yes when this job processes content from an untrusted source (external repos, the web, third-party data). A trusted-tier job marked untrusted is held for your approval instead of running with full permissions.',
         submitSuccess: 'Schedule created.',
     },
 
@@ -1233,6 +1237,8 @@ export const en: TranslationStructure = {
         fieldDispositionTopic: 'Disposition topic',
         dispositionTopicPlaceholder: 'e.g. architecture/api-design',
         dispositionTopicHint: 'Optional. The confidence gate uses this to decide autonomy (proceed / supervised / hold). Leave it empty — or enter a topic the gate doesn’t recognize — and the job is held for your approval before each run.',
+        fieldUntrustedInput: 'Untrusted input',
+        untrustedInputHint: 'Set to Yes when this job processes content from an untrusted source (external repos, the web, third-party data). A trusted-tier job marked untrusted is held for your approval instead of running with full permissions.',
     },
 
 } as const;

@@ -1132,6 +1132,8 @@ export const pt: TranslationStructure = {
         fieldDispositionTopic: 'Tópico de disposição',
         dispositionTopicPlaceholder: 'ex.: architecture/api-design',
         dispositionTopicHint: 'Opcional. O portão de confiança usa isto para decidir a autonomia (prosseguir / supervisionado / reter). Se deixar vazio ou inserir um tópico que o portão não reconhece, a tarefa fica retida para aprovação antes de cada execução.',
+        fieldUntrustedInput: 'Entrada não confiável',
+        untrustedInputHint: 'Selecione Sim quando a tarefa processa conteúdo de uma fonte não confiável (repos externos, a web, dados de terceiros). Uma tarefa de nível trusted marcada como não confiável fica retida para a sua aprovação em vez de ser executada com permissões completas.',
         fieldGateAction: 'Decisão do portão',
         fieldGateBucket: 'Confiança',
         fieldGateReason: 'Motivo do portão',
@@ -1182,6 +1184,8 @@ export const pt: TranslationStructure = {
         fieldDispositionTopic: 'Tópico de disposição',
         dispositionTopicPlaceholder: 'ex.: architecture/api-design',
         dispositionTopicHint: 'Opcional. O portão de confiança usa isto para decidir a autonomia (prosseguir / supervisionado / reter). Se deixar vazio ou inserir um tópico que o portão não reconhece, a tarefa fica retida para aprovação antes de cada execução.',
+        fieldUntrustedInput: 'Entrada não confiável',
+        untrustedInputHint: 'Selecione Sim quando a tarefa processa conteúdo de uma fonte não confiável (repos externos, a web, dados de terceiros). Uma tarefa de nível trusted marcada como não confiável fica retida para a sua aprovação em vez de ser executada com permissões completas.',
         submitSuccess: 'Agendamento criado.',
     },
 
@@ -1217,6 +1221,8 @@ export const pt: TranslationStructure = {
         fieldDispositionTopic: 'Tópico de disposição',
         dispositionTopicPlaceholder: 'ex.: architecture/api-design',
         dispositionTopicHint: 'Opcional. O portão de confiança usa isto para decidir a autonomia (prosseguir / supervisionado / reter). Se deixar vazio ou inserir um tópico que o portão não reconhece, a tarefa fica retida para aprovação antes de cada execução.',
+        fieldUntrustedInput: 'Entrada não confiável',
+        untrustedInputHint: 'Selecione Sim quando a tarefa processa conteúdo de uma fonte não confiável (repos externos, a web, dados de terceiros). Uma tarefa de nível trusted marcada como não confiável fica retida para a sua aprovação em vez de ser executada com permissões completas.',
     },
 } as const;
 

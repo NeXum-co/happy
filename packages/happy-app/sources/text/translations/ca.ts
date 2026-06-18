@@ -1133,6 +1133,8 @@ export const ca: TranslationStructure = {
         fieldDispositionTopic: 'Tema de disposició',
         dispositionTopicPlaceholder: 'p. ex. architecture/api-design',
         dispositionTopicHint: 'Opcional. La porta de confiança ho fa servir per decidir l’autonomia (continua / supervisat / atura). Si ho deixeu buit o escriviu un tema que la porta no reconeix, la tasca es reté per a aprovació abans de cada execució.',
+        fieldUntrustedInput: 'Entrada no fiable',
+        untrustedInputHint: 'Selecciona Sí quan la tasca processa contingut d’una font no fiable (repos externs, el web, dades de tercers). Una tasca de nivell trusted marcada com a no fiable es reté per a la teva aprovació en lloc d’executar-se amb permisos complets.',
         fieldGateAction: 'Decisió de la porta',
         fieldGateBucket: 'Confiança',
         fieldGateReason: 'Motiu de la porta',
@@ -1183,6 +1185,8 @@ export const ca: TranslationStructure = {
         fieldDispositionTopic: 'Tema de disposició',
         dispositionTopicPlaceholder: 'p. ex. architecture/api-design',
         dispositionTopicHint: 'Opcional. La porta de confiança ho fa servir per decidir l’autonomia (continua / supervisat / atura). Si ho deixeu buit o escriviu un tema que la porta no reconeix, la tasca es reté per a aprovació abans de cada execució.',
+        fieldUntrustedInput: 'Entrada no fiable',
+        untrustedInputHint: 'Selecciona Sí quan la tasca processa contingut d’una font no fiable (repos externs, el web, dades de tercers). Una tasca de nivell trusted marcada com a no fiable es reté per a la teva aprovació en lloc d’executar-se amb permisos complets.',
         submitSuccess: 'Programació creada.',
     },
 
@@ -1218,6 +1222,8 @@ export const ca: TranslationStructure = {
         fieldDispositionTopic: 'Tema de disposició',
         dispositionTopicPlaceholder: 'p. ex. architecture/api-design',
         dispositionTopicHint: 'Opcional. La porta de confiança ho fa servir per decidir l’autonomia (continua / supervisat / atura). Si ho deixeu buit o escriviu un tema que la porta no reconeix, la tasca es reté per a aprovació abans de cada execució.',
+        fieldUntrustedInput: 'Entrada no fiable',
+        untrustedInputHint: 'Selecciona Sí quan la tasca processa contingut d’una font no fiable (repos externs, el web, dades de tercers). Una tasca de nivell trusted marcada com a no fiable es reté per a la teva aprovació en lloc d’executar-se amb permisos complets.',
     },
 } as const;
 

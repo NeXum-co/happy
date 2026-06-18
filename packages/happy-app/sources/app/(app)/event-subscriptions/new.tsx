@@ -52,6 +52,7 @@ function NewEventSubscriptionScreen() {
     const [timeoutMinutes, setTimeoutMinutes] = React.useState('');
     const [allowedTools, setAllowedTools] = React.useState('');
     const [dispositionTopic, setDispositionTopic] = React.useState('');
+    const [untrustedInput, setUntrustedInput] = React.useState(false);
 
     const [submitting, submit] = useHappyAction(async () => {
         if (!onlineMachine) {
@@ -71,6 +72,7 @@ function NewEventSubscriptionScreen() {
             timeoutMs: timeoutMin !== undefined ? timeoutMin * 60000 : undefined,
             allowedTools: parseOptionalTools(allowedTools),
             dispositionTopic: dispositionTopic.trim() || undefined,
+            untrustedInput: untrustedInput || undefined,
         });
         Modal.alert(t('common.success'), t('event.submitSuccess'), [
             { text: t('common.ok'), onPress: () => router.back() },
@@ -215,6 +217,27 @@ function NewEventSubscriptionScreen() {
                     placeholderTextColor={theme.colors.textSecondary}
                 />
                 <Text style={styles.hint}>{t('event.dispositionTopicHint')}</Text>
+
+                <Text style={styles.label}>{t('event.fieldUntrustedInput')}</Text>
+                <View style={styles.tierRow}>
+                    <Pressable
+                        style={[styles.tierChip, !untrustedInput && styles.tierChipActive]}
+                        onPress={() => setUntrustedInput(false)}
+                    >
+                        <Text style={[styles.tierChipText, !untrustedInput && styles.tierChipTextActive]}>
+                            {t('common.no')}
+                        </Text>
+                    </Pressable>
+                    <Pressable
+                        style={[styles.tierChip, untrustedInput && styles.tierChipActive]}
+                        onPress={() => setUntrustedInput(true)}
+                    >
+                        <Text style={[styles.tierChipText, untrustedInput && styles.tierChipTextActive]}>
+                            {t('common.yes')}
+                        </Text>
+                    </Pressable>
+                </View>
+                <Text style={styles.hint}>{t('event.untrustedInputHint')}</Text>
 
                 <Pressable
                     style={[styles.submit, !canSubmit && styles.submitDisabled]}

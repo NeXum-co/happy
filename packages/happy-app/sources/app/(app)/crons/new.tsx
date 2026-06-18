@@ -54,6 +54,7 @@ function NewCronScreen() {
     const [timeoutMinutes, setTimeoutMinutes] = React.useState('');
     const [allowedTools, setAllowedTools] = React.useState('');
     const [dispositionTopic, setDispositionTopic] = React.useState('');
+    const [untrustedInput, setUntrustedInput] = React.useState(false);
 
     const cronExprInvalid = cronExpr.trim().length > 0 && !hasFiveCronFields(cronExpr);
 
@@ -74,6 +75,7 @@ function NewCronScreen() {
             timeoutMs: timeoutMin !== undefined ? timeoutMin * 60000 : undefined,
             allowedTools: parseOptionalTools(allowedTools),
             dispositionTopic: dispositionTopic.trim() || undefined,
+            untrustedInput: untrustedInput || undefined,
         });
         Modal.alert(t('common.success'), t('cron.submitSuccess'), [
             { text: t('common.ok'), onPress: () => router.back() },
@@ -219,6 +221,27 @@ function NewCronScreen() {
                     placeholderTextColor={theme.colors.textSecondary}
                 />
                 <Text style={styles.hint}>{t('cron.dispositionTopicHint')}</Text>
+
+                <Text style={styles.label}>{t('cron.fieldUntrustedInput')}</Text>
+                <View style={styles.tierRow}>
+                    <Pressable
+                        style={[styles.tierChip, !untrustedInput && styles.tierChipActive]}
+                        onPress={() => setUntrustedInput(false)}
+                    >
+                        <Text style={[styles.tierChipText, !untrustedInput && styles.tierChipTextActive]}>
+                            {t('common.no')}
+                        </Text>
+                    </Pressable>
+                    <Pressable
+                        style={[styles.tierChip, untrustedInput && styles.tierChipActive]}
+                        onPress={() => setUntrustedInput(true)}
+                    >
+                        <Text style={[styles.tierChipText, untrustedInput && styles.tierChipTextActive]}>
+                            {t('common.yes')}
+                        </Text>
+                    </Pressable>
+                </View>
+                <Text style={styles.hint}>{t('cron.untrustedInputHint')}</Text>
 
                 <Pressable
                     style={[styles.submit, !canSubmit && styles.submitDisabled]}

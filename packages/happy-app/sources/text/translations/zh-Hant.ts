@@ -1129,6 +1129,8 @@ export const zhHant: TranslationStructure = {
         fieldDispositionTopic: '處置主題',
         dispositionTopicPlaceholder: '例如 architecture/api-design',
         dispositionTopicHint: '選用。信心閘門會據此決定自主程度（繼續 / 受監督 / 暫停）。留空或填寫閘門無法識別的主題時，任務會在每次執行前被暫停以待核准。',
+        fieldUntrustedInput: '不可信輸入',
+        untrustedInputHint: '當此任務處理來自不可信來源（外部儲存庫、網路、第三方資料）的內容時設為「是」。被標記為不可信的 trusted 級任務會被保留以待核准，而不是以完整權限執行。',
         fieldGateAction: '閘門決定',
         fieldGateBucket: '信心度',
         fieldGateReason: '閘門原因',
@@ -1179,6 +1181,8 @@ export const zhHant: TranslationStructure = {
         fieldDispositionTopic: '處置主題',
         dispositionTopicPlaceholder: '例如 architecture/api-design',
         dispositionTopicHint: '選用。信心閘門會據此決定自主程度（繼續 / 受監督 / 暫停）。留空或填寫閘門無法識別的主題時，任務會在每次執行前被暫停以待核准。',
+        fieldUntrustedInput: '不可信輸入',
+        untrustedInputHint: '當此任務處理來自不可信來源（外部儲存庫、網路、第三方資料）的內容時設為「是」。被標記為不可信的 trusted 級任務會被保留以待核准，而不是以完整權限執行。',
         submitSuccess: '已建立排程。',
     },
 
@@ -1214,5 +1218,7 @@ export const zhHant: TranslationStructure = {
         fieldDispositionTopic: '處置主題',
         dispositionTopicPlaceholder: '例如 architecture/api-design',
         dispositionTopicHint: '選用。信心閘門會據此決定自主程度（繼續 / 受監督 / 暫停）。留空或填寫閘門無法識別的主題時，任務會在每次執行前被暫停以待核准。',
+        fieldUntrustedInput: '不可信輸入',
+        untrustedInputHint: '當此任務處理來自不可信來源（外部儲存庫、網路、第三方資料）的內容時設為「是」。被標記為不可信的 trusted 級任務會被保留以待核准，而不是以完整權限執行。',
     },
 } as const;

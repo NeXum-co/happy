@@ -1130,6 +1130,8 @@ export const zhHans: TranslationStructure = {
         fieldDispositionTopic: '处置主题',
         dispositionTopicPlaceholder: '例如 architecture/api-design',
         dispositionTopicHint: '可选。置信门据此决定自主程度（继续 / 受监督 / 暂停）。留空或填写门无法识别的主题时，任务会在每次运行前被暂停以待批准。',
+        fieldUntrustedInput: '不可信输入',
+        untrustedInputHint: '当此任务处理来自不可信来源（外部仓库、网络、第三方数据）的内容时设为“是”。被标记为不可信的 trusted 级任务会被保留以待批准，而不是以完整权限运行。',
         fieldGateAction: '门控决定',
         fieldGateBucket: '置信度',
         fieldGateReason: '门控原因',
@@ -1180,6 +1182,8 @@ export const zhHans: TranslationStructure = {
         fieldDispositionTopic: '处置主题',
         dispositionTopicPlaceholder: '例如 architecture/api-design',
         dispositionTopicHint: '可选。置信门据此决定自主程度（继续 / 受监督 / 暂停）。留空或填写门无法识别的主题时，任务会在每次运行前被暂停以待批准。',
+        fieldUntrustedInput: '不可信输入',
+        untrustedInputHint: '当此任务处理来自不可信来源（外部仓库、网络、第三方数据）的内容时设为“是”。被标记为不可信的 trusted 级任务会被保留以待批准，而不是以完整权限运行。',
         submitSuccess: '已创建计划任务。',
     },
 
@@ -1215,5 +1219,7 @@ export const zhHans: TranslationStructure = {
         fieldDispositionTopic: '处置主题',
         dispositionTopicPlaceholder: '例如 architecture/api-design',
         dispositionTopicHint: '可选。置信门据此决定自主程度（继续 / 受监督 / 暂停）。留空或填写门无法识别的主题时，任务会在每次运行前被暂停以待批准。',
+        fieldUntrustedInput: '不可信输入',
+        untrustedInputHint: '当此任务处理来自不可信来源（外部仓库、网络、第三方数据）的内容时设为“是”。被标记为不可信的 trusted 级任务会被保留以待批准，而不是以完整权限运行。',
     },
 } as const;

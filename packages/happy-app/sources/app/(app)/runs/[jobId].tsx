@@ -225,10 +225,13 @@ function JobDetailScreen() {
                 />
             </ItemGroup>
 
-            {(job.dispositionTopic || (!job.gateResolved && job.gateReason)) && (
+            {(job.dispositionTopic || job.untrustedInput || (!job.gateResolved && job.gateReason)) && (
                 <ItemGroup>
                     {job.dispositionTopic && (
                         <Item title={t('run.fieldDispositionTopic')} detail={job.dispositionTopic} showChevron={false} />
+                    )}
+                    {job.untrustedInput && (
+                        <Item title={t('run.fieldUntrustedInput')} detail={t('common.yes')} showChevron={false} />
                     )}
                     {/* UX-006: once Joshua approved the parked job (gateResolved), the held
                         verdict is history — show only the topic, not the "why held" rows. */}

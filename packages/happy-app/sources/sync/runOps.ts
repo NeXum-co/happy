@@ -28,6 +28,7 @@ export interface JobRecordView {
     gitHeadBefore?: string;
     gitHeadAfter?: string;
     dispositionTopic?: string;
+    untrustedInput?: boolean;
     gateAction?: 'proceed' | 'proceed-supervised' | 'escalate' | 'hold';
     gateBucket?: 'high-trust' | 'modify-prone' | 'mixed' | 'override-prone' | 'thin';
     gateReason?: string;
@@ -45,6 +46,7 @@ export async function machineSubmitJob(machineId: string, params: {
     timeoutMs?: number;
     allowedTools?: string[];
     dispositionTopic?: string;
+    untrustedInput?: boolean;
 }): Promise<{ jobId: string }> {
     const result = await apiSocket.machineRPC<{ jobId: string }, typeof params>(
         machineId,

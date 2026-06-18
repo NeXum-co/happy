@@ -1132,6 +1132,8 @@ export const it: TranslationStructure = {
         fieldDispositionTopic: 'Argomento di disposizione',
         dispositionTopicPlaceholder: 'es. architecture/api-design',
         dispositionTopicHint: 'Facoltativo. Il gate di confidenza lo usa per decidere l’autonomia (procedi / supervisionato / sospendi). Se lo lasci vuoto o inserisci un argomento che il gate non riconosce, il lavoro viene sospeso in attesa di approvazione prima di ogni esecuzione.',
+        fieldUntrustedInput: 'Input non attendibile',
+        untrustedInputHint: 'Imposta su Sì quando il lavoro elabora contenuti da una fonte non attendibile (repo esterni, il web, dati di terze parti). Un lavoro di livello trusted contrassegnato come non attendibile viene sospeso in attesa di approvazione invece di essere eseguito con permessi completi.',
         fieldGateAction: 'Decisione del gate',
         fieldGateBucket: 'Confidenza',
         fieldGateReason: 'Motivo del gate',
@@ -1182,6 +1184,8 @@ export const it: TranslationStructure = {
         fieldDispositionTopic: 'Argomento di disposizione',
         dispositionTopicPlaceholder: 'es. architecture/api-design',
         dispositionTopicHint: 'Facoltativo. Il gate di confidenza lo usa per decidere l’autonomia (procedi / supervisionato / sospendi). Se lo lasci vuoto o inserisci un argomento che il gate non riconosce, il lavoro viene sospeso in attesa di approvazione prima di ogni esecuzione.',
+        fieldUntrustedInput: 'Input non attendibile',
+        untrustedInputHint: 'Imposta su Sì quando il lavoro elabora contenuti da una fonte non attendibile (repo esterni, il web, dati di terze parti). Un lavoro di livello trusted contrassegnato come non attendibile viene sospeso in attesa di approvazione invece di essere eseguito con permessi completi.',
         submitSuccess: 'Pianificazione creata.',
     },
 
@@ -1217,6 +1221,8 @@ export const it: TranslationStructure = {
         fieldDispositionTopic: 'Argomento di disposizione',
         dispositionTopicPlaceholder: 'es. architecture/api-design',
         dispositionTopicHint: 'Facoltativo. Il gate di confidenza lo usa per decidere l’autonomia (procedi / supervisionato / sospendi). Se lo lasci vuoto o inserisci un argomento che il gate non riconosce, il lavoro viene sospeso in attesa di approvazione prima di ogni esecuzione.',
+        fieldUntrustedInput: 'Input non attendibile',
+        untrustedInputHint: 'Imposta su Sì quando il lavoro elabora contenuti da una fonte non attendibile (repo esterni, il web, dati di terze parti). Un lavoro di livello trusted contrassegnato come non attendibile viene sospeso in attesa di approvazione invece di essere eseguito con permessi completi.',
     },
 } as const;
 

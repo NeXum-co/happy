@@ -1131,6 +1131,8 @@ export const ja: TranslationStructure = {
         fieldDispositionTopic: '処理トピック',
         dispositionTopicPlaceholder: '例: architecture/api-design',
         dispositionTopicHint: '任意。確信度ゲートはこれを使って自律性（続行 / 監視あり / 保留）を判断します。空欄のまま、またはゲートが認識しないトピックを入力すると、ジョブは実行ごとに承認待ちで保留されます。',
+        fieldUntrustedInput: '信頼できない入力',
+        untrustedInputHint: 'このジョブが信頼できないソース（外部リポジトリ、ウェブ、サードパーティのデータ）のコンテンツを処理する場合は「はい」にします。trusted ティアのジョブを信頼できないと指定すると、フル権限で実行する代わりに承認待ちで保留されます。',
         fieldGateAction: 'ゲートの判定',
         fieldGateBucket: '確信度',
         fieldGateReason: 'ゲートの理由',
@@ -1181,6 +1183,8 @@ export const ja: TranslationStructure = {
         fieldDispositionTopic: '処理トピック',
         dispositionTopicPlaceholder: '例: architecture/api-design',
         dispositionTopicHint: '任意。確信度ゲートはこれを使って自律性（続行 / 監視あり / 保留）を判断します。空欄のまま、またはゲートが認識しないトピックを入力すると、ジョブは実行ごとに承認待ちで保留されます。',
+        fieldUntrustedInput: '信頼できない入力',
+        untrustedInputHint: 'このジョブが信頼できないソース（外部リポジトリ、ウェブ、サードパーティのデータ）のコンテンツを処理する場合は「はい」にします。trusted ティアのジョブを信頼できないと指定すると、フル権限で実行する代わりに承認待ちで保留されます。',
         submitSuccess: 'スケジュールを作成しました。',
     },
 
@@ -1216,5 +1220,7 @@ export const ja: TranslationStructure = {
         fieldDispositionTopic: '処理トピック',
         dispositionTopicPlaceholder: '例: architecture/api-design',
         dispositionTopicHint: '任意。確信度ゲートはこれを使って自律性（続行 / 監視あり / 保留）を判断します。空欄のまま、またはゲートが認識しないトピックを入力すると、ジョブは実行ごとに承認待ちで保留されます。',
+        fieldUntrustedInput: '信頼できない入力',
+        untrustedInputHint: 'このジョブが信頼できないソース（外部リポジトリ、ウェブ、サードパーティのデータ）のコンテンツを処理する場合は「はい」にします。trusted ティアのジョブを信頼できないと指定すると、フル権限で実行する代わりに承認待ちで保留されます。',
     },
 } as const;

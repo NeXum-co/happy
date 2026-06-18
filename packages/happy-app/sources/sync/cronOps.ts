@@ -16,6 +16,7 @@ export interface CronScheduleView {
     timeoutMs?: number;
     allowedTools?: string[];
     dispositionTopic?: string;
+    untrustedInput?: boolean;
     enabled: boolean;
     createdAt: number;
 }
@@ -31,6 +32,7 @@ export async function machineSubmitCron(machineId: string, params: {
     timeoutMs?: number;
     allowedTools?: string[];
     dispositionTopic?: string;
+    untrustedInput?: boolean;
 }): Promise<{ cronId: string }> {
     const result = await apiSocket.machineRPC<{ cronId: string }, typeof params>(
         machineId,

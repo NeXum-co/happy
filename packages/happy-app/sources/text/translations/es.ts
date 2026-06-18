@@ -1134,6 +1134,8 @@ export const es: TranslationStructure = {
         fieldDispositionTopic: 'Tema de disposición',
         dispositionTopicPlaceholder: 'p. ej. architecture/api-design',
         dispositionTopicHint: 'Opcional. La puerta de confianza lo usa para decidir la autonomía (continuar / supervisado / retener). Si lo dejas vacío o escribes un tema que la puerta no reconoce, la tarea se retiene para aprobación antes de cada ejecución.',
+        fieldUntrustedInput: 'Entrada no confiable',
+        untrustedInputHint: 'Selecciona Sí cuando la tarea procesa contenido de una fuente no confiable (repos externos, la web, datos de terceros). Una tarea de nivel trusted marcada como no confiable se retiene para tu aprobación en lugar de ejecutarse con permisos completos.',
         fieldGateAction: 'Decisión de la puerta',
         fieldGateBucket: 'Confianza',
         fieldGateReason: 'Motivo de la puerta',
@@ -1184,6 +1186,8 @@ export const es: TranslationStructure = {
         fieldDispositionTopic: 'Tema de disposición',
         dispositionTopicPlaceholder: 'p. ej. architecture/api-design',
         dispositionTopicHint: 'Opcional. La puerta de confianza lo usa para decidir la autonomía (continuar / supervisado / retener). Si lo dejas vacío o escribes un tema que la puerta no reconoce, la tarea se retiene para aprobación antes de cada ejecución.',
+        fieldUntrustedInput: 'Entrada no confiable',
+        untrustedInputHint: 'Selecciona Sí cuando la tarea procesa contenido de una fuente no confiable (repos externos, la web, datos de terceros). Una tarea de nivel trusted marcada como no confiable se retiene para tu aprobación en lugar de ejecutarse con permisos completos.',
         submitSuccess: 'Programación creada.',
     },
 
@@ -1219,6 +1223,8 @@ export const es: TranslationStructure = {
         fieldDispositionTopic: 'Tema de disposición',
         dispositionTopicPlaceholder: 'p. ej. architecture/api-design',
         dispositionTopicHint: 'Opcional. La puerta de confianza lo usa para decidir la autonomía (continuar / supervisado / retener). Si lo dejas vacío o escribes un tema que la puerta no reconoce, la tarea se retiene para aprobación antes de cada ejecución.',
+        fieldUntrustedInput: 'Entrada no confiable',
+        untrustedInputHint: 'Selecciona Sí cuando la tarea procesa contenido de una fuente no confiable (repos externos, la web, datos de terceros). Una tarea de nivel trusted marcada como no confiable se retiene para tu aprobación en lugar de ejecutarse con permisos completos.',
     },
 
 } as const;
