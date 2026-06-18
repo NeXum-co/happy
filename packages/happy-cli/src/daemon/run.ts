@@ -1013,11 +1013,12 @@ export async function startDaemon(): Promise<void> {
       // DETERMINISTIC key from the event identity so identical re-deliveries
       // dedupe via createIfAbsent (id becomes `event:{subId}:{derivedKey}`). The
       // git hook, which always sends the sha, is unaffected.
-      const effectiveKey = idempotencyKey ?? deriveEventIdempotencyKey(eventType, matchKey, payload);
+      const now = Date.now();
+      const effectiveKey = idempotencyKey ?? deriveEventIdempotencyKey(eventType, matchKey, payload, now);
       const created: string[] = [];
       for (const sub of subs) {
         try {
-          const builtJob = buildEventJob(sub, payload, effectiveKey, Date.now());
+          const builtJob = buildEventJob(sub, payload, effectiveKey, now);
           const inserted = jobStore.createIfAbsent(builtJob);
           created.push(builtJob.id);
           logger.debug(`[DAEMON RUN] triggerEvent: subscription ${sub.id} -> job ${builtJob.id} (inserted: ${inserted})`);
