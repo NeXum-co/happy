@@ -155,6 +155,12 @@ export interface SpawnSessionOptions {
     parentSessionId?: string;
     /** Happy message id used as the rewind point (only set for "duplicate"). */
     forkedFromMessageId?: string;
+    /**
+     * E10: Claude subscription account (vault name) this cloud session runs its
+     * inference on. Only meaningful for the `claude` agent; empty/undefined →
+     * the daemon binds the vault default (D-E10-3/13).
+     */
+    account?: string;
 }
 
 // Options for forking a Claude session on a machine
@@ -192,7 +198,7 @@ export interface ResumeSessionOptions {
  */
 export async function machineSpawnNewSession(options: SpawnSessionOptions): Promise<SpawnSessionResult> {
 
-    const { machineId, directory, profile, sessionName, approvedNewDirectoryCreation = false, token, agent, resumeClaudeSessionId, parentSessionId, forkedFromMessageId } = options;
+    const { machineId, directory, profile, sessionName, approvedNewDirectoryCreation = false, token, agent, resumeClaudeSessionId, parentSessionId, forkedFromMessageId, account } = options;
 
     try {
         const result = await apiSocket.machineRPC<SpawnSessionResult, {
@@ -206,10 +212,11 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
             resumeClaudeSessionId?: string,
             parentSessionId?: string,
             forkedFromMessageId?: string,
+            account?: string,
         }>(
             machineId,
             'spawn-happy-session',
-            { type: 'spawn-in-directory', directory, profile, sessionName, approvedNewDirectoryCreation, token, agent, resumeClaudeSessionId, parentSessionId, forkedFromMessageId }
+            { type: 'spawn-in-directory', directory, profile, sessionName, approvedNewDirectoryCreation, token, agent, resumeClaudeSessionId, parentSessionId, forkedFromMessageId, account }
         );
         return result;
     } catch (error) {
@@ -766,6 +773,135 @@ export async function forkAndSpawn(
     }
 
     return spawnResult;
+}
+
+// ─── E10 multi-subscription account ops ───────────────────────────────────
+// Thin machineRPC wrappers over the daemon's account-management/usage/switch
+// surface (happy-cli src/api/apiMachine.ts). Each verb also exists as an HTTP
+// control-endpoint (two surfaces, BUG-UAT-1); the app uses the RPC path. The
+// real OAuth tokens never reach the app — list-accounts returns no token, and
+// add-account's token rides the machine-encrypted channel into the vault.
+
+/** One vault account as projected by the daemon (D-E10-12: single defaultAccount pointer → isDefault). Never carries a token. */
+export interface AccountInfo {
+    name: string;
+    isDefault: boolean;
+    addedAt: number;
+}
+
+/** Per-account last-seen utilisation scraped from the unified-* headers (D-E10-6). Fractions 0..1; null = unknown (fail-soft). */
+export interface AccountUsage {
+    fiveHourUtil: number | null;
+    sevenDayUtil: number | null;
+    seenAt: number | null;
+}
+
+/** A running session with its live account, keyed by happySessionId (the id the app already knows). Source: the daemon's TrackedSession (fresh after remap), not server-synced metadata. */
+export interface SessionAccountInfo {
+    startedBy: string;
+    happySessionId: string;
+    pid: number;
+    account?: string;
+}
+
+/** Result of a live account-switch (AC-4). Fail-closed: bad target → ok:false with zero remaps. Unbound/terminal sessions land in `skipped`. */
+export interface AccountSwitchResult {
+    ok: boolean;
+    remapped?: string[];
+    skipped?: string[];
+    error?: string;
+}
+
+/** List the accounts in a machine's vault. Throws on RPC failure (callers wrap in useHappyAction). */
+export async function machineListAccounts(machineId: string): Promise<AccountInfo[]> {
+    const result = await apiSocket.machineRPC<{ accounts: AccountInfo[] }, {}>(
+        machineId,
+        'list-accounts',
+        {},
+    );
+    return result.accounts;
+}
+
+/** Add an account to a machine's vault. `token` is a `claude setup-token` value — encrypted into the vault, never logged. */
+export async function machineAddAccount(machineId: string, name: string, token: string, isDefault?: boolean): Promise<void> {
+    await apiSocket.machineRPC<{ ok: true }, { name: string; token: string; isDefault?: boolean }>(
+        machineId,
+        'add-account',
+        { name, token, isDefault },
+    );
+}
+
+/** Set the provider's default account (D-E10-3/13: an empty spawn uses the default). */
+export async function machineSetDefaultAccount(machineId: string, name: string): Promise<void> {
+    await apiSocket.machineRPC<{ ok: true }, { name: string }>(
+        machineId,
+        'set-default-account',
+        { name },
+    );
+}
+
+/** Remove an account from a machine's vault. */
+export async function machineRemoveAccount(machineId: string, name: string): Promise<void> {
+    await apiSocket.machineRPC<{ ok: true }, { name: string }>(
+        machineId,
+        'remove-account',
+        { name },
+    );
+}
+
+/** List running sessions with their live per-session account (feeds the migration popup). */
+export async function machineListSessions(machineId: string): Promise<SessionAccountInfo[]> {
+    const result = await apiSocket.machineRPC<{ children: SessionAccountInfo[] }, {}>(
+        machineId,
+        'list',
+        {},
+    );
+    return result.children;
+}
+
+/** Read per-account usage (AC-5). Fail-soft: missing account → no entry, missing util → null. */
+export async function machineGetUsage(machineId: string): Promise<Record<string, AccountUsage>> {
+    const result = await apiSocket.machineRPC<{ usage: Record<string, AccountUsage> }, {}>(
+        machineId,
+        'get-usage',
+        {},
+    );
+    return result.usage;
+}
+
+/** Live-switch a chosen set of running sessions to one account via the proxy (no respawn, AC-4). */
+export async function machineAccountSwitch(machineId: string, sessionIds: string[], account: string): Promise<AccountSwitchResult> {
+    return await apiSocket.machineRPC<AccountSwitchResult, { sessionIds: string[]; account: string }>(
+        machineId,
+        'account-switch',
+        { sessionIds, account },
+    );
+}
+
+/** Burn-policy config (S6, AC-8): burn-order + threshold (fraction 0..1). enabled=false → no auto-switch. */
+export interface BurnPolicyConfig {
+    enabled: boolean;
+    order: string[];
+    thresholdPct: number;
+}
+
+/** Read the machine's burn-policy (S6). */
+export async function machineGetBurnPolicy(machineId: string): Promise<BurnPolicyConfig> {
+    const result = await apiSocket.machineRPC<{ policy: BurnPolicyConfig }, {}>(
+        machineId,
+        'get-burn-policy',
+        {},
+    );
+    return result.policy;
+}
+
+/** Persist the machine's burn-policy (S6). Server validates the shape. */
+export async function machineSetBurnPolicy(machineId: string, config: BurnPolicyConfig): Promise<void> {
+    await apiSocket.machineRPC<{ ok: true }, BurnPolicyConfig>(
+        machineId,
+        'set-burn-policy',
+        config,
+    );
 }
 
 // Export types for external use

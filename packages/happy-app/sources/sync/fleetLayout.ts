@@ -56,14 +56,28 @@ export interface FleetLayout<S extends FleetSessionLike> {
     inactive: S[];
 }
 
+/** Stable comparator: oldest-created first, session id as a deterministic tie-breaker. */
+function byCreatedThenId<S extends FleetSessionLike>(a: S, b: S): number {
+    return (a.createdAt - b.createdAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+
 /**
- * Fleet list ordering (E02):
- * 1. needs-you band — all active sessions waiting on the user, across all
- *    projects, most recent activity first.
- * 2. Remaining active sessions grouped per project key; groups ordered by
- *    their most recent activity, sessions within a group likewise.
- * 3. Inactive sessions, newest created first (feeds the existing
- *    day-grouping).
+ * Fleet list ordering (E02, stabiele-sort).
+ *
+ * Every ordering key here is IMMUTABLE (createdAt, session id, project key), so
+ * the list does NOT reshuffle when a session's volatile `activeAt` ticks on
+ * every relay heartbeat. Entries only move when the SET of sessions changes — a
+ * session is added/removed, or crosses the needs-you / active / inactive
+ * boundary. This is what makes the list stay put and usable on mobile; the
+ * earlier `activeAt`-based sort made rows jump on every heartbeat. The needs-you
+ * band surfaces attention by MEMBERSHIP (the `needsYou` flag), not by ordering.
+ *
+ * 1. needs-you band — active sessions waiting on the user, across all projects,
+ *    by createdAt (oldest first), id as tie-breaker.
+ * 2. Remaining active sessions grouped per project key; groups ordered
+ *    alphabetically by key, sessions within a group by createdAt then id.
+ * 3. Inactive sessions, newest created first (createdAt is immutable, so stable;
+ *    feeds the existing day-grouping).
  */
 export function computeFleetLayout<S extends FleetSessionLike>(sessions: S[]): FleetLayout<S> {
     const needsYou: S[] = [];
@@ -80,8 +94,8 @@ export function computeFleetLayout<S extends FleetSessionLike>(sessions: S[]): F
         }
     }
 
-    needsYou.sort((a, b) => b.activeAt - a.activeAt);
-    inactive.sort((a, b) => b.createdAt - a.createdAt);
+    needsYou.sort(byCreatedThenId);
+    inactive.sort((a, b) => (b.createdAt - a.createdAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
     const byProject = new Map<string, S[]>();
     for (const session of activeRest) {
@@ -95,10 +109,10 @@ export function computeFleetLayout<S extends FleetSessionLike>(sessions: S[]): F
     }
 
     const projectGroups: FleetProjectGroup<S>[] = Array.from(byProject.entries()).map(([key, group]) => {
-        group.sort((a, b) => b.activeAt - a.activeAt);
+        group.sort(byCreatedThenId);
         return { key, sessions: group };
     });
-    projectGroups.sort((a, b) => (b.sessions[0]?.activeAt ?? 0) - (a.sessions[0]?.activeAt ?? 0));
+    projectGroups.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 
     return { needsYou, projectGroups, inactive };
 }

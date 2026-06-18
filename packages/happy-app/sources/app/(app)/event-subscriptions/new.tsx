@@ -51,6 +51,7 @@ function NewEventSubscriptionScreen() {
     const [turns, setTurns] = React.useState('');
     const [timeoutMinutes, setTimeoutMinutes] = React.useState('');
     const [allowedTools, setAllowedTools] = React.useState('');
+    const [dispositionTopic, setDispositionTopic] = React.useState('');
 
     const [submitting, submit] = useHappyAction(async () => {
         if (!onlineMachine) {
@@ -69,6 +70,7 @@ function NewEventSubscriptionScreen() {
             maxTurns: parseOptionalNumber(turns),
             timeoutMs: timeoutMin !== undefined ? timeoutMin * 60000 : undefined,
             allowedTools: parseOptionalTools(allowedTools),
+            dispositionTopic: dispositionTopic.trim() || undefined,
         });
         Modal.alert(t('common.success'), t('event.submitSuccess'), [
             { text: t('common.ok'), onPress: () => router.back() },
@@ -201,6 +203,18 @@ function NewEventSubscriptionScreen() {
                     placeholderTextColor={theme.colors.textSecondary}
                 />
                 <Text style={styles.hint}>{t('event.allowedToolsHint')}</Text>
+
+                <Text style={styles.label}>{t('event.fieldDispositionTopic')}</Text>
+                <TextInput
+                    style={styles.input}
+                    value={dispositionTopic}
+                    onChangeText={setDispositionTopic}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    placeholder={t('event.dispositionTopicPlaceholder')}
+                    placeholderTextColor={theme.colors.textSecondary}
+                />
+                <Text style={styles.hint}>{t('event.dispositionTopicHint')}</Text>
 
                 <Pressable
                     style={[styles.submit, !canSubmit && styles.submitDisabled]}

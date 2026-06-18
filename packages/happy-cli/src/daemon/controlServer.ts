@@ -9,7 +9,7 @@ import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-
 import { logger } from '@/ui/logger';
 import { Metadata } from '@/api/types';
 import { decodeBase64 } from '@/api/encryption';
-import { TrackedSession, SessionEncryptionData } from './types';
+import { SessionEncryptionData } from './types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
 import type { SubmitJobParams } from '@/api/apiMachine';
 import type { JobStatus } from './jobs/jobTypes';
@@ -54,12 +54,21 @@ const eventSubscriptionViewSchema = z.object({
 });
 
 export function startDaemonControlServer({
-  getChildren,
+  listSessions,
   stopSession,
   spawnSession,
   submitJob,
   stopJob,
   cancelJob,
+  resolveGate,
+  accountSwitch,
+  getUsage,
+  listAccounts,
+  addAccount,
+  setDefaultAccount,
+  removeAccount,
+  getBurnPolicy,
+  setBurnPolicy,
   listJobs,
   getJob,
   patchJobCost,
@@ -73,12 +82,21 @@ export function startDaemonControlServer({
   requestShutdown,
   onHappySessionWebhook
 }: {
-  getChildren: () => TrackedSession[];
+  listSessions: () => { startedBy: string; happySessionId: string; pid: number; account?: string }[];
   stopSession: (sessionId: string) => boolean;
   spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
   submitJob: (params: SubmitJobParams) => string;
   stopJob: (sessionId: string) => boolean;
   cancelJob: (jobId: string) => boolean;
+  resolveGate: (jobId: string, decision: 'approve' | 'reject') => Promise<boolean>;
+  accountSwitch: (sessionIds: string[], account: string) => Promise<{ ok: boolean; remapped?: string[]; skipped?: string[]; error?: string }>;
+  getUsage: () => Record<string, { fiveHourUtil: number | null; sevenDayUtil: number | null; seenAt: number | null }>;
+  listAccounts: () => Promise<{ name: string; isDefault: boolean; addedAt: number }[]>;
+  addAccount: (name: string, token: string, isDefault?: boolean) => Promise<void>;
+  setDefaultAccount: (name: string) => Promise<void>;
+  removeAccount: (name: string) => Promise<void>;
+  getBurnPolicy: () => Promise<{ enabled: boolean; order: string[]; thresholdPct: number }>;
+  setBurnPolicy: (config: { enabled: boolean; order: string[]; thresholdPct: number }) => Promise<void>;
   listJobs: (filter?: { status?: JobStatus }) => JobRecordView[];
   getJob: (id: string) => JobRecordView | null;
   patchJobCost: (sessionId: string, costUsd: number) => boolean;
@@ -151,23 +169,16 @@ export function startDaemonControlServer({
             children: z.array(z.object({
               startedBy: z.string(),
               happySessionId: z.string(),
-              pid: z.number()
+              pid: z.number(),
+              account: z.string().optional()
             }))
           })
         }
       }
     }, async () => {
-      const children = getChildren();
+      const children = listSessions();
       logger.debug(`[CONTROL SERVER] Listing ${children.length} sessions`);
-      return { 
-        children: children
-          .filter(child => child.happySessionId !== undefined)
-          .map(child => ({
-            startedBy: child.startedBy,
-            happySessionId: child.happySessionId!,
-            pid: child.pid
-          }))
-      }
+      return { children };
     });
 
     // Stop specific session
@@ -270,6 +281,8 @@ export function startDaemonControlServer({
           maxTurns: z.number().optional(),
           timeoutMs: z.number().optional(),
           allowedTools: z.array(z.string()).optional(),
+          dispositionTopic: z.string().optional(),
+          account: z.string().optional(),
         }),
         response: {
           200: z.object({
@@ -323,6 +336,147 @@ export function startDaemonControlServer({
       logger.debug(`[CONTROL SERVER] Cancel job request: ${jobId}`);
       const cancelled = cancelJob(jobId);
       return { cancelled };
+    });
+
+    // Live-switch (E10, AC-4): remap een gekozen set lopende cloud-sessies naar één
+    // account in de authProxy — geen respawn. Fail-closed op het doel-account (AC-6).
+    // Mirrors the account-switch RPC handler (BUG-UAT-1: beide surfaces).
+    typed.post('/account-switch', {
+      schema: {
+        body: z.object({
+          sessionIds: z.array(z.string()),
+          account: z.string()
+        }),
+        response: {
+          200: z.object({
+            ok: z.boolean(),
+            remapped: z.array(z.string()).optional(),
+            skipped: z.array(z.string()).optional(),
+            error: z.string().optional()
+          })
+        }
+      }
+    }, async (request) => {
+      const { sessionIds, account } = request.body;
+      logger.debug(`[CONTROL SERVER] Account switch: ${sessionIds.length} sessie(s) → ${account}`);
+      return accountSwitch(sessionIds, account);
+    });
+
+    // Usage-read (E10, AC-5): per-account laatst-geziene 5h/7d-utilisatie die de
+    // proxy uit de unified-* headers scrapte. Fail-soft (onbekend → null). Mirrors
+    // the get-usage RPC handler (BUG-UAT-1: beide surfaces).
+    typed.post('/usage', {
+      schema: {
+        response: {
+          200: z.object({
+            usage: z.record(z.string(), z.object({
+              fiveHourUtil: z.number().nullable(),
+              sevenDayUtil: z.number().nullable(),
+              seenAt: z.number().nullable()
+            }))
+          })
+        }
+      }
+    }, async () => {
+      return { usage: getUsage() };
+    });
+
+    // Account-management (E10, S5, D-E10-17) over de versleutelde vault. Mirrors the
+    // RPC handlers (BUG-UAT-1: beide surfaces). `/list-accounts` lekt geen token;
+    // `/add-account` neemt een geheim token dat versleuteld de vault in gaat — niet gelogd.
+    typed.post('/list-accounts', {
+      schema: {
+        response: {
+          200: z.object({
+            accounts: z.array(z.object({
+              name: z.string(),
+              isDefault: z.boolean(),
+              addedAt: z.number()
+            }))
+          })
+        }
+      }
+    }, async () => {
+      return { accounts: await listAccounts() };
+    });
+
+    typed.post('/add-account', {
+      schema: {
+        body: z.object({
+          name: z.string().min(1),
+          token: z.string().min(1),
+          isDefault: z.boolean().optional()
+        }),
+        response: { 200: z.object({ ok: z.boolean() }) }
+      }
+    }, async (request) => {
+      const { name, token, isDefault } = request.body;
+      logger.debug(`[CONTROL SERVER] Add account: ${name} (default=${isDefault ?? false})`); // geen token
+      await addAccount(name, token, isDefault);
+      return { ok: true };
+    });
+
+    typed.post('/set-default-account', {
+      schema: {
+        body: z.object({ name: z.string().min(1) }),
+        response: { 200: z.object({ ok: z.boolean() }) }
+      }
+    }, async (request) => {
+      await setDefaultAccount(request.body.name);
+      return { ok: true };
+    });
+
+    typed.post('/remove-account', {
+      schema: {
+        body: z.object({ name: z.string().min(1) }),
+        response: { 200: z.object({ ok: z.boolean() }) }
+      }
+    }, async (request) => {
+      await removeAccount(request.body.name);
+      return { ok: true };
+    });
+
+    // Burn-policy (E10, S6, AC-8): instelbare burn-volgorde + drempel. Mirrors the
+    // get-burn-policy/set-burn-policy RPC handlers (BUG-UAT-1: beide surfaces).
+    const burnPolicyBody = z.object({
+      enabled: z.boolean(),
+      order: z.array(z.string().min(1)),
+      thresholdPct: z.number().min(0).max(1)
+    });
+    typed.post('/get-burn-policy', {
+      schema: { response: { 200: z.object({ policy: burnPolicyBody }) } }
+    }, async () => {
+      return { policy: await getBurnPolicy() };
+    });
+
+    typed.post('/set-burn-policy', {
+      schema: { body: burnPolicyBody, response: { 200: z.object({ ok: z.boolean() }) } }
+    }, async (request) => {
+      await setBurnPolicy(request.body);
+      return { ok: true };
+    });
+
+    // Resolve a gate-parked autonomous job (E05, D-E05-4). A job parked in
+    // 'needs-attention' by the pre-spawn confidence gate awaits Joshua: 'approve'
+    // runs it (honouring a proceed-supervised tier downgrade), 'reject' drives it
+    // to dead. Mirrors the resolve-gate RPC handler (BUG-UAT-1: both surfaces).
+    typed.post('/resolve-gate', {
+      schema: {
+        body: z.object({
+          jobId: z.string(),
+          decision: z.enum(['approve', 'reject'])
+        }),
+        response: {
+          200: z.object({
+            resolved: z.boolean()
+          })
+        }
+      }
+    }, async (request) => {
+      const { jobId, decision } = request.body;
+      logger.debug(`[CONTROL SERVER] Resolve gate request: ${jobId} decision=${decision}`);
+      const resolved = await resolveGate(jobId, decision);
+      return { resolved };
     });
 
     // List autonomous jobs (E04). GET /jobs?status=<status> returns all jobs
@@ -379,6 +533,8 @@ export function startDaemonControlServer({
           maxTurns: z.number().optional(),
           timeoutMs: z.number().optional(),
           allowedTools: z.array(z.string()).optional(),
+          dispositionTopic: z.string().optional(),
+          account: z.string().optional(),
         }),
         response: {
           200: z.object({
@@ -450,6 +606,8 @@ export function startDaemonControlServer({
           maxTurns: z.number().optional(),
           timeoutMs: z.number().optional(),
           allowedTools: z.array(z.string()).optional(),
+          dispositionTopic: z.string().optional(),
+          account: z.string().optional(),
         }),
         response: {
           200: z.object({

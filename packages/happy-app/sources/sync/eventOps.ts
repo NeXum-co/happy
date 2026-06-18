@@ -16,6 +16,7 @@ export interface EventSubscriptionView {
     maxTurns?: number;
     timeoutMs?: number;
     allowedTools?: string[];
+    dispositionTopic?: string;
     enabled: boolean;
     createdAt: number;
 }
@@ -31,6 +32,7 @@ export async function machineSubmitEventSubscription(machineId: string, params: 
     maxTurns?: number;
     timeoutMs?: number;
     allowedTools?: string[];
+    dispositionTopic?: string;
 }): Promise<{ subscriptionId: string }> {
     const result = await apiSocket.machineRPC<{ subscriptionId: string }, typeof params>(
         machineId,

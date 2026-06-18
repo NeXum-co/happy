@@ -7,6 +7,7 @@ import { Typography } from '@/constants/Typography';
 import { encodeBase64 } from '@/encryption/base64';
 import { generateAuthKeyPair, authQRStart } from '@/auth/authQRStart';
 import { authQRWait } from '@/auth/authQRWait';
+import { isWebInsecureContext } from '@/auth/secureContext';
 import { layout } from '@/components/layout';
 import { Modal } from '@/modal';
 import { t } from '@/text';
@@ -80,6 +81,12 @@ export default function Restore() {
     useEffect(() => {
         const startQRAuth = async () => {
             try {
+                if (isWebInsecureContext()) {
+                    Modal.alert(t('common.error'), t('connect.secureContextRequired'));
+                    setIsWaitingForAuth(false);
+                    return;
+                }
+
                 setIsWaitingForAuth(true);
 
                 // Send authentication request
@@ -139,10 +146,7 @@ export default function Restore() {
 
                 <View style={{justifyContent: 'flex-end' }}>
                     <Text style={styles.secondInstructionText}>
-                        1. Open Happy on your mobile device{'\n'}
-                        2. Go to Settings → Account{'\n'}
-                        3. Tap "Link New Device"{'\n'}
-                        4. Scan this QR code
+                        {t('connect.qrLinkInstructions')}
                     </Text>
                 </View>
                 {!authReady && (
@@ -159,7 +163,7 @@ export default function Restore() {
                     />
                 )}
                 <View style={{ flexGrow: 4, paddingTop: 30 }}>
-                    <RoundButton title="Restore with Secret Key Instead" display='inverted' onPress={() => {
+                    <RoundButton title={t('connect.restoreWithSecretKey')} display='inverted' onPress={() => {
                         router.push('/restore/manual');
                     }} />
                 </View>

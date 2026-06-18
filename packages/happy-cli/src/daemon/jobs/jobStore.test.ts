@@ -97,6 +97,33 @@ describe('JobStore', () => {
     expect(bare.gitHeadAfter).toBeUndefined()
   })
 
+  it('round-trips the E05 dispositionTopic + gate-verdict fields', () => {
+    store.create(makeJob({
+      id: 'job-gate',
+      dispositionTopic: 'architecture/api-design',
+      gateAction: 'proceed-supervised',
+      gateBucket: 'modify-prone',
+      gateReason: 'domain architecture = modify-prone',
+      gateResolved: true,
+    }))
+
+    const loaded = store.get('job-gate')!
+    expect(loaded.dispositionTopic).toBe('architecture/api-design')
+    expect(loaded.gateAction).toBe('proceed-supervised')
+    expect(loaded.gateBucket).toBe('modify-prone')
+    expect(loaded.gateReason).toBe('domain architecture = modify-prone')
+    expect(loaded.gateResolved).toBe(true)
+
+    // absent → undefined (gateResolved not persisted when falsy)
+    store.create(makeJob({ id: 'job-nogate' }))
+    const bare = store.get('job-nogate')!
+    expect(bare.dispositionTopic).toBeUndefined()
+    expect(bare.gateAction).toBeUndefined()
+    expect(bare.gateBucket).toBeUndefined()
+    expect(bare.gateReason).toBeUndefined()
+    expect(bare.gateResolved).toBeUndefined()
+  })
+
   it('patch updates fields without a status transition', () => {
     store.create(makeJob({ id: 'job-patch', status: 'running' }))
 

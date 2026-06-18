@@ -157,4 +157,11 @@ describe('CronStore', () => {
     expect(all.find(s => s.id === 'cron-good')!.allowedTools).toEqual(['Read'])
     expect(all.find(s => s.id === 'cron-corrupt')!.allowedTools).toEqual([])
   })
+
+  it('round-trips dispositionTopic (pre-existing fix) en account (E10)', () => {
+    store.create(makeSchedule({ id: 'cron-meta', dispositionTopic: 'deploy', account: 'work' }))
+    const loaded = store.get('cron-meta')!
+    expect(loaded.dispositionTopic).toBe('deploy') // ging vóór de fix verloren → E05-gate undefined
+    expect(loaded.account).toBe('work')
+  })
 })

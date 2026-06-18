@@ -83,7 +83,10 @@ export function buildEventJob(
     timeoutAt: now + (sub.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     createdAt: now,
   }
+  // maxBudgetUsd/maxTurns/timeoutAt already carry the F1 defaults from the literal.
   if (sub.untrustedInput !== undefined) job.untrustedInput = sub.untrustedInput
+  if (sub.dispositionTopic !== undefined) job.dispositionTopic = sub.dispositionTopic
+  if (sub.account !== undefined) job.account = sub.account
   return job
 }
 
@@ -100,6 +103,8 @@ export interface SubmitEventSubscriptionParams {
   maxTurns?: number
   timeoutMs?: number
   allowedTools?: string[]
+  dispositionTopic?: string
+  account?: string
 }
 
 /**
@@ -128,5 +133,7 @@ export function buildEventSubscriptionFromSubmit(
   if (params.maxTurns !== undefined) sub.maxTurns = params.maxTurns
   if (params.timeoutMs !== undefined) sub.timeoutMs = params.timeoutMs
   if (params.allowedTools !== undefined) sub.allowedTools = params.allowedTools
+  if (params.dispositionTopic !== undefined) sub.dispositionTopic = params.dispositionTopic
+  if (params.account !== undefined) sub.account = params.account
   return sub
 }

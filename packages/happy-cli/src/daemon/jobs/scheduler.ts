@@ -25,6 +25,10 @@ import type { Semaphore } from './semaphore'
 import type { JobRecord } from './jobTypes'
 import { classifyFailure, shouldRetry, backoffMs } from './retry'
 import { captureGitState } from './audit'
+import { evaluate } from '@/disposition/gate'
+import { loadRollup as loadRollupReal } from '@/disposition/rollup'
+import type { DispositionRollup } from '@/disposition/types'
+import type { JobTier } from './jobTypes'
 import type { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers'
 
 /**
@@ -77,6 +81,10 @@ interface SchedulerDeps {
   intervalMs?: number
   now?: () => number
   backoff?: (attempt: number) => number
+  // E05: the pre-spawn gate reads the disposition-rollup. Injected so tests pass
+  // a fake without touching the filesystem (mirrors the spawn/now deps); defaults
+  // to the real read-only loader.
+  loadRollup?: () => DispositionRollup | null
 }
 
 interface TriggerMetadata {
@@ -112,6 +120,7 @@ export class JobScheduler {
   private readonly intervalMs: number
   private readonly now: () => number
   private readonly backoff: (attempt: number) => number
+  private readonly loadRollup: () => DispositionRollup | null
   private timer: NodeJS.Timeout | null = null
   private running = false
 
@@ -125,14 +134,20 @@ export class JobScheduler {
     this.intervalMs = deps.intervalMs ?? 1000
     this.now = deps.now ?? Date.now
     this.backoff = deps.backoff ?? (attempt => backoffMs(attempt))
+    this.loadRollup = deps.loadRollup ?? (() => loadRollupReal())
   }
 
-  /** Build the SHARED ENV CONTRACT for a job's tier. */
-  tierEnv(job: JobRecord): Record<string, string> {
+  /**
+   * Build the SHARED ENV CONTRACT for a job. `effectiveTier` is the tier the
+   * gate resolved for this run (E05): a 'proceed-supervised' verdict downgrades a
+   * declared 'trusted' job to 'supervised' for the permission-mode/allowedTools
+   * posture, without mutating the persisted record. Defaults to the declared tier.
+   */
+  tierEnv(job: JobRecord, effectiveTier: JobTier = job.tier): Record<string, string> {
     const env: Record<string, string> = {
-      HAPPY_JOB_PERMISSION_MODE: job.tier === 'trusted' ? 'bypassPermissions' : 'default',
+      HAPPY_JOB_PERMISSION_MODE: effectiveTier === 'trusted' ? 'bypassPermissions' : 'default',
     }
-    if (job.tier === 'supervised') {
+    if (effectiveTier === 'supervised') {
       const meta = this.parseTriggerMetadata(job)
       if (Array.isArray(meta.allowedTools) && meta.allowedTools.length > 0) {
         env.HAPPY_JOB_ALLOWED_TOOLS = meta.allowedTools.join(',')
@@ -144,6 +159,9 @@ export class JobScheduler {
     // with known pricing). Local jobs cost nothing and would be mis-priced by the
     // pricing fallback, so only cloud jobs are told to report their cost (IMP-4).
     if (!this.isLocal(job)) env.HAPPY_JOB_REPORT_COST = '1'
+    // E05: the runtime gate in the keyed session process reads this topic to make
+    // its own canUseTool decision (D-E05-7). Slice 3 consumes this env name.
+    if (job.dispositionTopic) env.HAPPY_JOB_DISPOSITION_TOPIC = job.dispositionTopic
     Object.assign(env, LOCAL_PRESET_ENV[job.preset] ?? {})
     return env
   }
@@ -173,40 +191,83 @@ export class JobScheduler {
     return !preset.startsWith('cloud')
   }
 
+  /**
+   * Containment verdict for a job about to spawn at `effectiveTier` (D-E04-2 /
+   * AC-3 / SEC-002). Returns null when it may run, or a specific exitReason when
+   * a TRUSTED (bypassPermissions) job must be parked: it must sit in a LINKED git
+   * worktree (not a plain clone), off the protected main/master branch, and not
+   * be flagged as processing untrusted external input. Supervised jobs always
+   * pass (null). Gating on effectiveTier means an E05 downgrade-to-supervised is
+   * honoured — a downgraded job is no longer bypassPermissions, so the trusted-only
+   * containment no longer applies. Checked on EVERY spawn path (tick() pre-gate,
+   * runJob() chokepoint, resolveGate('approve')) so no path bypasses it (SEC-002).
+   */
+  private containmentBlock(job: JobRecord, effectiveTier: JobTier): string | null {
+    if (effectiveTier !== 'trusted') return null
+    const containment = this.gitContainment(job.directory)
+    if (!containment.isWorktree) return 'trusted-requires-worktree'
+    if (containment.branch === 'main' || containment.branch === 'master') return 'trusted-on-protected-branch'
+    if (job.untrustedInput === true) return 'untrusted-requires-supervision'
+    return null
+  }
+
   async tick(): Promise<void> {
     this.enforceTimeouts()
 
     const job = this.store.claimNext(this.now())
     if (!job) return
 
-    // Containment gate (D-E04-2 / AC-3): a trusted (bypassPermissions) job may
-    // run trusted only when ALL hold — it sits in a LINKED git worktree, its
-    // branch is not the protected main/master, and it is not flagged as
-    // processing untrusted external input. Any failure parks it in
-    // needs-attention with a specific exitReason rather than running unsupervised
-    // (see jobs/CLAUDE.md: parking surfaces it to the operator, since an
-    // unattended supervised job would hang on a responder-less escalation).
-    // Supervised jobs skip this gate entirely.
-    if (job.tier === 'trusted') {
-      const containment = this.gitContainment(job.directory)
-      if (!containment.isWorktree) {
-        this.store.transition(job.id, 'needs-attention', { exitReason: 'trusted-requires-worktree' })
+    // Containment pre-gate (D-E04-2 / AC-3): park an obviously-uncontained trusted
+    // job before the E05 eval. The authoritative guard is the runJob() chokepoint
+    // on the (possibly E05-downgraded) effectiveTier; this is the early park on
+    // the declared tier with a specific exitReason (worktree / protected-branch /
+    // untrusted-input). Parking surfaces it to the operator (jobs/CLAUDE.md) —
+    // Joshua confirmed park over run-as-supervised (D-E04-sweep-4).
+    const preBlock = this.containmentBlock(job, job.tier)
+    if (preBlock) {
+      this.store.transition(job.id, 'needs-attention', { exitReason: preBlock })
+      return
+    }
+
+    // E05 pre-spawn confidence gate (D-E05-1/4/7). A job Joshua has already
+    // approved (gateResolved) skips the eval and runs at its declared tier; every
+    // other job is gated against the disposition-rollup before it spawns.
+    let effectiveTier: JobTier = job.tier
+    if (!job.gateResolved) {
+      const verdict = evaluate(job.dispositionTopic, this.loadRollup())
+      this.store.patch(job.id, { gateAction: verdict.action, gateBucket: verdict.bucket, gateReason: verdict.reason })
+      // escalate/hold → park in needs-attention (the AC-3 containment pattern),
+      // never spawn. Joshua resolves via resolveGate. Fail-closed (D-E05-5).
+      if (verdict.action === 'hold' || verdict.action === 'escalate') {
+        this.store.transition(job.id, 'needs-attention', { exitReason: `gate:${verdict.bucket}` })
         return
       }
-      if (containment.branch === 'main' || containment.branch === 'master') {
-        this.store.transition(job.id, 'needs-attention', { exitReason: 'trusted-on-protected-branch' })
-        return
-      }
-      if (job.untrustedInput === true) {
-        this.store.transition(job.id, 'needs-attention', { exitReason: 'untrusted-requires-supervision' })
-        return
-      }
+      // proceed-supervised downgrades the effective tier (D-E05-1 tier-floor).
+      effectiveTier = verdict.action === 'proceed-supervised' ? 'supervised' : job.tier
     }
 
     // Audit trail (D-E04-7): record the git HEAD before the job runs so a
     // reviewer can diff what it changed. captureGitState never throws.
     this.store.patch(job.id, { gitHeadBefore: captureGitState(job.directory).head })
 
+    await this.runJob(job, effectiveTier)
+  }
+
+  /**
+   * Spawn a claimed (running) job under the given effective tier and bind its
+   * outcome to the store. Shared by tick() (post-gate) and resolveGate('approve')
+   * so the spawn path stays in one place (D-E05-4).
+   */
+  private async runJob(job: JobRecord, effectiveTier: JobTier): Promise<void> {
+    // AC-3/D-E04-2 containment chokepoint (SEC-002): every spawn path passes
+    // through here, so a trusted/bypassPermissions job is never spawned outside a
+    // linked worktree, on a protected branch, or with untrusted input — not via
+    // tick(), and not via resolveGate('approve'). Gates on effectiveTier.
+    const block = this.containmentBlock(job, effectiveTier)
+    if (block) {
+      this.store.transition(job.id, 'needs-attention', { exitReason: block })
+      return
+    }
     const gated = this.isLocal(job)
     const release = gated ? await this.localSemaphore.acquire() : undefined
     try {
@@ -214,8 +275,9 @@ export class JobScheduler {
         directory: job.directory,
         agent: 'claude',
         initialPrompt: job.prompt,
-        environmentVariables: this.tierEnv(job),
+        environmentVariables: this.tierEnv(job, effectiveTier),
         sessionName: 'job-' + job.id,
+        account: job.account,
       }
 
       let result: SpawnSessionResult
@@ -246,6 +308,37 @@ export class JobScheduler {
     } finally {
       release?.()
     }
+  }
+
+  /**
+   * Resolve a gate-parked job (D-E05-4). approve → needs-attention -> running and
+   * spawn (honouring a proceed-supervised downgrade); reject → the cancel path
+   * needs-attention -> failed -> dead. Returns false if the job is not parked.
+   */
+  async resolveGate(jobId: string, decision: 'approve' | 'reject'): Promise<boolean> {
+    const job = this.store.get(jobId)
+    if (!job || job.status !== 'needs-attention') return false
+
+    if (decision === 'approve') {
+      const effectiveTier: JobTier = job.gateAction === 'proceed-supervised' ? 'supervised' : job.tier
+      // AC-3/D-E04-2 containment holds on the approve path too (SEC-002): refuse to
+      // spawn a trusted/bypassPermissions job that is uncontained (no worktree,
+      // protected branch, or untrusted input), even on explicit approve.
+      const block = this.containmentBlock(job, effectiveTier)
+      if (block) {
+        this.store.patch(jobId, { gateReason: `approve refused: ${block} (AC-3 / D-E04-2)` })
+        return false
+      }
+      // Clear the gate:* park reason so the approved (now running) job no longer reads
+      // as parked (ARCH-003); gateAction/gateBucket stay as historical audit and
+      // gateResolved marks it done.
+      this.store.transition(jobId, 'running', { gateResolved: true, exitReason: undefined })
+      await this.runJob(job, effectiveTier)
+    } else {
+      this.store.transition(jobId, 'failed', { exitReason: 'gate-rejected' })
+      this.store.transition(jobId, 'dead', { finishedAt: this.now() })
+    }
+    return true
   }
 
   /**
@@ -348,6 +441,8 @@ export interface SubmitJobParams {
   maxTurns?: number
   timeoutMs?: number
   allowedTools?: string[]
+  dispositionTopic?: string
+  account?: string
 }
 
 /**
@@ -373,6 +468,11 @@ export function buildJobFromSubmit(params: SubmitJobParams, now: number, id: str
     maxTurns: params.maxTurns ?? DEFAULT_MAX_TURNS,
     createdAt: now,
   }
+  // timeoutAt/maxBudgetUsd/maxTurns already have the F1 defaults applied in the
+  // object literal above (caller value or DEFAULT_*); only the remaining optional
+  // fields are copied through here.
   if (params.untrustedInput !== undefined) job.untrustedInput = params.untrustedInput
+  if (params.dispositionTopic !== undefined) job.dispositionTopic = params.dispositionTopic
+  if (params.account !== undefined) job.account = params.account
   return job
 }

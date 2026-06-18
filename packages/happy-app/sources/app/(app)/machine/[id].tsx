@@ -562,6 +562,16 @@ export default function MachineDetailScreen() {
                     </ItemGroup>
                 )}
 
+                {/* Subscriptions (E10 multi-account) — accounts are per-daemon, entry lives here */}
+                <ItemGroup>
+                    <Item
+                        title={t('subscriptions.machineRowTitle')}
+                        subtitle={t('subscriptions.machineRowSubtitle')}
+                        icon={<Ionicons name="people-circle-outline" size={29} color="#34C759" />}
+                        onPress={() => router.push(`/machine/${machineId}/accounts`)}
+                    />
+                </ItemGroup>
+
                 {/* Previous Sessions (debug view) */}
                 {previousSessions.length > 0 && (
                     <ItemGroup title={'Previous Sessions (up to 5 most recent)'}>

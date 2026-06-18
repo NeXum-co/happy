@@ -67,7 +67,10 @@ export function buildCronJob(schedule: CronSchedule, occurrenceMs: number, now: 
     timeoutAt: now + (schedule.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     createdAt: now,
   }
+  // maxBudgetUsd/maxTurns/timeoutAt already carry the F1 defaults from the literal.
   if (schedule.untrustedInput !== undefined) job.untrustedInput = schedule.untrustedInput
+  if (schedule.dispositionTopic !== undefined) job.dispositionTopic = schedule.dispositionTopic
+  if (schedule.account !== undefined) job.account = schedule.account
   return job
 }
 
@@ -83,6 +86,8 @@ export interface SubmitCronParams {
   maxTurns?: number
   timeoutMs?: number
   allowedTools?: string[]
+  dispositionTopic?: string
+  account?: string
 }
 
 /**
@@ -106,6 +111,8 @@ export function buildCronFromSubmit(params: SubmitCronParams, now: number, id: s
   if (params.maxTurns !== undefined) schedule.maxTurns = params.maxTurns
   if (params.timeoutMs !== undefined) schedule.timeoutMs = params.timeoutMs
   if (params.allowedTools !== undefined) schedule.allowedTools = params.allowedTools
+  if (params.dispositionTopic !== undefined) schedule.dispositionTopic = params.dispositionTopic
+  if (params.account !== undefined) schedule.account = params.account
   return schedule
 }
 

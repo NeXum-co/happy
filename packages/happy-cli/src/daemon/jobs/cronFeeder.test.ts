@@ -182,6 +182,14 @@ describe('buildCronJob', () => {
     const unflagged = buildCronJob(makeSchedule(), occ, T0)
     expect(unflagged.untrustedInput).toBeUndefined()
   })
+
+  it('copies dispositionTopic from the schedule when set, leaves undefined otherwise (E05)', () => {
+    const withTopic = buildCronJob(makeSchedule({ dispositionTopic: 'process/deploy' }), MINUTE_BOUNDARY, T0)
+    expect(withTopic.dispositionTopic).toBe('process/deploy')
+
+    const without = buildCronJob(makeSchedule(), MINUTE_BOUNDARY, T0)
+    expect(without.dispositionTopic).toBeUndefined()
+  })
 })
 
 describe('buildCronFromSubmit', () => {

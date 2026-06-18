@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/auth/AuthContext';
 import { RoundButton } from '@/components/RoundButton';
@@ -9,6 +9,8 @@ import { authGetToken } from '@/auth/authGetToken';
 import { decodeBase64, encodeBase64 } from '@/encryption/base64';
 import { generateAuthKeyPair, authQRStart, QRAuthKeyPair } from '@/auth/authQRStart';
 import { authQRWait } from '@/auth/authQRWait';
+import { isWebInsecureContext } from '@/auth/secureContext';
+import { classifyRestoreError } from '@/auth/classifyRestoreError';
 import { layout } from '@/components/layout';
 import { Modal } from '@/modal';
 import { t } from '@/text';
@@ -82,7 +84,7 @@ export default function Restore() {
         // Encryption needs WebCrypto, which only exists in secure contexts
         // (https / localhost). Without this check a perfectly valid key fails
         // deep inside login and gets misreported as "invalid secret key".
-        if (Platform.OS === 'web' && !globalThis.crypto?.subtle) {
+        if (isWebInsecureContext()) {
             Modal.alert(t('common.error'), t('connect.secureContextRequired'));
             return;
         }
@@ -119,7 +121,7 @@ export default function Restore() {
 
         } catch (error) {
             console.error('Restore error:', error);
-            Modal.alert(t('common.error'), t('server.failedToConnectToServer'));
+            Modal.alert(t('common.error'), t(classifyRestoreError(error)));
         }
     };
 
@@ -128,7 +130,7 @@ export default function Restore() {
             <View style={styles.container}>
                 <View style={styles.contentWrapper}>
                     <Text style={styles.instructionText}>
-                        Enter your secret key to restore access to your account.
+                        {t('connect.restoreInstructions')}
                     </Text>
 
                     <TextInput

@@ -159,6 +159,18 @@ Fork-only modules on top of upstream — upstream docs do not know them.
 - A broken profiles.json (missing / invalid JSON / schema mismatch) never crashes the daemon: warn + behave as if no profiles exist.
 - `tmuxSession` is schema-restricted to `[a-zA-Z0-9_-]` (SEC-003: a crafted name with `:` could retarget tmux windows/panes). Don't loosen the regex.
 
+### E05 confidence gate (memory-decision-layer)
+
+A pure, fail-closed decision layer over the autonomous-job spine: per job it
+decides — from Joshua's structured disposition rollup, never from any prompt —
+whether to run autonomously, run supervised, escalate, or hold. It adds no new
+executor or store; it gates the existing spawn. Two docs cover it:
+
+- `src/disposition/CLAUDE.md` — the gate core (`evaluate()`, fail-closed, the
+  read-only rollup contract, the autonomy dial, the runtime safe-list floor).
+- `src/daemon/jobs/CLAUDE.md` (§ "E05 confidence gate") — how the pre-spawn gate,
+  `resolveGate` approve/reject, and the AC-3 floor wire into the scheduler.
+
 
 # Running the Daemon
 

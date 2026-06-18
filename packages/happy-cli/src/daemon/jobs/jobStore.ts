@@ -39,6 +39,12 @@ interface JobRow {
   maxTurns: number | null
   gitHeadBefore: string | null
   gitHeadAfter: string | null
+  dispositionTopic: string | null
+  gateAction: string | null
+  gateBucket: string | null
+  gateReason: string | null
+  gateResolved: number | null
+  account: string | null
   createdAt: number
 }
 
@@ -69,6 +75,12 @@ function rowToRecord(row: JobRow): JobRecord {
   if (row.maxTurns !== null) record.maxTurns = row.maxTurns
   if (row.gitHeadBefore !== null) record.gitHeadBefore = row.gitHeadBefore
   if (row.gitHeadAfter !== null) record.gitHeadAfter = row.gitHeadAfter
+  if (row.dispositionTopic !== null) record.dispositionTopic = row.dispositionTopic
+  if (row.gateAction !== null) record.gateAction = row.gateAction as JobRecord['gateAction']
+  if (row.gateBucket !== null) record.gateBucket = row.gateBucket as JobRecord['gateBucket']
+  if (row.gateReason !== null) record.gateReason = row.gateReason
+  if (row.gateResolved !== null) record.gateResolved = row.gateResolved === 1
+  if (row.account !== null) record.account = row.account
   return record
 }
 
@@ -106,6 +118,12 @@ export class JobStore {
         maxTurns INTEGER,
         gitHeadBefore TEXT,
         gitHeadAfter TEXT,
+        dispositionTopic TEXT,
+        gateAction TEXT,
+        gateBucket TEXT,
+        gateReason TEXT,
+        gateResolved INTEGER,
+        account TEXT,
         createdAt INTEGER NOT NULL
       )
     `)
@@ -116,6 +134,27 @@ export class JobStore {
     }
     if (!cols.some(c => c.name === 'untrustedInput')) {
       this.db.exec(`ALTER TABLE jobs ADD COLUMN untrustedInput INTEGER`)
+    }
+    // Idempotent migration (E05): add the disposition-gate columns to a store
+    // created before they existed.
+    if (!cols.some(c => c.name === 'dispositionTopic')) {
+      this.db.exec(`ALTER TABLE jobs ADD COLUMN dispositionTopic TEXT`)
+    }
+    if (!cols.some(c => c.name === 'gateAction')) {
+      this.db.exec(`ALTER TABLE jobs ADD COLUMN gateAction TEXT`)
+    }
+    if (!cols.some(c => c.name === 'gateBucket')) {
+      this.db.exec(`ALTER TABLE jobs ADD COLUMN gateBucket TEXT`)
+    }
+    if (!cols.some(c => c.name === 'gateReason')) {
+      this.db.exec(`ALTER TABLE jobs ADD COLUMN gateReason TEXT`)
+    }
+    if (!cols.some(c => c.name === 'gateResolved')) {
+      this.db.exec(`ALTER TABLE jobs ADD COLUMN gateResolved INTEGER`)
+    }
+    // Idempotent migration (E10): add the account column to a store created before it existed.
+    if (!cols.some(c => c.name === 'account')) {
+      this.db.exec(`ALTER TABLE jobs ADD COLUMN account TEXT`)
     }
     // Indexes for the hot query paths: status filters (list), sessionId lookups
     // (findBySessionId / cost reporting), and the claim ordering (status + createdAt).
@@ -133,12 +172,14 @@ export class JobStore {
         id, triggerType, triggerMetadata, tier, preset, untrustedInput, directory, prompt,
         status, attempts, maxAttempts, sessionId, sessionPid, scheduledAt, claimedAt,
         timeoutAt, finishedAt, exitReason, costUsd, maxBudgetUsd, maxTurns,
-        gitHeadBefore, gitHeadAfter, createdAt
+        gitHeadBefore, gitHeadAfter, dispositionTopic, gateAction, gateBucket,
+        gateReason, gateResolved, account, createdAt
       ) VALUES (
         @id, @triggerType, @triggerMetadata, @tier, @preset, @untrustedInput, @directory, @prompt,
         @status, @attempts, @maxAttempts, @sessionId, @sessionPid, @scheduledAt, @claimedAt,
         @timeoutAt, @finishedAt, @exitReason, @costUsd, @maxBudgetUsd, @maxTurns,
-        @gitHeadBefore, @gitHeadAfter, @createdAt
+        @gitHeadBefore, @gitHeadAfter, @dispositionTopic, @gateAction, @gateBucket,
+        @gateReason, @gateResolved, @account, @createdAt
       )
     `).run({
       id: job.id,
@@ -164,6 +205,12 @@ export class JobStore {
       maxTurns: job.maxTurns ?? null,
       gitHeadBefore: job.gitHeadBefore ?? null,
       gitHeadAfter: job.gitHeadAfter ?? null,
+      dispositionTopic: job.dispositionTopic ?? null,
+      gateAction: job.gateAction ?? null,
+      gateBucket: job.gateBucket ?? null,
+      gateReason: job.gateReason ?? null,
+      gateResolved: job.gateResolved ? 1 : null,
+      account: job.account ?? null,
       createdAt: job.createdAt,
     })
   }
@@ -175,12 +222,14 @@ export class JobStore {
         id, triggerType, triggerMetadata, tier, preset, untrustedInput, directory, prompt,
         status, attempts, maxAttempts, sessionId, sessionPid, scheduledAt, claimedAt,
         timeoutAt, finishedAt, exitReason, costUsd, maxBudgetUsd, maxTurns,
-        gitHeadBefore, gitHeadAfter, createdAt
+        gitHeadBefore, gitHeadAfter, dispositionTopic, gateAction, gateBucket,
+        gateReason, gateResolved, account, createdAt
       ) VALUES (
         @id, @triggerType, @triggerMetadata, @tier, @preset, @untrustedInput, @directory, @prompt,
         @status, @attempts, @maxAttempts, @sessionId, @sessionPid, @scheduledAt, @claimedAt,
         @timeoutAt, @finishedAt, @exitReason, @costUsd, @maxBudgetUsd, @maxTurns,
-        @gitHeadBefore, @gitHeadAfter, @createdAt
+        @gitHeadBefore, @gitHeadAfter, @dispositionTopic, @gateAction, @gateBucket,
+        @gateReason, @gateResolved, @account, @createdAt
       )
     `).run({
       id: job.id,
@@ -206,6 +255,12 @@ export class JobStore {
       maxTurns: job.maxTurns ?? null,
       gitHeadBefore: job.gitHeadBefore ?? null,
       gitHeadAfter: job.gitHeadAfter ?? null,
+      dispositionTopic: job.dispositionTopic ?? null,
+      gateAction: job.gateAction ?? null,
+      gateBucket: job.gateBucket ?? null,
+      gateReason: job.gateReason ?? null,
+      gateResolved: job.gateResolved ? 1 : null,
+      account: job.account ?? null,
       createdAt: job.createdAt,
     })
     return result.changes === 1
@@ -307,17 +362,23 @@ export class JobStore {
       'triggerType', 'triggerMetadata', 'tier', 'preset', 'untrustedInput', 'directory', 'prompt',
       'status', 'attempts', 'maxAttempts', 'sessionId', 'sessionPid', 'scheduledAt', 'claimedAt',
       'timeoutAt', 'finishedAt', 'exitReason', 'costUsd', 'maxBudgetUsd', 'maxTurns',
-      'gitHeadBefore', 'gitHeadAfter', 'createdAt',
+      'gitHeadBefore', 'gitHeadAfter', 'dispositionTopic', 'gateAction', 'gateBucket',
+      'gateReason', 'gateResolved', 'account', 'createdAt',
     ]
     const present = columns.filter(c => c in patch)
     if (present.length === 0) return
     const assignments = present.map(c => `${c} = @${c}`).join(', ')
     const params: Record<string, unknown> = { id }
-    // SQLite has no boolean; untrustedInput round-trips as 0/1/null.
+    // SQLite has no boolean; the boolean fields untrustedInput and gateResolved
+    // round-trip as 0/1/null (better-sqlite3 cannot bind a JS boolean).
     for (const c of present) {
-      params[c] = c === 'untrustedInput'
-        ? (patch.untrustedInput === undefined ? null : (patch.untrustedInput ? 1 : 0))
-        : patch[c] ?? null
+      if (c === 'untrustedInput') {
+        params[c] = patch.untrustedInput === undefined ? null : (patch.untrustedInput ? 1 : 0)
+      } else if (c === 'gateResolved') {
+        params[c] = patch.gateResolved ? 1 : null
+      } else {
+        params[c] = patch[c] ?? null
+      }
     }
     this.db.prepare(`UPDATE jobs SET ${assignments} WHERE id = @id`).run(params)
   }

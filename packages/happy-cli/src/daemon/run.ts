@@ -14,7 +14,13 @@ import { startCaffeinate, stopCaffeinate } from '@/utils/caffeinate';
 import packageJson from '../../package.json';
 import { getEnvironmentInfo } from '@/ui/doctor';
 import { spawnHappyCLI } from '@/utils/spawnHappyCLI';
-import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readPersistedSessions, persistSession } from '@/persistence';
+import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readPersistedSessions, persistSession, readCredentials } from '@/persistence';
+import { startAuthProxy, type AuthProxy } from '@/accounts/authProxy';
+import { applyAccountBinding } from '@/accounts/accountBinding';
+import { applyAccountSwitch, type SwitchResult } from '@/accounts/accountSwitch';
+import { createUsageStore, type AccountUsage } from '@/accounts/usageStore';
+import { vaultMasterKey, listAccounts, addAccount, removeAccount, setDefaultAccount, getBurnPolicy, setBurnPolicy, type AccountInfo } from '@/accounts/accountVault';
+import { planBurnRemap, type BurnPolicyConfig } from '@/accounts/burnPolicy';
 import type { PersistedSession } from '@/persistence';
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stopDaemon } from './controlClient';
@@ -261,6 +267,16 @@ export async function startDaemon(): Promise<void> {
       }
     };
 
+    // E10: localhost-only auth-proxy die per cloud-sessie het echte account-token
+    // injecteert. Gestart vóór spawnSession zodat de closure 'm capteert; gestopt
+    // in cleanupAndShutdown. S4: de proxy meldt per response het account + de
+    // upstream-headers aan de usageStore (proxy blijft dom — D-E10-14).
+    const usageStore = createUsageStore();
+    const authProxy: AuthProxy = await startAuthProxy({
+      onResponse: (account, headers) => usageStore.record(account, headers),
+    });
+    logger.debug(`[DAEMON RUN] authProxy (E10) luistert op http://127.0.0.1:${authProxy.port}`);
+
     // Spawn a new session (sessionId reserved for future --resume functionality)
     const spawnSession = async (options: SpawnSessionOptions): Promise<SpawnSessionResult> => {
       logger.debugLargeJson('[DAEMON RUN] Spawning session', options);
@@ -377,6 +393,28 @@ export async function startDaemon(): Promise<void> {
         if (options.resumeClaudeSessionId) {
           extraEnv.HAPPY_FORK_CLAUDE_SESSION_ID = options.resumeClaudeSessionId;
         }
+
+        // E10: bind deze cloud-spawn aan een account (engaged-only, fail-closed).
+        // Niet-claude/local-preset spawns en een lege vault passeren ongemoeid.
+        // S6: zonder expliciete keuze stuurt de burn-policy (config + live usage) de
+        // account-keuze; álle accounts vol → warn + default-fallback (D-E10-19).
+        const accountCreds = await readCredentials();
+        const binding = accountCreds
+          ? await applyAccountBinding(extraEnv, { agent: options.agent, account: options.account },
+              { vaultFile: configuration.accountsVaultFile, masterKey: await vaultMasterKey(accountCreds), proxy: authProxy,
+                burnPolicy: await getBurnPolicy(configuration.accountsVaultFile, 'claude'), usage: usageStore.snapshot() })
+          : { ok: true as const, stripApiKey: false };
+        if (!binding.ok) {
+          return { type: 'error', errorMessage: binding.error };
+        }
+        if (binding.ok && binding.warning) {
+          logger.warn(`[DAEMON RUN] ${binding.warning}`);
+        }
+        const stripApiKey = binding.stripApiKey;
+        // E10/S3: routing-key + account vasthouden zodat de TrackedSession ze draagt
+        // (live-switch via accountSwitch → authProxy.remap). undefined bij passthrough.
+        const accountBinding = binding.binding;
+
         logger.debug(`[DAEMON RUN] Environment variable keys (before expansion) (${Object.keys(extraEnv).length}): ${Object.keys(extraEnv).join(', ')}`);
 
         // Expand ${VAR} references from daemon's process.env
@@ -493,6 +531,10 @@ export async function startDaemon(): Promise<void> {
           // Add extra environment variables (these should already be filtered)
           Object.assign(tmuxEnv, extraEnv);
 
+          // E10: strip ANTHROPIC_API_KEY zodra account-binding actief is, anders
+          // overruled een geërfde key stil de routing-key (proxy wordt omzeild).
+          if (stripApiKey) delete tmuxEnv.ANTHROPIC_API_KEY;
+
           const tmuxResult = await tmux.spawnInTmux([fullCommand], {
             sessionName: tmuxSessionName,
             windowName: windowName,
@@ -513,6 +555,8 @@ export async function startDaemon(): Promise<void> {
               pid: tmuxResult.pid, // Real PID from tmux -P flag
               tmuxSessionId: tmuxResult.sessionId,
               directoryCreated,
+              routingKey: accountBinding?.routingKey,
+              account: accountBinding?.account,
               message: directoryCreated
                 ? `The path '${directory}' did not exist. We created a new folder and spawned a new session in tmux session '${tmuxSessionName}'. Use 'tmux attach -t ${tmuxSessionName}' to view the session.`
                 : `Spawned new session in tmux session '${tmuxSessionName}'. Use 'tmux attach -t ${tmuxSessionName}' to view the session.`
@@ -607,10 +651,14 @@ export async function startDaemon(): Promise<void> {
           return spawnTrackedHappyProcess({
             args,
             cwd: directory,
-            env: {
-              ...process.env,
-              ...extraEnv
-            },
+            routingKey: accountBinding?.routingKey,
+            account: accountBinding?.account,
+            env: (() => {
+              const childEnv: NodeJS.ProcessEnv = { ...process.env, ...extraEnv };
+              // E10: zie tmux-tak — strip de geërfde API-key bij actieve binding.
+              if (stripApiKey) delete childEnv.ANTHROPIC_API_KEY;
+              return childEnv;
+            })(),
             directoryCreated,
             message: messageParts.length > 0 ? messageParts.join(' ') : undefined,
           });
@@ -637,12 +685,16 @@ export async function startDaemon(): Promise<void> {
       env,
       directoryCreated = false,
       message,
+      routingKey,
+      account,
     }: {
       args: string[];
       cwd: string;
       env: NodeJS.ProcessEnv;
       directoryCreated?: boolean;
       message?: string;
+      routingKey?: string;
+      account?: string;
     }): Promise<SpawnSessionResult> => {
       const happyProcess = spawnHappyCLI(args, {
         cwd,
@@ -667,6 +719,8 @@ export async function startDaemon(): Promise<void> {
         childProcess: happyProcess,
         directoryCreated,
         message,
+        routingKey,
+        account,
       };
 
       pidToTrackedSession.set(happyProcess.pid, trackedSession);
@@ -1073,14 +1127,116 @@ export async function startDaemon(): Promise<void> {
       return true;
     };
 
+    // Resolve a gate-parked job (E05, D-E05-4). A job the pre-spawn confidence
+    // gate parked in 'needs-attention' awaits Joshua: 'approve' runs it (honouring
+    // a proceed-supervised downgrade), 'reject' drives it to dead. Exposed on BOTH
+    // control surfaces (HTTP + RPC) via the same scheduler method (BUG-UAT-1).
+    const resolveGate = (jobId: string, decision: 'approve' | 'reject'): Promise<boolean> =>
+      jobScheduler.resolveGate(jobId, decision);
+
+    // Live-switch (AC-4): remap een gekozen set lopende cloud-sessies naar één
+    // account in de authProxy — geen respawn. Fail-closed op het doel-account
+    // (AC-6): doel niet ontsleutelbaar → nul remaps. Een ongebonden sessie (geen
+    // routing-key) komt in `skipped`. Twee surfaces (HTTP + RPC, BUG-UAT-1) roepen
+    // deze ene closure aan.
+    const accountSwitch = async (sessionIds: string[], account: string): Promise<SwitchResult> => {
+      const creds = await readCredentials();
+      if (!creds) return { ok: false, error: 'geen credentials — switch geweigerd' };
+      return applyAccountSwitch(sessionIds, { account }, {
+        vaultFile: configuration.accountsVaultFile,
+        masterKey: await vaultMasterKey(creds),
+        proxy: authProxy,
+        lookupRoutingKey: (sid) => findTrackedSessionById(sid)?.routingKey,
+      });
+    };
+
+    // Usage-read (AC-5): per-account laatst-geziene 5h/7d-utilisatie die de proxy
+    // uit de unified-* headers scrapte. Fail-soft (onbekend → null). Twee surfaces
+    // (HTTP /usage + RPC get-usage, BUG-UAT-1) lezen deze ene snapshot.
+    const getUsage = (): Record<string, AccountUsage> => usageStore.snapshot();
+
+    // Account-management-surface (S5, D-E10-17) over de bestaande vault-CRUD. Twee
+    // surfaces (HTTP + RPC, BUG-UAT-1) roepen deze closures aan zodat de app de
+    // accounts kan lezen/beheren. `add-account` neemt een geheim token (van een
+    // machine-side `claude setup-token`) en versleutelt het de vault in — het token
+    // wordt nóóit gelogd (security.md). `list-accounts` lekt geen token (alleen metadata).
+    const listAccountsVerb = (): Promise<AccountInfo[]> =>
+      listAccounts(configuration.accountsVaultFile, 'claude');
+    const addAccountVerb = async (name: string, token: string, isDefault?: boolean): Promise<void> => {
+      const creds = await readCredentials();
+      if (!creds) throw new Error('geen credentials — add-account geweigerd');
+      await addAccount(configuration.accountsVaultFile, await vaultMasterKey(creds),
+        { provider: 'claude', name, oauthToken: token, isDefault });
+    };
+    const setDefaultAccountVerb = (name: string): Promise<void> =>
+      setDefaultAccount(configuration.accountsVaultFile, 'claude', name);
+    const removeAccountVerb = (name: string): Promise<void> =>
+      removeAccount(configuration.accountsVaultFile, 'claude', name);
+
+    // Burn-policy (S6, AC-8, D-E10-8): instelbare burn-volgorde + drempel. Twee
+    // surfaces (HTTP + RPC, BUG-UAT-1) lezen/schrijven de config op de vault.
+    const getBurnPolicyVerb = (): Promise<BurnPolicyConfig> =>
+      getBurnPolicy(configuration.accountsVaultFile, 'claude');
+    const setBurnPolicyVerb = (config: BurnPolicyConfig): Promise<void> =>
+      setBurnPolicy(configuration.accountsVaultFile, 'claude', config);
+
+    // Monitor-tick (S6, D-E10-20): verschuift lopende cloud-sessies waarvan het
+    // account de drempel raakt naar het volgende account met ruimte (via de S3-
+    // accountSwitch-machinerie; geen respawn). Pure planner planBurnRemap beslist;
+    // hier alleen de daemon-glue. Throwt nooit (zoals reaper): fout → volgende tick.
+    const runBurnMonitorOnce = async (): Promise<void> => {
+      try {
+        const policy = await getBurnPolicy(configuration.accountsVaultFile, 'claude');
+        if (!policy.enabled) return;
+        const sessions = getCurrentChildren()
+          .filter(s => s.happySessionId !== undefined && s.account !== undefined)
+          .map(s => ({ sessionId: s.happySessionId!, account: s.account! }));
+        if (sessions.length === 0) return;
+        const plan = planBurnRemap(sessions, usageStore.snapshot(), policy);
+        if (plan.length === 0) return;
+        // Groepeer per doel-account → één accountSwitch per groep.
+        const byTarget = new Map<string, string[]>();
+        for (const { sessionId, toAccount } of plan) {
+          (byTarget.get(toAccount) ?? byTarget.set(toAccount, []).get(toAccount)!).push(sessionId);
+        }
+        for (const [toAccount, sessionIds] of byTarget) {
+          const result = await accountSwitch(sessionIds, toAccount);
+          if (result.ok) {
+            logger.info(`[DAEMON RUN] burn-monitor: ${result.remapped?.length ?? 0} sessie(s) → '${toAccount}' (drempel ${Math.round(policy.thresholdPct * 100)}%)`);
+          } else {
+            logger.warn(`[DAEMON RUN] burn-monitor: remap → '${toAccount}' faalde: ${result.error}`);
+          }
+        }
+      } catch (error) {
+        logger.warn('[DAEMON RUN] burn-monitor tick faalde (overgeslagen tot de volgende heartbeat)', error);
+      }
+    };
+
+    // Sessie-projectie (gedeeld door HTTP /list én RPC list, BUG-UAT-1). Levert de
+    // app de live per-sessie-account-map (gekeyd op happySessionId) voor de
+    // migratie-popup; de daemon-TrackedSession is de verse bron (remap kan 'm wijzigen).
+    const listSessions = (): { startedBy: string; happySessionId: string; pid: number; account?: string }[] =>
+      getCurrentChildren()
+        .filter(child => child.happySessionId !== undefined)
+        .map(child => ({ startedBy: child.startedBy, happySessionId: child.happySessionId!, pid: child.pid, account: child.account }));
+
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
-      getChildren: getCurrentChildren,
+      listSessions,
       stopSession,
       spawnSession,
       submitJob,
       stopJob,
       cancelJob,
+      resolveGate,
+      accountSwitch,
+      getUsage,
+      listAccounts: listAccountsVerb,
+      addAccount: addAccountVerb,
+      setDefaultAccount: setDefaultAccountVerb,
+      removeAccount: removeAccountVerb,
+      getBurnPolicy: getBurnPolicyVerb,
+      setBurnPolicy: setBurnPolicyVerb,
       listJobs,
       getJob,
       patchJobCost,
@@ -1160,6 +1316,16 @@ export async function startDaemon(): Promise<void> {
       listJobs,
       getJob,
       cancelJob,
+      resolveGate,
+      accountSwitch,
+      getUsage,
+      listAccounts: listAccountsVerb,
+      addAccount: addAccountVerb,
+      setDefaultAccount: setDefaultAccountVerb,
+      removeAccount: removeAccountVerb,
+      getBurnPolicy: getBurnPolicyVerb,
+      setBurnPolicy: setBurnPolicyVerb,
+      listSessions,
       submitCron,
       listCrons,
       deleteCron,
@@ -1223,6 +1389,10 @@ export async function startDaemon(): Promise<void> {
 
       // Archive server-active sessions whose host process died (see daemon/reaper.ts)
       await runReaperOnce(reaperDeps);
+
+      // E10/S6: burn-monitor — remap lopende sessies van een (bijna-)uitgeput
+      // account naar het volgende met ruimte (D-E10-20). No-op als de policy uit is.
+      await runBurnMonitorOnce();
 
       // Check if daemon needs update by detecting whether `dist/index.mjs` was
       // replaced on disk since the daemon started (npm install rewrites the file).
@@ -1337,6 +1507,7 @@ export async function startDaemon(): Promise<void> {
 
       apiMachine.shutdown();
       await stopControlServer();
+      authProxy.stop();
       await cleanupDaemonState();
       await stopCaffeinate();
       await releaseDaemonLock(daemonLockHandle);

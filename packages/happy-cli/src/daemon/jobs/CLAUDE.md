@@ -129,6 +129,36 @@ commit sha as the idempotencyKey.
   would mis-price them. Preset is local unless it clearly names a cloud preset
   (local-default, D-E04-5).
 
+## E05 confidence gate (pre-spawn)
+
+A second gate runs in `tick()` **directly after the AC-3 containment guard**,
+before a job spawns. It calls the pure `evaluate(dispositionTopic, rollup)` (see
+`../../disposition/CLAUDE.md`) and writes the verdict onto the job record
+(`gateAction` / `gateBucket` / `gateReason`). The verdict drives the spawn:
+
+- **escalate / hold** → park in `needs-attention` with `exitReason='gate:<bucket>'`
+  — the SAME containment pattern AC-3 uses — and never spawn. Fail-closed
+  (D-E05-5): missing/thin/corrupt disposition data holds.
+- **proceed-supervised** → spawn, but with the **effective tier downgraded** to
+  `supervised` (a declared `trusted` job loses `bypassPermissions` for this run;
+  the persisted tier is untouched) so every tool call goes through `canUseTool`.
+- **proceed** → spawn at the declared tier.
+
+A job Joshua has already approved carries `gateResolved` and **skips re-gating**,
+so it doesn't re-park. `resolveGate(approve)` drives `needs-attention → running`
+and spawns via the shared `runJob()` — the spawn block is extracted out of
+`tick()` so both paths share it (D-E05-4); `reject` takes the cancel path
+`failed → dead`.
+
+**AC-3 containment runs on BOTH spawn paths** (SEC-002): the
+`trustedWithoutWorktree()` guard is checked in `tick()` AND again in `runJob()` /
+a `resolveGate` pre-check, so an explicit approve can never spawn a
+`trusted`/`bypassPermissions` job outside a git worktree.
+
+A runtime sibling of this gate lives in the keyed session process
+(`../../claude/utils/permissionHandler.ts`) and only auto-approves read-only
+tools under a high-trust topic (D-E05-8); see `../../disposition/CLAUDE.md`.
+
 ## GOTCHA: every management action needs TWO surfaces (BUG-UAT-1)
 
 An app-callable action must be wired in BOTH places or it silently works in one
@@ -145,8 +175,9 @@ management verb, add both surfaces.
 ## Files
 
 - `jobTypes.ts` / `jobStore.ts` / `stateMachine.ts` — job records, durable store, transitions
-- `scheduler.ts` — the worker pool (claim → spawn → bind exit), tier env, retry wiring, `buildJobFromSubmit`
+- `scheduler.ts` — the worker pool (claim → gate → spawn → bind exit), tier env, `runJob`/`resolveGate`, retry wiring, `buildJobFromSubmit`
 - `semaphore.ts` / `retry.ts` — concurrency permit, failure classification + backoff
-- `jobView.ts` / `audit.ts` — external projection (drops `triggerMetadata`), per-job git audit
+- `jobView.ts` / `audit.ts` — external projection (drops `triggerMetadata`, keeps the E05 gate fields), per-job git audit
+- the E05 gate core lives in `../../disposition/` (its own CLAUDE.md)
 - `cronTypes.ts` / `cronStore.ts` / `cronSchedule.ts` / `cronFeeder.ts` — cron definitions, store, pure scheduling, feeder
 - `eventTypes.ts` / `eventStore.ts` / `eventTrigger.ts` — event definitions, store, pure matching/build

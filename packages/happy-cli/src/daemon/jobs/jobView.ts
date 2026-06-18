@@ -37,8 +37,18 @@ export const jobRecordViewSchema = z.object({
     maxTurns: z.number().optional(),
     gitHeadBefore: z.string().optional(),
     gitHeadAfter: z.string().optional(),
+    dispositionTopic: z.string().optional(),
+    gateAction: z.enum(['proceed', 'proceed-supervised', 'escalate', 'hold']).optional(),
+    gateBucket: z.enum(['high-trust', 'modify-prone', 'mixed', 'override-prone', 'thin']).optional(),
+    gateReason: z.string().optional(),
+    gateResolved: z.boolean().optional(),
 })
 
+/**
+ * Project a JobRecord for external consumption: strips `triggerMetadata` and
+ * keeps everything else, including the E05 gate fields (`dispositionTopic`,
+ * `gateAction`, `gateBucket`, `gateReason`, `gateResolved`) the run-view reads.
+ */
 export function toJobRecordView(j: JobRecord): JobRecordView {
     const { triggerMetadata, ...view } = j
     return view

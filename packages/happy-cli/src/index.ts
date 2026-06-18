@@ -34,6 +34,7 @@ import { extractNoSandboxFlag } from './utils/sandboxFlags'
 import { handleResumeCommand } from '@/resume/handleResumeCommand'
 import { ensureDaemonRunning } from './daemon/ensureDaemonRunning'
 import { handleCodexCommand } from './commands/codexCommand'
+import { handleAccountsCommand } from '@/commands/accountsCommand'
 import { handleEventCommand } from './commands/eventGitHook'
 import { runFleetCommand } from './fleet/fleetStatus'
 
@@ -104,6 +105,18 @@ Conversation history is preserved on the server, but in-flight tool calls are in
     // Handle connect subcommands
     try {
       await handleConnectCommand(args.slice(1));
+    } catch (error) {
+      console.error(chalk.red('Error:'), error instanceof Error ? error.message : 'Unknown error')
+      if (process.env.DEBUG) {
+        console.error(error)
+      }
+      process.exit(1)
+    }
+    return;
+  } else if (subcommand === 'accounts') {
+    // Handle accounts subcommands (E10 multi-subscription vault)
+    try {
+      await handleAccountsCommand(args.slice(1));
     } catch (error) {
       console.error(chalk.red('Error:'), error instanceof Error ? error.message : 'Unknown error')
       if (process.env.DEBUG) {

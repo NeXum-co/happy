@@ -167,4 +167,11 @@ describe('EventStore', () => {
     expect(all.find(s => s.id === 'event-good')!.allowedTools).toEqual(['Read'])
     expect(all.find(s => s.id === 'event-corrupt')!.allowedTools).toEqual([])
   })
+
+  it('round-trips dispositionTopic (pre-existing fix) en account (E10)', () => {
+    store.create(makeSubscription({ id: 'event-meta', dispositionTopic: 'deploy', account: 'work' }))
+    const loaded = store.get('event-meta')!
+    expect(loaded.dispositionTopic).toBe('deploy') // ging vóór de fix verloren → E05-gate undefined
+    expect(loaded.account).toBe('work')
+  })
 })

@@ -10,6 +10,8 @@ import { PermissionResult } from "../sdk/types";
 import { Session } from "../session";
 import { EnhancedMode, PermissionMode } from "../loop";
 import { getToolDescriptor } from "./getToolDescriptor";
+import { shouldAutoApprove } from "@/disposition/runtimeGate";
+import { loadRollup } from "@/disposition/rollup";
 
 interface PermissionResponse {
     id: string;
@@ -180,6 +182,17 @@ export class PermissionHandler {
         // Plan mode: auto-approve read-only tools (Read, Glob, Grep, etc.)
         // Dangerous tools (Bash, Edit, Write) still require approval
         if (this.permissionMode === 'plan' && !descriptor.dangerous) {
+            return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
+        }
+
+        // E05 runtime gate: an autonomous job in a high-trust disposition topic may
+        // auto-approve a NON-dangerous tool instead of escalating to Joshua. Dangerous
+        // tools (Bash/Write/Edit) and any non-high-trust / unknown topic fall through to
+        // the normal needs-you escalation below (fail-closed). The topic is carried by the
+        // spawn env contract (HAPPY_JOB_DISPOSITION_TOPIC), set by the daemon's tierEnv.
+        const dispositionTopic = process.env.HAPPY_JOB_DISPOSITION_TOPIC;
+        if (dispositionTopic && shouldAutoApprove(toolName, dispositionTopic, loadRollup())) {
+            logger.debug(`[E05 GATE] auto-approving ${toolName} (high-trust topic ${dispositionTopic})`);
             return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
         }
 

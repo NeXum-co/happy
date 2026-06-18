@@ -103,6 +103,24 @@ type MachineRpcHandlers = {
     getJob?: (id: string) => JobRecordView | null;
     /** Cancel a non-running (pending/retrying) job; returns whether it was cancelled. */
     cancelJob?: (jobId: string) => boolean;
+    /** Resolve a gate-parked job (E05): 'approve' runs it, 'reject' drives it to dead. Returns whether it was resolved. */
+    resolveGate?: (jobId: string, decision: 'approve' | 'reject') => Promise<boolean>;
+    /** Live-switch (E10, AC-4): remap a chosen set of running cloud sessions to one account. Fail-closed on the target account. */
+    accountSwitch?: (sessionIds: string[], account: string) => Promise<{ ok: boolean; remapped?: string[]; skipped?: string[]; error?: string }>;
+    /** Usage-read (E10, AC-5): per-account last-seen 5h/7d utilisation scraped from the unified-* headers. Fail-soft (unknown → null). */
+    getUsage?: () => Record<string, { fiveHourUtil: number | null; sevenDayUtil: number | null; seenAt: number | null }>;
+    /** List sessions with their live account (E10, S5). Mirrors HTTP /list — keyed by happySessionId for the migration popup. */
+    listSessions?: () => { startedBy: string; happySessionId: string; pid: number; account?: string }[];
+    /** Account-management (E10, S5, D-E10-17) over the encrypted vault. list-accounts never leaks a token. */
+    listAccounts?: () => Promise<{ name: string; isDefault: boolean; addedAt: number }[]>;
+    /** Add an account from a machine-side `claude setup-token` paste; token encrypted into the vault, never logged. */
+    addAccount?: (name: string, token: string, isDefault?: boolean) => Promise<void>;
+    setDefaultAccount?: (name: string) => Promise<void>;
+    removeAccount?: (name: string) => Promise<void>;
+    /** Burn-policy (E10, S6, AC-8): read the configurable burn-order + threshold. */
+    getBurnPolicy?: () => Promise<{ enabled: boolean; order: string[]; thresholdPct: number }>;
+    /** Burn-policy (E10, S6): persist the burn-order + threshold (validated). */
+    setBurnPolicy?: (config: { enabled: boolean; order: string[]; thresholdPct: number }) => Promise<void>;
     /** Create a durable cron schedule from submit-cron params; returns its id. */
     submitCron?: (params: SubmitCronParams) => string;
     /** List all cron schedules as CronScheduleView projections. */
@@ -129,6 +147,8 @@ export interface SubmitJobParams {
     maxTurns?: number;
     timeoutMs?: number;
     allowedTools?: string[];
+    dispositionTopic?: string;
+    account?: string;
 }
 
 export class ApiMachineClient {
@@ -165,6 +185,16 @@ export class ApiMachineClient {
         listJobs,
         getJob,
         cancelJob,
+        resolveGate,
+        accountSwitch,
+        getUsage,
+        listSessions,
+        listAccounts,
+        addAccount,
+        setDefaultAccount,
+        removeAccount,
+        getBurnPolicy,
+        setBurnPolicy,
         submitCron,
         listCrons,
         deleteCron,
@@ -179,14 +209,14 @@ export class ApiMachineClient {
         // pending job; the daemon scheduler claims and runs it on its next tick.
         if (submitJob) {
             this.rpcHandlerManager.registerHandler('submit-job', async (params: any) => {
-                const { directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools } = params || {};
+                const { directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account } = params || {};
                 if (typeof directory !== 'string' || directory.length === 0) {
                     throw new Error('directory is required');
                 }
                 if (typeof prompt !== 'string' || prompt.length === 0) {
                     throw new Error('prompt is required');
                 }
-                const jobId = submitJob({ directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools });
+                const jobId = submitJob({ directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account });
                 logger.debug(`[API MACHINE] Submitted job ${jobId}`);
                 return { jobId };
             });
@@ -238,6 +268,114 @@ export class ApiMachineClient {
             });
         }
 
+        // Register account-switch handler (E10, AC-4). Live-remaps a chosen set of
+        // running cloud sessions to one account via the authProxy (no respawn).
+        // Fail-closed on the target account. Mirrors the HTTP /account-switch endpoint.
+        if (accountSwitch) {
+            this.rpcHandlerManager.registerHandler('account-switch', async (params: any) => {
+                const { sessionIds, account } = params || {};
+                if (!Array.isArray(sessionIds) || sessionIds.some((s: unknown) => typeof s !== 'string'))
+                    throw new Error('sessionIds must be string[]');
+                if (typeof account !== 'string' || account.length === 0) throw new Error('account is required');
+                const result = await accountSwitch(sessionIds, account);
+                logger.debug(`[API MACHINE] Account switch → ${account}: ok=${result.ok}`);
+                return result;
+            });
+        }
+
+        // Register get-usage handler (E10, AC-5). Returns the per-account last-seen
+        // 5h/7d utilisation the proxy scraped from the unified-* headers. Fail-soft
+        // (unknown → null). Mirrors the HTTP /usage endpoint (BUG-UAT-1: both surfaces).
+        if (getUsage) {
+            this.rpcHandlerManager.registerHandler('get-usage', async () => {
+                return { usage: getUsage() };
+            });
+        }
+
+        // Register list handler (E10, S5). Mirrors HTTP /list: sessions with their
+        // live account, keyed by happySessionId, so the app can group the migration
+        // popup per account. The daemon's TrackedSession is the fresh source (remap
+        // can change it) — not server-synced metadata.
+        if (listSessions) {
+            this.rpcHandlerManager.registerHandler('list', async () => {
+                return { children: listSessions() };
+            });
+        }
+
+        // Register account-management handlers (E10, S5, D-E10-17) over the encrypted
+        // vault. Mirror the HTTP endpoints (BUG-UAT-1). list-accounts never leaks a
+        // token; add-account takes a secret token (machine-side `claude setup-token`
+        // paste) that is encrypted into the vault and NEVER logged (security.md).
+        if (listAccounts) {
+            this.rpcHandlerManager.registerHandler('list-accounts', async () => {
+                return { accounts: await listAccounts() };
+            });
+        }
+        if (addAccount) {
+            this.rpcHandlerManager.registerHandler('add-account', async (params: any) => {
+                const { name, token, isDefault } = params || {};
+                if (typeof name !== 'string' || name.length === 0) throw new Error('name is required');
+                if (typeof token !== 'string' || token.length === 0) throw new Error('token is required');
+                await addAccount(name, token, isDefault === true);
+                logger.debug(`[API MACHINE] Add account: ${name} (default=${isDefault === true})`); // geen token
+                return { ok: true };
+            });
+        }
+        if (setDefaultAccount) {
+            this.rpcHandlerManager.registerHandler('set-default-account', async (params: any) => {
+                const { name } = params || {};
+                if (typeof name !== 'string' || name.length === 0) throw new Error('name is required');
+                await setDefaultAccount(name);
+                return { ok: true };
+            });
+        }
+        if (removeAccount) {
+            this.rpcHandlerManager.registerHandler('remove-account', async (params: any) => {
+                const { name } = params || {};
+                if (typeof name !== 'string' || name.length === 0) throw new Error('name is required');
+                await removeAccount(name);
+                return { ok: true };
+            });
+        }
+
+        // Register burn-policy handlers (E10, S6, AC-8). Mirror the HTTP endpoints
+        // (BUG-UAT-1). set-burn-policy validates the shape (enabled bool, order array
+        // of non-empty strings, thresholdPct finite in [0,1]) before persisting.
+        if (getBurnPolicy) {
+            this.rpcHandlerManager.registerHandler('get-burn-policy', async () => {
+                return { policy: await getBurnPolicy() };
+            });
+        }
+        if (setBurnPolicy) {
+            this.rpcHandlerManager.registerHandler('set-burn-policy', async (params: any) => {
+                const { enabled, order, thresholdPct } = params || {};
+                if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean');
+                if (!Array.isArray(order) || order.some(n => typeof n !== 'string' || n.length === 0)) {
+                    throw new Error('order must be an array of non-empty strings');
+                }
+                if (typeof thresholdPct !== 'number' || !Number.isFinite(thresholdPct) || thresholdPct < 0 || thresholdPct > 1) {
+                    throw new Error('thresholdPct must be a number in [0,1]');
+                }
+                await setBurnPolicy({ enabled, order, thresholdPct });
+                return { ok: true };
+            });
+        }
+
+        // Register resolve-gate handler (autonomous jobs, E05). Resolves a job the
+        // pre-spawn confidence gate parked in 'needs-attention': 'approve' runs it
+        // (honouring a proceed-supervised downgrade), 'reject' drives it to dead.
+        // Mirrors the HTTP /resolve-gate endpoint (BUG-UAT-1: both surfaces).
+        if (resolveGate) {
+            this.rpcHandlerManager.registerHandler('resolve-gate', async (params: any) => {
+                const { jobId, decision } = params || {};
+                if (typeof jobId !== 'string' || jobId.length === 0) throw new Error('jobId is required');
+                if (decision !== 'approve' && decision !== 'reject') throw new Error("decision must be 'approve' or 'reject'");
+                const resolved = await resolveGate(jobId, decision);
+                logger.debug(`[API MACHINE] Resolve gate ${jobId} decision=${decision}: ${resolved}`);
+                return { resolved };
+            });
+        }
+
         // Register submit-cron handler (cron schedules, E04). Validation
         // (cronExpr/directory/prompt) lives solely in the submitCron closure
         // (daemon/run.ts) — the single source of truth (QUAL-2). The closure
@@ -245,8 +383,8 @@ export class ApiMachineClient {
         // an { error } RPC response, so no duplicate checks are needed here.
         if (submitCron) {
             this.rpcHandlerManager.registerHandler('submit-cron', async (params: any) => {
-                const { cronExpr, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools } = params || {};
-                const cronId = submitCron({ cronExpr, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools });
+                const { cronExpr, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account } = params || {};
+                const cronId = submitCron({ cronExpr, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account });
                 logger.debug(`[API MACHINE] Submitted cron ${cronId}`);
                 return { cronId };
             });
@@ -279,8 +417,8 @@ export class ApiMachineClient {
         // wrapped into an { error } RPC response, so no duplicate checks here.
         if (submitEventSubscription) {
             this.rpcHandlerManager.registerHandler('submit-event-subscription', async (params: any) => {
-                const { eventType, matchKey, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools } = params || {};
-                const subscriptionId = submitEventSubscription({ eventType, matchKey, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools });
+                const { eventType, matchKey, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account } = params || {};
+                const subscriptionId = submitEventSubscription({ eventType, matchKey, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account });
                 logger.debug(`[API MACHINE] Submitted event subscription ${subscriptionId}`);
                 return { subscriptionId };
             });
@@ -323,14 +461,14 @@ export class ApiMachineClient {
 
         // Register spawn session handler
         this.rpcHandlerManager.registerHandler('spawn-happy-session', async (params: any) => {
-            const { directory, profile, sessionName, sessionId, machineId, approvedNewDirectoryCreation, agent, environmentVariables, token, resumeClaudeSessionId, parentSessionId, forkedFromMessageId } = params || {};
+            const { directory, profile, sessionName, sessionId, machineId, approvedNewDirectoryCreation, agent, environmentVariables, token, resumeClaudeSessionId, parentSessionId, forkedFromMessageId, account } = params || {};
             logger.debug(`[API MACHINE] Spawning session with params: ${JSON.stringify(params)}`);
 
             if (!directory && !profile) {
                 throw new Error('Directory is required');
             }
 
-            const result = await spawnSession({ directory, profile, sessionName, sessionId, machineId, approvedNewDirectoryCreation, agent, environmentVariables, token, resumeClaudeSessionId, parentSessionId, forkedFromMessageId });
+            const result = await spawnSession({ directory, profile, sessionName, sessionId, machineId, approvedNewDirectoryCreation, agent, environmentVariables, token, resumeClaudeSessionId, parentSessionId, forkedFromMessageId, account });
 
             switch (result.type) {
                 case 'success':
