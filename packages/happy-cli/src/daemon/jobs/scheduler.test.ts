@@ -538,6 +538,9 @@ describe('JobScheduler pre-spawn gate (E05)', () => {
     await scheduler.tick()
 
     expect(calls[0].environmentVariables?.HAPPY_JOB_DISPOSITION_TOPIC).toBe('arch/trust')
+    // E05-sweep S3: the daemon-resolved bucket rides along so the runtime gate
+    // honours this verdict instead of re-reading a possibly-changed rollup.
+    expect(calls[0].environmentVariables?.HAPPY_JOB_GATE_BUCKET).toBe('high-trust')
   })
 
   it('resolveGate approve: a parked job runs and gateResolved is set', async () => {

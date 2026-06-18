@@ -10,7 +10,7 @@
  * through to the existing needs-you escalation.
  */
 import { evaluate } from './gate';
-import type { DispositionRollup } from './types';
+import type { DispositionBucket, DispositionRollup } from './types';
 
 /**
  * Tools the runtime gate may auto-approve under a high-trust topic. Deliberately
@@ -28,7 +28,13 @@ const AUTO_APPROVE_TOOLS = new Set<string>([
  *          topic, or missing rollup returns `false` → the caller forwards the
  *          escalation to Joshua (fail-closed, D-E05-5/8).
  */
-export function shouldAutoApprove(toolName: string, topic: string | null | undefined, rollup: DispositionRollup | null): boolean {
+export function shouldAutoApprove(toolName: string, topic: string | null | undefined, rollup: DispositionRollup | null, bucket?: DispositionBucket): boolean {
   if (!AUTO_APPROVE_TOOLS.has(toolName)) return false;
-  return evaluate(topic, rollup).bucket === 'high-trust';
+  // Prefer the daemon-resolved bucket (carried via the HAPPY_JOB_GATE_BUCKET env
+  // contract) so a rollup edited mid-run cannot flip the runtime verdict away from
+  // the pre-spawn decision (E05-sweep S3). Fall back to re-evaluating the rollup
+  // only when no bucket is carried (interactive / legacy sessions). An unknown
+  // bucket string fails closed (only an exact 'high-trust' auto-approves).
+  const effectiveBucket = bucket ?? evaluate(topic, rollup).bucket;
+  return effectiveBucket === 'high-trust';
 }

@@ -12,6 +12,7 @@ import { EnhancedMode, PermissionMode } from "../loop";
 import { getToolDescriptor } from "./getToolDescriptor";
 import { shouldAutoApprove } from "@/disposition/runtimeGate";
 import { loadRollup } from "@/disposition/rollup";
+import type { DispositionBucket } from "@/disposition/types";
 
 interface PermissionResponse {
     id: string;
@@ -191,7 +192,12 @@ export class PermissionHandler {
         // the normal needs-you escalation below (fail-closed). The topic is carried by the
         // spawn env contract (HAPPY_JOB_DISPOSITION_TOPIC), set by the daemon's tierEnv.
         const dispositionTopic = process.env.HAPPY_JOB_DISPOSITION_TOPIC;
-        if (dispositionTopic && shouldAutoApprove(toolName, dispositionTopic, loadRollup())) {
+        // Prefer the daemon-resolved bucket from the env contract (E05-sweep S3) so a
+        // rollup edited mid-run can't flip this verdict away from the pre-spawn
+        // decision; only re-read the rollup when the bucket isn't carried (interactive
+        // / legacy sessions). An unknown env value fails closed in shouldAutoApprove.
+        const gateBucket = process.env.HAPPY_JOB_GATE_BUCKET as DispositionBucket | undefined;
+        if (dispositionTopic && shouldAutoApprove(toolName, dispositionTopic, gateBucket ? null : loadRollup(), gateBucket)) {
             logger.debug(`[E05 GATE] auto-approving ${toolName} (high-trust topic ${dispositionTopic})`);
             return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
         }

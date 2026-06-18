@@ -38,4 +38,26 @@ describe('shouldAutoApprove', () => {
     expect(shouldAutoApprove('Read', 'security/x', null)).toBe(false);
     expect(shouldAutoApprove('Read', 'marketing/x', rollup)).toBe(false);
   });
+
+  describe('E05-sweep S3 — daemon-resolved bucket override (snapshot consistency)', () => {
+    it('honours the carried bucket, ignoring the rollup (a mid-run rollup edit cannot flip it)', () => {
+      // bucket='high-trust' carried in env: auto-approve a safe-list tool even if
+      // the rollup (here null, simulating a since-deleted/changed file) would hold.
+      expect(shouldAutoApprove('Read', 'security/x', null, 'high-trust')).toBe(true);
+      // bucket='modify-prone' carried: never auto-approve, even if the rollup now
+      // says high-trust for this topic.
+      expect(shouldAutoApprove('Read', 'security/x', rollup, 'modify-prone')).toBe(false);
+    });
+    it('still enforces the safe-list floor regardless of the carried bucket', () => {
+      expect(shouldAutoApprove('Bash', 'security/x', null, 'high-trust')).toBe(false);
+      expect(shouldAutoApprove('Task', 'security/x', null, 'high-trust')).toBe(false);
+    });
+    it('an unknown carried bucket value fails closed', () => {
+      expect(shouldAutoApprove('Read', 'security/x', null, 'garbage' as never)).toBe(false);
+    });
+    it('falls back to the rollup when no bucket is carried (interactive/legacy)', () => {
+      expect(shouldAutoApprove('Read', 'security/x', rollup, undefined)).toBe(true);
+      expect(shouldAutoApprove('Read', 'architecture/x', rollup, undefined)).toBe(false);
+    });
+  });
 });

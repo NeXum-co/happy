@@ -24,6 +24,7 @@ import {
 } from '@/claude/utils/claudeSessionFork';
 import type { JobStatus } from '@/daemon/jobs/jobTypes';
 import type { JobRecordView } from '@/daemon/jobs/jobView';
+import type { SubmitJobParams } from '@/daemon/jobs/scheduler';
 import type { SubmitCronParams } from '@/daemon/jobs/cronFeeder';
 import type { CronScheduleView } from '@/daemon/jobs/cronTypes';
 import type { SubmitEventSubscriptionParams } from '@/daemon/jobs/eventTrigger';
@@ -137,19 +138,15 @@ type MachineRpcHandlers = {
     triggerEvent?: (params: { eventType: string; matchKey?: string; idempotencyKey?: string; payload?: unknown }) => { created: string[] };
 }
 
-/** Params accepted by the submit-job RPC / HTTP endpoint (autonomous jobs, E04). */
-export interface SubmitJobParams {
-    directory: string;
-    prompt: string;
-    tier?: 'trusted' | 'supervised';
-    preset?: string;
-    maxBudgetUsd?: number;
-    maxTurns?: number;
-    timeoutMs?: number;
-    allowedTools?: string[];
-    dispositionTopic?: string;
-    account?: string;
-}
+/**
+ * Params accepted by the submit-job RPC / HTTP endpoint (autonomous jobs, E04).
+ * Single source of truth lives with the builder (`@/daemon/jobs/scheduler`,
+ * imported at the top) so the surface contract and the builder contract cannot
+ * drift (E05-sweep S1): the `untrustedInput` containment flag was silently
+ * dropped while two divergent `SubmitJobParams` definitions existed. Re-exported
+ * here because `run.ts` and others import it from `@/api/apiMachine`.
+ */
+export type { SubmitJobParams };
 
 export class ApiMachineClient {
     private socket!: Socket<ServerToDaemonEvents, DaemonToServerEvents>;
@@ -209,14 +206,14 @@ export class ApiMachineClient {
         // pending job; the daemon scheduler claims and runs it on its next tick.
         if (submitJob) {
             this.rpcHandlerManager.registerHandler('submit-job', async (params: any) => {
-                const { directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account } = params || {};
+                const { directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, untrustedInput, account } = params || {};
                 if (typeof directory !== 'string' || directory.length === 0) {
                     throw new Error('directory is required');
                 }
                 if (typeof prompt !== 'string' || prompt.length === 0) {
                     throw new Error('prompt is required');
                 }
-                const jobId = submitJob({ directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account });
+                const jobId = submitJob({ directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, untrustedInput, account });
                 logger.debug(`[API MACHINE] Submitted job ${jobId}`);
                 return { jobId };
             });
@@ -383,8 +380,8 @@ export class ApiMachineClient {
         // an { error } RPC response, so no duplicate checks are needed here.
         if (submitCron) {
             this.rpcHandlerManager.registerHandler('submit-cron', async (params: any) => {
-                const { cronExpr, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account } = params || {};
-                const cronId = submitCron({ cronExpr, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account });
+                const { cronExpr, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, untrustedInput, account } = params || {};
+                const cronId = submitCron({ cronExpr, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, untrustedInput, account });
                 logger.debug(`[API MACHINE] Submitted cron ${cronId}`);
                 return { cronId };
             });
@@ -417,8 +414,8 @@ export class ApiMachineClient {
         // wrapped into an { error } RPC response, so no duplicate checks here.
         if (submitEventSubscription) {
             this.rpcHandlerManager.registerHandler('submit-event-subscription', async (params: any) => {
-                const { eventType, matchKey, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account } = params || {};
-                const subscriptionId = submitEventSubscription({ eventType, matchKey, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, account });
+                const { eventType, matchKey, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, untrustedInput, account } = params || {};
+                const subscriptionId = submitEventSubscription({ eventType, matchKey, directory, prompt, tier, preset, maxBudgetUsd, maxTurns, timeoutMs, allowedTools, dispositionTopic, untrustedInput, account });
                 logger.debug(`[API MACHINE] Submitted event subscription ${subscriptionId}`);
                 return { subscriptionId };
             });

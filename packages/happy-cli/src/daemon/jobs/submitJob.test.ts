@@ -46,4 +46,18 @@ describe('buildJobFromSubmit', () => {
     expect(job.timeoutAt).toBe(15_000)
     expect(JSON.parse(job.triggerMetadata)).toEqual({ allowedTools: ['Read', 'Edit'] })
   })
+
+  it('propagates untrustedInput and dispositionTopic (E05-sweep S1 — the containment flag must survive submit)', () => {
+    const flagged = buildJobFromSubmit({
+      directory: '/work', prompt: 'go', tier: 'trusted',
+      untrustedInput: true, dispositionTopic: 'architecture/api-design',
+    }, 5000, 'id-3')
+    expect(flagged.untrustedInput).toBe(true)
+    expect(flagged.dispositionTopic).toBe('architecture/api-design')
+
+    // Absent flag stays undefined (not false/null) so containmentBlock only
+    // degrades when explicitly marked untrusted.
+    const plain = buildJobFromSubmit({ directory: '/work', prompt: 'go' }, 5000, 'id-4')
+    expect(plain.untrustedInput).toBeUndefined()
+  })
 })

@@ -162,6 +162,9 @@ export class JobScheduler {
     // E05: the runtime gate in the keyed session process reads this topic to make
     // its own canUseTool decision (D-E05-7). Slice 3 consumes this env name.
     if (job.dispositionTopic) env.HAPPY_JOB_DISPOSITION_TOPIC = job.dispositionTopic
+    // E05-sweep S3: carry the daemon-resolved bucket so the runtime gate honours
+    // the pre-spawn verdict rather than re-reading a possibly-changed rollup.
+    if (job.gateBucket) env.HAPPY_JOB_GATE_BUCKET = job.gateBucket
     Object.assign(env, LOCAL_PRESET_ENV[job.preset] ?? {})
     return env
   }
@@ -236,6 +239,12 @@ export class JobScheduler {
     if (!job.gateResolved) {
       const verdict = evaluate(job.dispositionTopic, this.loadRollup())
       this.store.patch(job.id, { gateAction: verdict.action, gateBucket: verdict.bucket, gateReason: verdict.reason })
+      // Mirror the persisted verdict onto the in-memory record so tierEnv (same
+      // tick, via runJob) can carry gateBucket into HAPPY_JOB_GATE_BUCKET — the
+      // runtime gate then honours this verdict instead of re-reading the rollup
+      // (E05-sweep S3). store.patch only writes the DB; it does not mutate `job`.
+      job.gateAction = verdict.action
+      job.gateBucket = verdict.bucket
       // escalate/hold → park in needs-attention (the AC-3 containment pattern),
       // never spawn. Joshua resolves via resolveGate. Fail-closed (D-E05-5).
       if (verdict.action === 'hold' || verdict.action === 'escalate') {
@@ -333,7 +342,12 @@ export class JobScheduler {
       // as parked (ARCH-003); gateAction/gateBucket stay as historical audit and
       // gateResolved marks it done.
       this.store.transition(jobId, 'running', { gateResolved: true, exitReason: undefined })
-      await this.runJob(job, effectiveTier)
+      // Re-read the persisted record so runJob's AC-3 containment evaluates the
+      // stored untrustedInput/tier rather than the pre-approve in-memory snapshot
+      // taken at the top of this method (E05-sweep S2). get() returns the
+      // just-transitioned running record.
+      const fresh = this.store.get(jobId) ?? job
+      await this.runJob(fresh, effectiveTier)
     } else {
       this.store.transition(jobId, 'failed', { exitReason: 'gate-rejected' })
       this.store.transition(jobId, 'dead', { finishedAt: this.now() })
