@@ -101,6 +101,13 @@ export async function startTestDaemon(): Promise<{ machineId: string }> {
         throw new Error(`testDaemon: vault seed failed: ${seed.stderr || seed.stdout}`);
     }
 
+    // Seed the jobStore with deterministic E04/E05 records (runs/crons/event-subscriptions screens).
+    // No 'pending' jobs ⇒ the scheduler never claims/spawns them; the cron uses a far-future expr.
+    const seedJobs = spawnSync(TSX, ['scripts/seedJobs.ts'], { cwd: CLI_DIR, env, encoding: 'utf8' });
+    if (seedJobs.status !== 0) {
+        throw new Error(`testDaemon: job seed failed: ${seedJobs.stderr || seedJobs.stdout}`);
+    }
+
     // Start the daemon detached (own process group) so teardown can kill the whole tsx tree.
     daemon = spawn(TSX, ['src/index.ts', 'daemon', 'start-sync'], {
         cwd: CLI_DIR, env, detached: true, stdio: 'ignore',
