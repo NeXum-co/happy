@@ -14,9 +14,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { JobStore } from './jobStore'
 import { Semaphore } from './semaphore'
-import { JobScheduler } from './scheduler'
+import {
+  JobScheduler,
+  buildJobFromSubmit,
+  DEFAULT_MAX_TURNS,
+  DEFAULT_MAX_BUDGET_USD,
+  DEFAULT_TIMEOUT_MS,
+} from './scheduler'
+import type { SubmitJobParams, GitContainment } from './scheduler'
 import type { JobRecord } from './jobTypes'
 import type { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers'
+
+/** A fake git-containment probe (ignores the directory, returns fixed facts). */
+const fakeContainment = (facts: GitContainment): ((dir: string) => GitContainment) => () => facts
 
 function makeJob(overrides: Partial<JobRecord> = {}): JobRecord {
   return {
@@ -166,46 +176,118 @@ describe('JobScheduler', () => {
     expect(loaded.attempts).toBe(1)
   })
 
-  it('parks a trusted job without a .git directory in needs-attention, never spawning', async () => {
-    const noGit = mkdtempSync(join(tmpdir(), 'happy-nogit-'))
-    store.create(makeJob({ id: 'trust-nogit', tier: 'trusted', directory: noGit }))
-
-    let spawnCount = 0
-    const spawn = async (): Promise<SpawnSessionResult> => {
-      spawnCount++
-      return { type: 'success', sessionId: 's' }
-    }
-    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn })
-
-    await scheduler.tick()
-
-    expect(spawnCount).toBe(0)
-    const loaded = store.get('trust-nogit')!
-    expect(loaded.status).toBe('needs-attention')
-    expect(loaded.exitReason).toBe('trusted-requires-worktree')
-
-    rmSync(noGit, { recursive: true, force: true })
-  })
-
-  it('runs a trusted job inside a git worktree with bypassPermissions', async () => {
-    const worktree = mkdtempSync(join(tmpdir(), 'happy-worktree-'))
-    mkdirSync(join(worktree, '.git'))
-    store.create(makeJob({ id: 'trust-git', tier: 'trusted', directory: worktree }))
+  it('runs a trusted job in a linked worktree on a feature branch with no untrusted input (bypassPermissions)', async () => {
+    store.create(makeJob({ id: 'trust-ok', tier: 'trusted', directory: dir }))
 
     const calls: SpawnSessionOptions[] = []
     const spawn = async (opts: SpawnSessionOptions): Promise<SpawnSessionResult> => {
       calls.push(opts)
       return { type: 'success', sessionId: 'sess-trusted' }
     }
-    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn })
+    const gitContainment = fakeContainment({ isWorktree: true, branch: 'feature/x' })
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, gitContainment })
 
     await scheduler.tick()
 
     expect(calls).toHaveLength(1)
     expect(calls[0].environmentVariables?.HAPPY_JOB_PERMISSION_MODE).toBe('bypassPermissions')
-    expect(store.get('trust-git')!.status).toBe('running')
+    expect(store.get('trust-ok')!.status).toBe('running')
+  })
 
-    rmSync(worktree, { recursive: true, force: true })
+  it('parks a trusted job NOT in a linked worktree in needs-attention (trusted-requires-worktree)', async () => {
+    store.create(makeJob({ id: 'trust-noworktree', tier: 'trusted', directory: dir }))
+
+    let spawnCount = 0
+    const spawn = async (): Promise<SpawnSessionResult> => {
+      spawnCount++
+      return { type: 'success', sessionId: 's' }
+    }
+    const gitContainment = fakeContainment({ isWorktree: false, branch: 'feature/x' })
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, gitContainment })
+
+    await scheduler.tick()
+
+    expect(spawnCount).toBe(0)
+    const loaded = store.get('trust-noworktree')!
+    expect(loaded.status).toBe('needs-attention')
+    expect(loaded.exitReason).toBe('trusted-requires-worktree')
+  })
+
+  it('parks a trusted job on a protected branch (main) in needs-attention (trusted-on-protected-branch)', async () => {
+    store.create(makeJob({ id: 'trust-main', tier: 'trusted', directory: dir }))
+
+    let spawnCount = 0
+    const spawn = async (): Promise<SpawnSessionResult> => {
+      spawnCount++
+      return { type: 'success', sessionId: 's' }
+    }
+    const gitContainment = fakeContainment({ isWorktree: true, branch: 'main' })
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, gitContainment })
+
+    await scheduler.tick()
+
+    expect(spawnCount).toBe(0)
+    const loaded = store.get('trust-main')!
+    expect(loaded.status).toBe('needs-attention')
+    expect(loaded.exitReason).toBe('trusted-on-protected-branch')
+  })
+
+  it('parks a trusted job on master (also protected) in needs-attention (trusted-on-protected-branch)', async () => {
+    store.create(makeJob({ id: 'trust-master', tier: 'trusted', directory: dir }))
+
+    let spawnCount = 0
+    const spawn = async (): Promise<SpawnSessionResult> => {
+      spawnCount++
+      return { type: 'success', sessionId: 's' }
+    }
+    const gitContainment = fakeContainment({ isWorktree: true, branch: 'master' })
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, gitContainment })
+
+    await scheduler.tick()
+
+    expect(spawnCount).toBe(0)
+    expect(store.get('trust-master')!.exitReason).toBe('trusted-on-protected-branch')
+  })
+
+  it('parks a trusted job with untrustedInput in needs-attention (untrusted-requires-supervision)', async () => {
+    store.create(makeJob({ id: 'trust-untrusted', tier: 'trusted', directory: dir, untrustedInput: true }))
+
+    let spawnCount = 0
+    const spawn = async (): Promise<SpawnSessionResult> => {
+      spawnCount++
+      return { type: 'success', sessionId: 's' }
+    }
+    const gitContainment = fakeContainment({ isWorktree: true, branch: 'feature/x' })
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, gitContainment })
+
+    await scheduler.tick()
+
+    expect(spawnCount).toBe(0)
+    const loaded = store.get('trust-untrusted')!
+    expect(loaded.status).toBe('needs-attention')
+    expect(loaded.exitReason).toBe('untrusted-requires-supervision')
+  })
+
+  it('does not apply the containment gate to supervised jobs (spawns regardless of git state)', async () => {
+    store.create(makeJob({ id: 'sup-main', tier: 'supervised', directory: dir }))
+
+    let containmentCalls = 0
+    const calls: SpawnSessionOptions[] = []
+    const spawn = async (opts: SpawnSessionOptions): Promise<SpawnSessionResult> => {
+      calls.push(opts)
+      return { type: 'success', sessionId: 'sess-sup' }
+    }
+    const gitContainment = (): GitContainment => {
+      containmentCalls++
+      return { isWorktree: false, branch: 'main' }
+    }
+    const scheduler = new JobScheduler({ store, localSemaphore: new Semaphore(1), spawn, gitContainment })
+
+    await scheduler.tick()
+
+    expect(containmentCalls).toBe(0)
+    expect(calls).toHaveLength(1)
+    expect(store.get('sup-main')!.status).toBe('running')
   })
 
   it('onSessionExit success drives a running job to succeeded', () => {
@@ -257,21 +339,26 @@ describe('JobScheduler', () => {
     expect(store.get('done')!.status).toBe('succeeded')
   })
 
-  it('enforceTimeouts kills and kills a past-timeout running job (tick)', async () => {
+  it('enforceTimeouts kills via killOnly and drives a past-timeout job running→failed→dead (T-D)', async () => {
     store.create(makeJob({ id: 'late', status: 'running', sessionId: 'sess-late', timeoutAt: 1000, claimedAt: 500 }))
 
-    const killed: string[] = []
+    const killedOnly: string[] = []
+    const killedSession: string[] = []
     const scheduler = new JobScheduler({
       store,
       localSemaphore: new Semaphore(1),
       spawn: async () => ({ type: 'success', sessionId: 's' }),
-      killSession: (sid) => { killed.push(sid) },
+      // killOnly signals the pid WITHOUT any state transition (the prod wiring).
+      killOnly: (sid) => { killedOnly.push(sid) },
+      // killSession (operator-stop path) must NOT be used on the timeout path.
+      killSession: (sid) => { killedSession.push(sid) },
       now: () => 9000,
     })
 
     await scheduler.tick()
 
-    expect(killed).toEqual(['sess-late'])
+    expect(killedOnly).toEqual(['sess-late'])
+    expect(killedSession).toEqual([])
     const loaded = store.get('late')!
     expect(loaded.status).toBe('dead')
     expect(loaded.exitReason).toBe('wall-clock-timeout')
@@ -281,18 +368,18 @@ describe('JobScheduler', () => {
   it('enforceTimeouts leaves a future-timeout running job untouched', async () => {
     store.create(makeJob({ id: 'early', status: 'running', sessionId: 'sess-early', timeoutAt: 20000, claimedAt: 500 }))
 
-    const killed: string[] = []
+    const killedOnly: string[] = []
     const scheduler = new JobScheduler({
       store,
       localSemaphore: new Semaphore(1),
       spawn: async () => ({ type: 'success', sessionId: 's' }),
-      killSession: (sid) => { killed.push(sid) },
+      killOnly: (sid) => { killedOnly.push(sid) },
       now: () => 9000,
     })
 
     await scheduler.tick()
 
-    expect(killed).toEqual([])
+    expect(killedOnly).toEqual([])
     expect(store.get('early')!.status).toBe('running')
   })
 
@@ -361,5 +448,91 @@ describe('JobScheduler.tierEnv local routing', () => {
     expect(env.HAPPY_JOB_MODEL).toBeUndefined()
     expect(env.HAPPY_JOB_PERMISSION_MODE).toBe('bypassPermissions')
     expect(env.HAPPY_JOB_REPORT_COST).toBe('1') // cloud jobs report their real cost
+  })
+
+  it('sets HAPPY_JOB_MAX_BUDGET_USD / HAPPY_JOB_MAX_TURNS env for a job carrying caps (T-G)', () => {
+    const scheduler = new JobScheduler({ store: {} as JobStore, localSemaphore: new Semaphore(1), spawn: noopSpawn })
+    const env = scheduler.tierEnv(makeJob({ tier: 'supervised', maxBudgetUsd: 5, maxTurns: 50 }))
+    expect(env.HAPPY_JOB_MAX_BUDGET_USD).toBe('5')
+    expect(env.HAPPY_JOB_MAX_TURNS).toBe('50')
+  })
+
+  it('sets HAPPY_JOB_ALLOWED_TOOLS for a supervised job with allowedTools metadata (T-G)', () => {
+    const scheduler = new JobScheduler({ store: {} as JobStore, localSemaphore: new Semaphore(1), spawn: noopSpawn })
+    const env = scheduler.tierEnv(makeJob({
+      tier: 'supervised',
+      triggerMetadata: JSON.stringify({ allowedTools: ['Read', 'Grep'] }),
+    }))
+    expect(env.HAPPY_JOB_ALLOWED_TOOLS).toBe('Read,Grep')
+  })
+})
+
+describe('buildJobFromSubmit default circuit-breakers (F1)', () => {
+  it('applies concrete default ceilings when the caller passes no caps (T-E)', () => {
+    const params: SubmitJobParams = { directory: '/tmp/work', prompt: 'do it' }
+    const now = 1000
+
+    const job = buildJobFromSubmit(params, now, 'job-1')
+
+    expect(job.maxTurns).toBe(DEFAULT_MAX_TURNS)
+    expect(job.maxBudgetUsd).toBe(DEFAULT_MAX_BUDGET_USD)
+    expect(job.timeoutAt).toBe(now + DEFAULT_TIMEOUT_MS)
+  })
+
+  it('lets caller-provided caps override the defaults', () => {
+    const params: SubmitJobParams = {
+      directory: '/tmp/work',
+      prompt: 'do it',
+      maxTurns: 10,
+      maxBudgetUsd: 1,
+      timeoutMs: 60_000,
+    }
+    const now = 1000
+
+    const job = buildJobFromSubmit(params, now, 'job-1')
+
+    expect(job.maxTurns).toBe(10)
+    expect(job.maxBudgetUsd).toBe(1)
+    expect(job.timeoutAt).toBe(now + 60_000)
+  })
+
+  it('exposes conservative default constants', () => {
+    expect(DEFAULT_MAX_TURNS).toBe(50)
+    expect(DEFAULT_MAX_BUDGET_USD).toBe(5)
+    expect(DEFAULT_TIMEOUT_MS).toBe(30 * 60 * 1000)
+  })
+
+  it('copies untrustedInput only when defined', () => {
+    const withFlag = buildJobFromSubmit({ directory: '/tmp/work', prompt: 'p', untrustedInput: true }, 1000, 'j1')
+    expect(withFlag.untrustedInput).toBe(true)
+
+    const without = buildJobFromSubmit({ directory: '/tmp/work', prompt: 'p' }, 1000, 'j2')
+    expect(without.untrustedInput).toBeUndefined()
+  })
+})
+
+describe('JobScheduler semaphore release on spawn-throw (T-H)', () => {
+  it('releases the local permit on the spawn-throw path so the lane is not deadlocked', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'happy-sem-throw-'))
+    const store = new JobStore(join(dir, 'jobs.db'))
+    store.init()
+    store.create(makeJob({ id: 'throw', directory: dir }))
+
+    const semaphore = new Semaphore(1)
+    const spawn = async (): Promise<SpawnSessionResult> => {
+      throw { status: 500, message: 'spawn blew up' }
+    }
+    const scheduler = new JobScheduler({ store, localSemaphore: semaphore, spawn })
+
+    await scheduler.tick()
+
+    // After a spawn that throws, the single local permit must be back.
+    expect(semaphore.available).toBe(1)
+    // And it must actually be re-acquirable (no leaked permit count).
+    const release = await semaphore.acquire()
+    expect(semaphore.available).toBe(0)
+    release()
+
+    rmSync(dir, { recursive: true, force: true })
   })
 })

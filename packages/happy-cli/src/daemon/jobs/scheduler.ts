@@ -8,16 +8,17 @@
  * gated through a semaphore so only N run concurrently on this machine; cloud
  * jobs are not gated.
  *
- * Containment guard (AC-3): a 'trusted' (bypassPermissions) job is only allowed
- * to run when its directory is a git worktree (`.git` present). Otherwise it is
- * parked in 'needs-attention' and never spawned.
+ * Containment gate (D-E04-2 / AC-3): a 'trusted' (bypassPermissions) job is only
+ * allowed to run trusted when its directory is a LINKED git worktree, its branch
+ * is not main/master, and it is not flagged as processing untrusted input.
+ * Otherwise it is parked in 'needs-attention' (with a specific exitReason) and
+ * never spawned.
  *
  * `spawn` is injected as a constructor dependency so the scheduler stays
  * testable with a fake spawn over a real store/semaphore/retry stack.
  */
 
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { logger } from '@/ui/logger'
 import type { JobStore } from './jobStore'
 import type { Semaphore } from './semaphore'
@@ -26,11 +27,53 @@ import { classifyFailure, shouldRetry, backoffMs } from './retry'
 import { captureGitState } from './audit'
 import type { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers'
 
+/**
+ * Default circuit-breakers (D-E04-6). EVERY autonomous job gets a concrete
+ * budget, turn, and wall-clock ceiling at build time, so a job submitted with no
+ * caps can never run unbounded (the "27M-token infinite loop" risk). A caller
+ * value always overrides the default. The budget default is a no-op safety for
+ * local ($0) jobs and a real cap for cloud presets.
+ */
+export const DEFAULT_MAX_TURNS = 50
+export const DEFAULT_MAX_BUDGET_USD = 5
+export const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000 // 30 min wall-clock
+
+/**
+ * Git containment facts for a job's directory, used by the trusted-job gate
+ * (D-E04-2). `isWorktree` is true only for a LINKED git worktree (common-dir
+ * differs from git-dir); `branch` is the current branch or null when it cannot
+ * be resolved.
+ */
+export interface GitContainment {
+  isWorktree: boolean
+  branch: string | null
+}
+
+/**
+ * Real git-containment probe: a directory is a linked worktree when its
+ * git-common-dir resolves DIFFERENTLY from its git-dir. Any git failure (not a
+ * repo, detached, git missing) degrades to the safe `{ isWorktree: false, branch:
+ * null }`, which parks a trusted job rather than running it.
+ */
+function realGitContainment(dir: string): GitContainment {
+  try {
+    const commonDir = execFileSync('git', ['-C', dir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim()
+    const gitDir = execFileSync('git', ['-C', dir, 'rev-parse', '--git-dir'], { encoding: 'utf8' }).trim()
+    const branch = execFileSync('git', ['-C', dir, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim()
+    return { isWorktree: commonDir !== gitDir, branch: branch.length > 0 ? branch : null }
+  } catch (error) {
+    logger.debug(`[JOB SCHEDULER] gitContainment probe failed for ${dir}, treating as non-worktree:`, error)
+    return { isWorktree: false, branch: null }
+  }
+}
+
 interface SchedulerDeps {
   store: JobStore
   localSemaphore: Semaphore
   spawn: (opts: SpawnSessionOptions) => Promise<SpawnSessionResult>
   killSession?: (sessionId: string) => void
+  killOnly?: (sessionId: string) => void
+  gitContainment?: (dir: string) => GitContainment
   intervalMs?: number
   now?: () => number
   backoff?: (attempt: number) => number
@@ -64,6 +107,8 @@ export class JobScheduler {
   private readonly localSemaphore: Semaphore
   private readonly spawn: (opts: SpawnSessionOptions) => Promise<SpawnSessionResult>
   private readonly killSession?: (sessionId: string) => void
+  private readonly killOnly?: (sessionId: string) => void
+  private readonly gitContainment: (dir: string) => GitContainment
   private readonly intervalMs: number
   private readonly now: () => number
   private readonly backoff: (attempt: number) => number
@@ -75,6 +120,8 @@ export class JobScheduler {
     this.localSemaphore = deps.localSemaphore
     this.spawn = deps.spawn
     this.killSession = deps.killSession
+    this.killOnly = deps.killOnly
+    this.gitContainment = deps.gitContainment ?? realGitContainment
     this.intervalMs = deps.intervalMs ?? 1000
     this.now = deps.now ?? Date.now
     this.backoff = deps.backoff ?? (attempt => backoffMs(attempt))
@@ -132,10 +179,28 @@ export class JobScheduler {
     const job = this.store.claimNext(this.now())
     if (!job) return
 
-    // Containment guard (AC-3): trusted jobs must run inside a git worktree.
-    if (job.tier === 'trusted' && !existsSync(join(job.directory, '.git'))) {
-      this.store.transition(job.id, 'needs-attention', { exitReason: 'trusted-requires-worktree' })
-      return
+    // Containment gate (D-E04-2 / AC-3): a trusted (bypassPermissions) job may
+    // run trusted only when ALL hold — it sits in a LINKED git worktree, its
+    // branch is not the protected main/master, and it is not flagged as
+    // processing untrusted external input. Any failure parks it in
+    // needs-attention with a specific exitReason rather than running unsupervised
+    // (see jobs/CLAUDE.md: parking surfaces it to the operator, since an
+    // unattended supervised job would hang on a responder-less escalation).
+    // Supervised jobs skip this gate entirely.
+    if (job.tier === 'trusted') {
+      const containment = this.gitContainment(job.directory)
+      if (!containment.isWorktree) {
+        this.store.transition(job.id, 'needs-attention', { exitReason: 'trusted-requires-worktree' })
+        return
+      }
+      if (containment.branch === 'main' || containment.branch === 'master') {
+        this.store.transition(job.id, 'needs-attention', { exitReason: 'trusted-on-protected-branch' })
+        return
+      }
+      if (job.untrustedInput === true) {
+        this.store.transition(job.id, 'needs-attention', { exitReason: 'untrusted-requires-supervision' })
+        return
+      }
     }
 
     // Audit trail (D-E04-7): record the git HEAD before the job runs so a
@@ -212,12 +277,18 @@ export class JobScheduler {
    * Wall-clock enforcement: any running job past its timeoutAt is killed and
    * driven to dead with exitReason 'wall-clock-timeout'. Runs at the start of
    * every tick so a stuck session cannot outlive its budget.
+   *
+   * enforceTimeouts is the SOLE transition authority on the timeout path. It
+   * uses `killOnly` to signal the pid WITHOUT any state transition (unlike the
+   * operator-stop `killSession`, which synchronously calls onSessionExit and
+   * would otherwise race this method's running -> failed -> dead transitions and
+   * overwrite the exitReason). `killSession` is intentionally NOT used here.
    */
   private enforceTimeouts(): void {
     const now = this.now()
     for (const job of this.store.list({ status: 'running' })) {
       if (job.timeoutAt === undefined || job.timeoutAt >= now || job.sessionId === undefined) continue
-      this.killSession?.(job.sessionId)
+      this.killOnly?.(job.sessionId)
       this.store.transition(job.id, 'failed', { exitReason: 'wall-clock-timeout' })
       this.store.transition(job.id, 'dead', { finishedAt: this.now() })
     }
@@ -267,11 +338,12 @@ export class JobScheduler {
   }
 }
 
-interface SubmitJobParams {
+export interface SubmitJobParams {
   directory: string
   prompt: string
   tier?: JobRecord['tier']
   preset?: string
+  untrustedInput?: boolean
   maxBudgetUsd?: number
   maxTurns?: number
   timeoutMs?: number
@@ -280,7 +352,9 @@ interface SubmitJobParams {
 
 /**
  * Pure mapping from submit-job params to a fresh pending JobRecord.
- * Defaults: supervised tier, 'local-qwen' preset, 5 max attempts.
+ * Defaults: supervised tier, 'local-qwen' preset, 5 max attempts, and the
+ * default circuit-breakers (D-E04-6) — every job gets a concrete budget, turn,
+ * and wall-clock ceiling; a caller value overrides the default.
  */
 export function buildJobFromSubmit(params: SubmitJobParams, now: number, id: string): JobRecord {
   const job: JobRecord = {
@@ -294,10 +368,11 @@ export function buildJobFromSubmit(params: SubmitJobParams, now: number, id: str
     status: 'pending',
     attempts: 0,
     maxAttempts: 5,
+    timeoutAt: now + (params.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+    maxBudgetUsd: params.maxBudgetUsd ?? DEFAULT_MAX_BUDGET_USD,
+    maxTurns: params.maxTurns ?? DEFAULT_MAX_TURNS,
     createdAt: now,
   }
-  if (params.timeoutMs !== undefined) job.timeoutAt = now + params.timeoutMs
-  if (params.maxBudgetUsd !== undefined) job.maxBudgetUsd = params.maxBudgetUsd
-  if (params.maxTurns !== undefined) job.maxTurns = params.maxTurns
+  if (params.untrustedInput !== undefined) job.untrustedInput = params.untrustedInput
   return job
 }

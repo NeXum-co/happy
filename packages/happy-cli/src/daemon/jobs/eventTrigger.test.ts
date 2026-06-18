@@ -14,6 +14,7 @@ import {
   buildEventSubscriptionFromSubmit,
 } from './eventTrigger'
 import type { SubmitEventSubscriptionParams } from './eventTrigger'
+import { DEFAULT_MAX_TURNS, DEFAULT_MAX_BUDGET_USD, DEFAULT_TIMEOUT_MS } from './scheduler'
 import type { EventSubscription } from './eventTypes'
 
 const T0 = Date.UTC(2026, 0, 1, 0, 0, 0)
@@ -120,15 +121,23 @@ describe('buildEventJob', () => {
     expect(JSON.parse(job.triggerMetadata).allowedTools).toEqual(['Read'])
   })
 
-  it('omits optional caps and defaults allowedTools to [] when the subscription has none', () => {
+  it('applies default circuit-breaker ceilings and defaults allowedTools to [] when the subscription has none (F1)', () => {
     const sub = makeSub()
 
     const job = buildEventJob(sub, { sha: 'z' }, 'key', T0)
 
-    expect(job.maxBudgetUsd).toBeUndefined()
-    expect(job.maxTurns).toBeUndefined()
-    expect(job.timeoutAt).toBeUndefined()
+    expect(job.maxBudgetUsd).toBe(DEFAULT_MAX_BUDGET_USD)
+    expect(job.maxTurns).toBe(DEFAULT_MAX_TURNS)
+    expect(job.timeoutAt).toBe(T0 + DEFAULT_TIMEOUT_MS)
     expect(JSON.parse(job.triggerMetadata).allowedTools).toEqual([])
+  })
+
+  it('propagates untrustedInput from subscription to job only when set (F1)', () => {
+    const flagged = buildEventJob(makeSub({ untrustedInput: true }), { sha: 'z' }, 'key', T0)
+    expect(flagged.untrustedInput).toBe(true)
+
+    const unflagged = buildEventJob(makeSub(), { sha: 'z' }, 'key', T0)
+    expect(unflagged.untrustedInput).toBeUndefined()
   })
 })
 
@@ -191,5 +200,21 @@ describe('buildEventSubscriptionFromSubmit', () => {
     expect(sub.maxTurns).toBe(40)
     expect(sub.timeoutMs).toBe(600_000)
     expect(sub.allowedTools).toEqual(['Read'])
+  })
+
+  it('copies untrustedInput only when set (F1)', () => {
+    const flagged = buildEventSubscriptionFromSubmit(
+      { eventType: 'git.commit', directory: '/tmp/repo', prompt: 'p', untrustedInput: true },
+      T0,
+      'sub-1',
+    )
+    expect(flagged.untrustedInput).toBe(true)
+
+    const unflagged = buildEventSubscriptionFromSubmit(
+      { eventType: 'git.commit', directory: '/tmp/repo', prompt: 'p' },
+      T0,
+      'sub-2',
+    )
+    expect(unflagged.untrustedInput).toBeUndefined()
   })
 })

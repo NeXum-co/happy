@@ -23,6 +23,7 @@
 
 import { logger } from '@/ui/logger'
 import { occurrencesBetween } from './cronSchedule'
+import { DEFAULT_MAX_TURNS, DEFAULT_MAX_BUDGET_USD, DEFAULT_TIMEOUT_MS } from './scheduler'
 import type { CronStore } from './cronStore'
 import type { JobStore } from './jobStore'
 import type { CronSchedule } from './cronTypes'
@@ -39,8 +40,9 @@ interface CronFeederDeps {
 /**
  * Pure mapping from a schedule + occurrence to a fresh pending cron JobRecord.
  * The id is deterministic so repeated ticks dedupe through createIfAbsent.
- * Optional caps are copied only when the schedule sets them; the schedule's
- * timeoutMs becomes an absolute timeoutAt relative to `now`.
+ * The default circuit-breakers (D-E04-6) apply when the schedule sets no cap, so
+ * every cron job gets a concrete budget/turn/wall-clock ceiling; a schedule value
+ * overrides the default. `untrustedInput` is forwarded only when set.
  */
 export function buildCronJob(schedule: CronSchedule, occurrenceMs: number, now: number): JobRecord {
   const job: JobRecord = {
@@ -60,11 +62,12 @@ export function buildCronJob(schedule: CronSchedule, occurrenceMs: number, now: 
     attempts: 0,
     maxAttempts: 5,
     scheduledAt: occurrenceMs,
+    maxBudgetUsd: schedule.maxBudgetUsd ?? DEFAULT_MAX_BUDGET_USD,
+    maxTurns: schedule.maxTurns ?? DEFAULT_MAX_TURNS,
+    timeoutAt: now + (schedule.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     createdAt: now,
   }
-  if (schedule.maxBudgetUsd !== undefined) job.maxBudgetUsd = schedule.maxBudgetUsd
-  if (schedule.maxTurns !== undefined) job.maxTurns = schedule.maxTurns
-  if (schedule.timeoutMs !== undefined) job.timeoutAt = now + schedule.timeoutMs
+  if (schedule.untrustedInput !== undefined) job.untrustedInput = schedule.untrustedInput
   return job
 }
 
@@ -75,6 +78,7 @@ export interface SubmitCronParams {
   prompt: string
   tier?: 'trusted' | 'supervised'
   preset?: string
+  untrustedInput?: boolean
   maxBudgetUsd?: number
   maxTurns?: number
   timeoutMs?: number
@@ -97,6 +101,7 @@ export function buildCronFromSubmit(params: SubmitCronParams, now: number, id: s
     enabled: true,
     createdAt: now,
   }
+  if (params.untrustedInput !== undefined) schedule.untrustedInput = params.untrustedInput
   if (params.maxBudgetUsd !== undefined) schedule.maxBudgetUsd = params.maxBudgetUsd
   if (params.maxTurns !== undefined) schedule.maxTurns = params.maxTurns
   if (params.timeoutMs !== undefined) schedule.timeoutMs = params.timeoutMs

@@ -30,6 +30,8 @@ import { validateCronExpr } from './jobs/cronSchedule';
 import type { CronScheduleView } from './jobs/cronTypes';
 import { EventStore } from './jobs/eventStore';
 import { matchSubscriptions, buildEventJob, buildEventSubscriptionFromSubmit, type SubmitEventSubscriptionParams } from './jobs/eventTrigger';
+import { resolveKillTarget } from './jobs/killTarget';
+import { deriveEventIdempotencyKey } from './jobs/eventIdempotency';
 import type { EventSubscriptionView } from './jobs/eventTypes';
 import type { SubmitJobParams } from '@/api/apiMachine';
 import type { JobStatus } from './jobs/jobTypes';
@@ -867,45 +869,71 @@ export async function startDaemon(): Promise<void> {
       store: jobStore,
       localSemaphore: new Semaphore(1),
       spawn: spawnSession,
-      killSession: (sessionId: string) => { stopJob(sessionId); }
+      // Operator path (/stop-job): kill the session AND transition the job.
+      killSession: (sessionId: string) => { stopJob(sessionId); },
+      // Timeout path (enforceTimeouts): signal the pid only. The scheduler owns
+      // the running->failed->dead transition for a timed-out job, so killOnly
+      // must NOT call onSessionExit — doing so would double-drive the state
+      // machine. It performs the same SIGTERM + tracked-SIGKILL mechanics.
+      killOnly: (sessionId: string) => { signalKill(sessionId); }
     });
 
-    // Targeted kill of an autonomous job's session: SIGTERM, then SIGKILL after
-    // 5s if still alive, then mark the job needs-attention via the scheduler.
-    // Returns whether a tracked session was found (mirrors stopSession's lookup).
-    const stopJob = (sessionId: string): boolean => {
-      let targetPid: number | undefined;
-      for (const [pid, session] of pidToTrackedSession.entries()) {
-        if (session.happySessionId === sessionId ||
-          (sessionId.startsWith('PID-') && pid === parseInt(sessionId.replace('PID-', '')))) {
-          targetPid = pid;
-          break;
-        }
-      }
+    // Pending deferred-SIGKILL timers. Each entry is removed when its timer
+    // fires; all remaining ones are cleared in cleanupAndShutdown so no kill can
+    // fire during/after teardown (same class as the "broad pkill killed the real
+    // daemon" incident — a stray timer must never outlive the daemon).
+    const pendingKillTimers = new Set<NodeJS.Timeout>();
+
+    // Send SIGTERM to the session's current pid, then schedule an identity-checked
+    // SIGKILL 5s later. The escalation does NOT trust the captured pid: at fire
+    // time it RE-RESOLVES the target by sessionId against the live tracking map
+    // (resolveKillTarget) and only kills if the SAME sessionId still maps to the
+    // SAME pid — guarding against a pid reused by another process within the 5s.
+    // Returns whether a tracked session was found. No state transition here.
+    const signalKill = (sessionId: string): boolean => {
+      const targetPid = resolveKillTarget(sessionId, pidToTrackedSession);
       if (targetPid === undefined) {
-        logger.debug(`[DAEMON RUN] stopJob: session ${sessionId} not found`);
+        logger.debug(`[DAEMON RUN] signalKill: session ${sessionId} not found`);
         return false;
       }
 
       try {
         process.kill(targetPid, 'SIGTERM');
-        logger.debug(`[DAEMON RUN] stopJob: sent SIGTERM to PID ${targetPid} (session ${sessionId})`);
+        logger.debug(`[DAEMON RUN] signalKill: sent SIGTERM to PID ${targetPid} (session ${sessionId})`);
       } catch (error) {
-        logger.debug(`[DAEMON RUN] stopJob: SIGTERM failed for PID ${targetPid}:`, error);
+        logger.debug(`[DAEMON RUN] signalKill: SIGTERM failed for PID ${targetPid}:`, error);
       }
 
-      const pidToKill = targetPid;
-      setTimeout(() => {
-        if (isPidAlive(pidToKill)) {
+      const timer = setTimeout(() => {
+        pendingKillTimers.delete(timer);
+        // Re-resolve: only SIGKILL if this sessionId STILL maps to the same pid.
+        const stillPid = resolveKillTarget(sessionId, pidToTrackedSession);
+        if (stillPid === undefined) {
+          logger.debug(`[DAEMON RUN] signalKill: session ${sessionId} gone before SIGKILL; skipping`);
+          return;
+        }
+        if (isPidAlive(stillPid)) {
           try {
-            process.kill(pidToKill, 'SIGKILL');
-            logger.debug(`[DAEMON RUN] stopJob: escalated to SIGKILL for PID ${pidToKill} (session ${sessionId})`);
+            process.kill(stillPid, 'SIGKILL');
+            logger.debug(`[DAEMON RUN] signalKill: escalated to SIGKILL for PID ${stillPid} (session ${sessionId})`);
           } catch (error) {
-            logger.debug(`[DAEMON RUN] stopJob: SIGKILL failed for PID ${pidToKill}:`, error);
+            logger.debug(`[DAEMON RUN] signalKill: SIGKILL failed for PID ${stillPid}:`, error);
           }
         }
       }, 5_000);
+      pendingKillTimers.add(timer);
+      return true;
+    };
 
+    // Targeted kill of an autonomous job's session (operator /stop-job path):
+    // the kill mechanics of signalKill PLUS marking the job needs-attention via
+    // the scheduler. Returns whether a tracked session was found.
+    const stopJob = (sessionId: string): boolean => {
+      const found = signalKill(sessionId);
+      if (!found) {
+        logger.debug(`[DAEMON RUN] stopJob: session ${sessionId} not found`);
+        return false;
+      }
       jobScheduler.onSessionExit(sessionId, 'killed');
       return true;
     };
@@ -980,10 +1008,16 @@ export async function startDaemon(): Promise<void> {
     // A failure for one subscription is logged and skipped — it never aborts the rest.
     const triggerEvent = ({ eventType, matchKey, idempotencyKey, payload }: { eventType: string; matchKey?: string; idempotencyKey?: string; payload?: unknown }): { created: string[] } => {
       const subs = matchSubscriptions(eventStore.list(), eventType, matchKey);
+      // F8: an unauthenticated localhost re-delivery without an idempotencyKey
+      // would otherwise mint a random id per call and double-spawn. Derive a
+      // DETERMINISTIC key from the event identity so identical re-deliveries
+      // dedupe via createIfAbsent (id becomes `event:{subId}:{derivedKey}`). The
+      // git hook, which always sends the sha, is unaffected.
+      const effectiveKey = idempotencyKey ?? deriveEventIdempotencyKey(eventType, matchKey, payload);
       const created: string[] = [];
       for (const sub of subs) {
         try {
-          const builtJob = buildEventJob(sub, payload, idempotencyKey, Date.now(), idempotencyKey ? undefined : (subId) => 'event:' + subId + ':' + randomUUID());
+          const builtJob = buildEventJob(sub, payload, effectiveKey, Date.now());
           const inserted = jobStore.createIfAbsent(builtJob);
           created.push(builtJob.id);
           logger.debug(`[DAEMON RUN] triggerEvent: subscription ${sub.id} -> job ${builtJob.id} (inserted: ${inserted})`);
@@ -1272,6 +1306,13 @@ export async function startDaemon(): Promise<void> {
 
       // Stop the autonomous job scheduler tick loop
       jobScheduler.stop();
+
+      // Clear any pending deferred-SIGKILL timers so none fires during/after
+      // teardown (a stray timer could SIGKILL a pid the OS has since reused).
+      for (const timer of pendingKillTimers) {
+        clearTimeout(timer);
+      }
+      pendingKillTimers.clear();
 
       // Stop the cron feeder tick loop
       cronFeeder.stop();

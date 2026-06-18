@@ -5,10 +5,10 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { buildJobFromSubmit } from './scheduler'
+import { buildJobFromSubmit, DEFAULT_MAX_TURNS, DEFAULT_MAX_BUDGET_USD, DEFAULT_TIMEOUT_MS } from './scheduler'
 
 describe('buildJobFromSubmit', () => {
-  it('applies defaults for a minimal submit', () => {
+  it('applies default circuit-breakers for a minimal submit (F1 — no job runs with a null ceiling)', () => {
     const job = buildJobFromSubmit({ directory: '/work', prompt: 'go' }, 5000, 'id-1')
 
     expect(job.id).toBe('id-1')
@@ -20,9 +20,11 @@ describe('buildJobFromSubmit', () => {
     expect(job.maxAttempts).toBe(5)
     expect(job.createdAt).toBe(5000)
     expect(JSON.parse(job.triggerMetadata)).toEqual({ allowedTools: [] })
-    expect(job.timeoutAt).toBeUndefined()
-    expect(job.maxBudgetUsd).toBeUndefined()
-    expect(job.maxTurns).toBeUndefined()
+    // F1: every autonomous job gets a hard budget/turn/wall-clock ceiling even
+    // when the caller omits them (D-E04-6).
+    expect(job.maxTurns).toBe(DEFAULT_MAX_TURNS)
+    expect(job.maxBudgetUsd).toBe(DEFAULT_MAX_BUDGET_USD)
+    expect(job.timeoutAt).toBe(5000 + DEFAULT_TIMEOUT_MS)
   })
 
   it('propagates explicit fields and computes timeoutAt', () => {

@@ -17,6 +17,7 @@ import { CronStore } from './cronStore'
 import { JobStore } from './jobStore'
 import { CronFeeder, buildCronJob, buildCronFromSubmit } from './cronFeeder'
 import type { SubmitCronParams } from './cronFeeder'
+import { DEFAULT_MAX_TURNS, DEFAULT_MAX_BUDGET_USD, DEFAULT_TIMEOUT_MS } from './scheduler'
 import type { CronSchedule } from './cronTypes'
 
 const T0 = Date.UTC(2026, 0, 1, 0, 0, 0)        // 1767225600000
@@ -160,16 +161,26 @@ describe('buildCronJob', () => {
     expect(job.timeoutAt).toBe(T0_PLUS_90S + 600_000)
   })
 
-  it('omits optional caps and defaults allowedTools to [] when the schedule has none', () => {
+  it('applies default circuit-breaker ceilings and defaults allowedTools to [] when the schedule has none (F1)', () => {
     const occ = MINUTE_BOUNDARY
     const schedule = makeSchedule()
 
     const job = buildCronJob(schedule, occ, T0)
 
-    expect(job.maxBudgetUsd).toBeUndefined()
-    expect(job.maxTurns).toBeUndefined()
-    expect(job.timeoutAt).toBeUndefined()
+    expect(job.maxBudgetUsd).toBe(DEFAULT_MAX_BUDGET_USD)
+    expect(job.maxTurns).toBe(DEFAULT_MAX_TURNS)
+    expect(job.timeoutAt).toBe(T0 + DEFAULT_TIMEOUT_MS)
     expect(JSON.parse(job.triggerMetadata).allowedTools).toEqual([])
+  })
+
+  it('propagates untrustedInput from schedule to job only when set (F1)', () => {
+    const occ = MINUTE_BOUNDARY
+
+    const flagged = buildCronJob(makeSchedule({ untrustedInput: true }), occ, T0)
+    expect(flagged.untrustedInput).toBe(true)
+
+    const unflagged = buildCronJob(makeSchedule(), occ, T0)
+    expect(unflagged.untrustedInput).toBeUndefined()
   })
 })
 
@@ -229,5 +240,21 @@ describe('buildCronFromSubmit', () => {
     expect(schedule.maxTurns).toBe(40)
     expect(schedule.timeoutMs).toBe(600_000)
     expect(schedule.allowedTools).toEqual(['Read'])
+  })
+
+  it('copies untrustedInput only when set (F1)', () => {
+    const flagged = buildCronFromSubmit(
+      { cronExpr: '0 * * * *', directory: '/tmp/work', prompt: 'p', untrustedInput: true },
+      T0,
+      'sched-1',
+    )
+    expect(flagged.untrustedInput).toBe(true)
+
+    const unflagged = buildCronFromSubmit(
+      { cronExpr: '0 * * * *', directory: '/tmp/work', prompt: 'p' },
+      T0,
+      'sched-2',
+    )
+    expect(unflagged.untrustedInput).toBeUndefined()
   })
 })
