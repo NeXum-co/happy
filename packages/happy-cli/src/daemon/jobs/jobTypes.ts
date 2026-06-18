@@ -17,6 +17,7 @@ export interface JobRecord {
   triggerMetadata: string;   // JSON string
   tier: JobTier;
   preset: string;            // e.g. 'local-qwen' (default) or a cloud preset
+  untrustedInput?: boolean;  // job processes untrusted external content; a trusted job with this set is degraded (D-E04-2 / D-E04-sweep-2)
   directory: string;
   prompt: string;
   status: JobStatus;

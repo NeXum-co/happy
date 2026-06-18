@@ -13,6 +13,7 @@ export interface CronSchedule {
   prompt: string;
   tier: 'trusted' | 'supervised';
   preset: string;
+  untrustedInput?: boolean;  // forwarded to each spawned JobRecord (D-E04-sweep-2)
   maxBudgetUsd?: number;
   maxTurns?: number;
   timeoutMs?: number;

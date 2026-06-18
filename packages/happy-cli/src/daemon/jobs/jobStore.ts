@@ -21,6 +21,7 @@ interface JobRow {
   triggerMetadata: string
   tier: string
   preset: string
+  untrustedInput: number | null
   directory: string
   prompt: string
   status: string
@@ -55,6 +56,7 @@ function rowToRecord(row: JobRow): JobRecord {
     maxAttempts: row.maxAttempts,
     createdAt: row.createdAt,
   }
+  if (row.untrustedInput !== null) record.untrustedInput = row.untrustedInput === 1
   if (row.sessionId !== null) record.sessionId = row.sessionId
   if (row.sessionPid !== null) record.sessionPid = row.sessionPid
   if (row.scheduledAt !== null) record.scheduledAt = row.scheduledAt
@@ -86,6 +88,7 @@ export class JobStore {
         triggerMetadata TEXT NOT NULL,
         tier TEXT NOT NULL,
         preset TEXT NOT NULL,
+        untrustedInput INTEGER,
         directory TEXT NOT NULL,
         prompt TEXT NOT NULL,
         status TEXT NOT NULL,
@@ -106,10 +109,13 @@ export class JobStore {
         createdAt INTEGER NOT NULL
       )
     `)
-    // Idempotent migration: add sessionPid to a store created before it existed.
+    // Idempotent migrations: add columns to a store created before they existed.
     const cols = this.db.prepare(`PRAGMA table_info(jobs)`).all() as { name: string }[]
     if (!cols.some(c => c.name === 'sessionPid')) {
       this.db.exec(`ALTER TABLE jobs ADD COLUMN sessionPid INTEGER`)
+    }
+    if (!cols.some(c => c.name === 'untrustedInput')) {
+      this.db.exec(`ALTER TABLE jobs ADD COLUMN untrustedInput INTEGER`)
     }
     // Indexes for the hot query paths: status filters (list), sessionId lookups
     // (findBySessionId / cost reporting), and the claim ordering (status + createdAt).
@@ -124,12 +130,12 @@ export class JobStore {
   create(job: JobRecord): void {
     this.db.prepare(`
       INSERT INTO jobs (
-        id, triggerType, triggerMetadata, tier, preset, directory, prompt,
+        id, triggerType, triggerMetadata, tier, preset, untrustedInput, directory, prompt,
         status, attempts, maxAttempts, sessionId, sessionPid, scheduledAt, claimedAt,
         timeoutAt, finishedAt, exitReason, costUsd, maxBudgetUsd, maxTurns,
         gitHeadBefore, gitHeadAfter, createdAt
       ) VALUES (
-        @id, @triggerType, @triggerMetadata, @tier, @preset, @directory, @prompt,
+        @id, @triggerType, @triggerMetadata, @tier, @preset, @untrustedInput, @directory, @prompt,
         @status, @attempts, @maxAttempts, @sessionId, @sessionPid, @scheduledAt, @claimedAt,
         @timeoutAt, @finishedAt, @exitReason, @costUsd, @maxBudgetUsd, @maxTurns,
         @gitHeadBefore, @gitHeadAfter, @createdAt
@@ -140,6 +146,7 @@ export class JobStore {
       triggerMetadata: job.triggerMetadata,
       tier: job.tier,
       preset: job.preset,
+      untrustedInput: job.untrustedInput === undefined ? null : (job.untrustedInput ? 1 : 0),
       directory: job.directory,
       prompt: job.prompt,
       status: job.status,
@@ -165,12 +172,12 @@ export class JobStore {
   createIfAbsent(job: JobRecord): boolean {
     const result = this.db.prepare(`
       INSERT OR IGNORE INTO jobs (
-        id, triggerType, triggerMetadata, tier, preset, directory, prompt,
+        id, triggerType, triggerMetadata, tier, preset, untrustedInput, directory, prompt,
         status, attempts, maxAttempts, sessionId, sessionPid, scheduledAt, claimedAt,
         timeoutAt, finishedAt, exitReason, costUsd, maxBudgetUsd, maxTurns,
         gitHeadBefore, gitHeadAfter, createdAt
       ) VALUES (
-        @id, @triggerType, @triggerMetadata, @tier, @preset, @directory, @prompt,
+        @id, @triggerType, @triggerMetadata, @tier, @preset, @untrustedInput, @directory, @prompt,
         @status, @attempts, @maxAttempts, @sessionId, @sessionPid, @scheduledAt, @claimedAt,
         @timeoutAt, @finishedAt, @exitReason, @costUsd, @maxBudgetUsd, @maxTurns,
         @gitHeadBefore, @gitHeadAfter, @createdAt
@@ -181,6 +188,7 @@ export class JobStore {
       triggerMetadata: job.triggerMetadata,
       tier: job.tier,
       preset: job.preset,
+      untrustedInput: job.untrustedInput === undefined ? null : (job.untrustedInput ? 1 : 0),
       directory: job.directory,
       prompt: job.prompt,
       status: job.status,
@@ -251,15 +259,35 @@ export class JobStore {
    * unknown pid is reset to 'pending' with its session attachment cleared so it
    * is claimed fresh. This deliberately bypasses the state machine (running ->
    * pending is not a normal edge) — it is crash recovery, not a lifecycle step.
+   *
+   * F5 identity hardening: a bare liveness probe trusts a REUSED pid — after a
+   * crash the OS may have handed the same pid number to an unrelated process,
+   * which would keep the dead job 'running' forever. When `pidStartedAtMs` is
+   * supplied and resolves a start time, a pid whose process started AFTER the
+   * job was claimed is a reuse → the job is requeued. If the probe can't tell
+   * (null, e.g. Windows or no permission) it degrades to liveness-only.
    */
-  recoverOnStartup(isAlive: (pid: number) => boolean): number {
+  recoverOnStartup(
+    isAlive: (pid: number) => boolean,
+    pidStartedAtMs?: (pid: number) => number | null,
+  ): number {
     const requeue = this.db.prepare(`
       UPDATE jobs SET status = 'pending', sessionId = NULL, sessionPid = NULL, claimedAt = NULL
       WHERE id = ? AND status = 'running'
     `)
     let recovered = 0
     for (const job of this.list({ status: 'running' })) {
-      if (job.sessionPid !== undefined && isAlive(job.sessionPid)) continue
+      const alive = job.sessionPid !== undefined && isAlive(job.sessionPid)
+      if (alive) {
+        // The pid is live; verify it is still OUR process and not a reuse. A
+        // process that started after we claimed the job cannot be our session.
+        const startedAt = pidStartedAtMs && job.sessionPid !== undefined
+          ? pidStartedAtMs(job.sessionPid)
+          : null
+        const reused = startedAt !== null && startedAt !== undefined
+          && job.claimedAt !== undefined && startedAt > job.claimedAt
+        if (!reused) continue
+      }
       recovered += requeue.run(job.id).changes
     }
     return recovered
@@ -276,7 +304,7 @@ export class JobStore {
 
   private applyUpdate(id: string, patch: Partial<JobRecord>): void {
     const columns: (keyof JobRecord)[] = [
-      'triggerType', 'triggerMetadata', 'tier', 'preset', 'directory', 'prompt',
+      'triggerType', 'triggerMetadata', 'tier', 'preset', 'untrustedInput', 'directory', 'prompt',
       'status', 'attempts', 'maxAttempts', 'sessionId', 'sessionPid', 'scheduledAt', 'claimedAt',
       'timeoutAt', 'finishedAt', 'exitReason', 'costUsd', 'maxBudgetUsd', 'maxTurns',
       'gitHeadBefore', 'gitHeadAfter', 'createdAt',
@@ -285,7 +313,12 @@ export class JobStore {
     if (present.length === 0) return
     const assignments = present.map(c => `${c} = @${c}`).join(', ')
     const params: Record<string, unknown> = { id }
-    for (const c of present) params[c] = patch[c] ?? null
+    // SQLite has no boolean; untrustedInput round-trips as 0/1/null.
+    for (const c of present) {
+      params[c] = c === 'untrustedInput'
+        ? (patch.untrustedInput === undefined ? null : (patch.untrustedInput ? 1 : 0))
+        : patch[c] ?? null
+    }
     this.db.prepare(`UPDATE jobs SET ${assignments} WHERE id = @id`).run(params)
   }
 

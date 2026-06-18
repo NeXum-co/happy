@@ -11,6 +11,7 @@
  * Runs once at daemon start and on every heartbeat tick (see daemon/run.ts).
  */
 
+import { execFileSync } from 'node:child_process';
 import { logger } from '@/ui/logger';
 import { decrypt, decodeBase64 } from '@/api/encryption';
 import type { Metadata } from '@/api/types';
@@ -38,6 +39,27 @@ export function isPidAlive(pid: number): boolean {
     return true;
   } catch (error) {
     return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+  }
+}
+
+/**
+ * Best-effort wall-clock start time (epoch ms) of a live pid, used to tell a
+ * still-running original process apart from a same-pid reuse (F5). Uses
+ * `ps -o lstart=` which exists on Linux and macOS; on Windows (no ps) or any
+ * parse failure it returns null, and callers degrade to a liveness-only check.
+ * This is identity hardening, not a hard guarantee — null means "can't tell".
+ */
+export function pidStartTimeMs(pid: number): number | null {
+  try {
+    const out = execFileSync('ps', ['-o', 'lstart=', '-p', String(pid)], {
+      encoding: 'utf8',
+      timeout: 2000,
+    }).trim();
+    if (!out) return null;
+    const ms = Date.parse(out);
+    return Number.isNaN(ms) ? null : ms;
+  } catch {
+    return null;
   }
 }
 

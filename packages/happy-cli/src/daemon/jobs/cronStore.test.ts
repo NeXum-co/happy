@@ -8,6 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -129,5 +130,31 @@ describe('CronStore', () => {
     expect(loaded.maxTurns).toBeUndefined()
     expect(loaded.timeoutMs).toBeUndefined()
     expect(loaded.allowedTools).toBeUndefined()
+  })
+
+  it('round-trips untrustedInput as a boolean (true/false/absent)', () => {
+    store.create(makeSchedule({ id: 'cron-untrusted', untrustedInput: true }))
+    store.create(makeSchedule({ id: 'cron-clean', untrustedInput: false }))
+    store.create(makeSchedule({ id: 'cron-noflag' }))
+
+    expect(store.get('cron-untrusted')!.untrustedInput).toBe(true)
+    expect(store.get('cron-clean')!.untrustedInput).toBe(false)
+    expect(store.get('cron-noflag')!.untrustedInput).toBeUndefined()
+  })
+
+  it('F6: a corrupt allowedTools row degrades to [] instead of throwing out of list()', () => {
+    store.create(makeSchedule({ id: 'cron-good', allowedTools: ['Read'] }))
+    store.create(makeSchedule({ id: 'cron-corrupt', allowedTools: ['Write'] }))
+
+    // Corrupt one row's JSON directly, as a partial write or a bad migration might.
+    const raw = new Database(dbPath)
+    raw.prepare(`UPDATE cron_schedules SET allowedTools = ? WHERE id = ?`).run('{not valid json', 'cron-corrupt')
+    raw.close()
+
+    // list() must not throw — that would abort the whole feeder tick (SF-4 sibling).
+    const all = store.list()
+    expect(all.length).toBe(2)
+    expect(all.find(s => s.id === 'cron-good')!.allowedTools).toEqual(['Read'])
+    expect(all.find(s => s.id === 'cron-corrupt')!.allowedTools).toEqual([])
   })
 })

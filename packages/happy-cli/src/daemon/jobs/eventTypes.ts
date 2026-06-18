@@ -16,6 +16,7 @@ export interface EventSubscription {
   prompt: string;
   tier: 'trusted' | 'supervised';   // default 'supervised'
   preset: string;                   // default 'local-qwen'
+  untrustedInput?: boolean;         // forwarded to each spawned JobRecord (D-E04-sweep-2)
   maxBudgetUsd?: number;
   maxTurns?: number;
   timeoutMs?: number;

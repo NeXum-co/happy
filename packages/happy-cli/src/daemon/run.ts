@@ -18,7 +18,7 @@ import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquire
 import type { PersistedSession } from '@/persistence';
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stopDaemon } from './controlClient';
-import { runReaperOnce, isPidAlive } from './reaper';
+import { runReaperOnce, isPidAlive, pidStartTimeMs } from './reaper';
 import { loadProfiles, sanitizeWindowName } from './profiles';
 import { startDaemonControlServer } from './controlServer';
 import { JobStore } from './jobs/jobStore';
@@ -857,7 +857,7 @@ export async function startDaemon(): Promise<void> {
     // the app, gating local-preset jobs through a single-permit semaphore.
     const jobStore = new JobStore(join(configuration.happyHomeDir, 'jobs.db'));
     jobStore.init();
-    const recoveredJobs = jobStore.recoverOnStartup(isPidAlive);
+    const recoveredJobs = jobStore.recoverOnStartup(isPidAlive, pidStartTimeMs);
     logger.debug(`[DAEMON RUN] Job store ready; recovered ${recoveredJobs} timed-out job(s)`);
     // killSession is wired below to stopJob. The cycle (scheduler needs stopJob
     // for wall-clock kills; stopJob needs the scheduler to mark the job

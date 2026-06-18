@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -140,5 +141,30 @@ describe('EventStore', () => {
     expect(loaded.maxTurns).toBeUndefined()
     expect(loaded.timeoutMs).toBeUndefined()
     expect(loaded.allowedTools).toBeUndefined()
+  })
+
+  it('round-trips untrustedInput as a boolean (true/false/absent)', () => {
+    store.create(makeSubscription({ id: 'event-untrusted', untrustedInput: true }))
+    store.create(makeSubscription({ id: 'event-clean', untrustedInput: false }))
+    store.create(makeSubscription({ id: 'event-noflag' }))
+
+    expect(store.get('event-untrusted')!.untrustedInput).toBe(true)
+    expect(store.get('event-clean')!.untrustedInput).toBe(false)
+    expect(store.get('event-noflag')!.untrustedInput).toBeUndefined()
+  })
+
+  it('F6: a corrupt allowedTools row degrades to [] instead of throwing out of list()', () => {
+    store.create(makeSubscription({ id: 'event-good', allowedTools: ['Read'] }))
+    store.create(makeSubscription({ id: 'event-corrupt', allowedTools: ['Write'] }))
+
+    const raw = new Database(dbPath)
+    raw.prepare(`UPDATE event_subscriptions SET allowedTools = ? WHERE id = ?`).run('{not valid json', 'event-corrupt')
+    raw.close()
+
+    // list() feeds trigger-event matching; one bad row must not drop every match.
+    const all = store.list()
+    expect(all.length).toBe(2)
+    expect(all.find(s => s.id === 'event-good')!.allowedTools).toEqual(['Read'])
+    expect(all.find(s => s.id === 'event-corrupt')!.allowedTools).toEqual([])
   })
 })

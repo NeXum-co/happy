@@ -171,6 +171,43 @@ describe('JobStore', () => {
     expect(live.sessionPid).toBe(222)
   })
 
+  it('round-trips untrustedInput as a boolean (true/false/absent)', () => {
+    store.create(makeJob({ id: 'job-untrusted', untrustedInput: true }))
+    store.create(makeJob({ id: 'job-trusted-input', untrustedInput: false }))
+    store.create(makeJob({ id: 'job-no-flag' }))
+
+    expect(store.get('job-untrusted')!.untrustedInput).toBe(true)
+    expect(store.get('job-trusted-input')!.untrustedInput).toBe(false)
+    // absent → undefined, NOT false (the gate must distinguish "unset" from "trusted")
+    expect(store.get('job-no-flag')!.untrustedInput).toBeUndefined()
+  })
+
+  it('F5: recoverOnStartup requeues a live-but-REUSED pid (started after the job was claimed)', () => {
+    // The session's original pid died; the OS reissued the same number to an
+    // unrelated process that is alive now. Liveness alone would wrongly keep the
+    // dead job running; the start-time probe catches the reuse.
+    store.create(makeJob({ id: 'reused', status: 'running', sessionId: 'sess-reused', sessionPid: 333, claimedAt: 1_000 }))
+    store.create(makeJob({ id: 'original', status: 'running', sessionId: 'sess-orig', sessionPid: 444, claimedAt: 5_000 }))
+
+    const recovered = store.recoverOnStartup(
+      () => true,                                  // both pids resolve as alive
+      (pid) => (pid === 333 ? 9_000 : 2_000),      // 333 started AFTER claim (reuse); 444 before (still ours)
+    )
+
+    expect(recovered).toBe(1)
+    expect(store.get('reused')!.status).toBe('pending')   // reused pid → requeued
+    expect(store.get('original')!.status).toBe('running') // genuine survivor left alone
+  })
+
+  it('F5: a null start-time probe degrades to liveness-only (unsupported platform)', () => {
+    store.create(makeJob({ id: 'live', status: 'running', sessionId: 'sess-live', sessionPid: 555, claimedAt: 1_000 }))
+
+    // Probe can't tell (Windows / no permission) → trust liveness, leave running.
+    const recovered = store.recoverOnStartup(() => true, () => null)
+    expect(recovered).toBe(0)
+    expect(store.get('live')!.status).toBe('running')
+  })
+
   it('list filters by status', () => {
     store.create(makeJob({ id: 'p1', status: 'pending' }))
     store.create(makeJob({ id: 'r1', status: 'running' }))

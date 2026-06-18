@@ -12,6 +12,7 @@
 import Database from 'better-sqlite3'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { logger } from '@/ui/logger'
 import type { EventSubscription } from './eventTypes'
 
 interface EventRow {
@@ -22,6 +23,7 @@ interface EventRow {
   prompt: string
   tier: string
   preset: string
+  untrustedInput: number | null
   maxBudgetUsd: number | null
   maxTurns: number | null
   timeoutMs: number | null
@@ -42,11 +44,27 @@ function rowToSubscription(row: EventRow): EventSubscription {
     createdAt: row.createdAt,
   }
   if (row.matchKey !== null) subscription.matchKey = row.matchKey
+  if (row.untrustedInput !== null) subscription.untrustedInput = row.untrustedInput === 1
   if (row.maxBudgetUsd !== null) subscription.maxBudgetUsd = row.maxBudgetUsd
   if (row.maxTurns !== null) subscription.maxTurns = row.maxTurns
   if (row.timeoutMs !== null) subscription.timeoutMs = row.timeoutMs
-  if (row.allowedTools !== null) subscription.allowedTools = JSON.parse(row.allowedTools) as string[]
+  if (row.allowedTools !== null) subscription.allowedTools = parseAllowedTools(row.allowedTools, row.id)
   return subscription
+}
+
+/**
+ * Parse the allowedTools JSON column, tolerating a corrupt row (F6). A single
+ * malformed value must not throw out of list() — the trigger-event path lists
+ * subscriptions to match an event, and one bad row would drop every match.
+ * Degrade to no allowlist with a logged warning, mirroring parseTriggerMetadata.
+ */
+function parseAllowedTools(raw: string, id: string): string[] {
+  try {
+    return JSON.parse(raw) as string[]
+  } catch (error) {
+    logger.warn(`[EVENT STORE] corrupt allowedTools for subscription ${id}, treating as empty:`, error)
+    return []
+  }
 }
 
 export class EventStore {
@@ -67,6 +85,7 @@ export class EventStore {
         prompt TEXT NOT NULL,
         tier TEXT NOT NULL,
         preset TEXT NOT NULL,
+        untrustedInput INTEGER,
         maxBudgetUsd REAL,
         maxTurns INTEGER,
         timeoutMs INTEGER,
@@ -75,6 +94,11 @@ export class EventStore {
         createdAt INTEGER NOT NULL
       )
     `)
+    // Idempotent migration: add untrustedInput to a store created before it existed.
+    const cols = this.db.prepare(`PRAGMA table_info(event_subscriptions)`).all() as { name: string }[]
+    if (!cols.some(c => c.name === 'untrustedInput')) {
+      this.db.exec(`ALTER TABLE event_subscriptions ADD COLUMN untrustedInput INTEGER`)
+    }
     // Index the hot match path: trigger-event filters enabled subscriptions by eventType.
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_event_subscriptions_event_type ON event_subscriptions (eventType, enabled)`)
   }
@@ -82,10 +106,10 @@ export class EventStore {
   create(s: EventSubscription): void {
     this.db.prepare(`
       INSERT INTO event_subscriptions (
-        id, eventType, matchKey, directory, prompt, tier, preset,
+        id, eventType, matchKey, directory, prompt, tier, preset, untrustedInput,
         maxBudgetUsd, maxTurns, timeoutMs, allowedTools, enabled, createdAt
       ) VALUES (
-        @id, @eventType, @matchKey, @directory, @prompt, @tier, @preset,
+        @id, @eventType, @matchKey, @directory, @prompt, @tier, @preset, @untrustedInput,
         @maxBudgetUsd, @maxTurns, @timeoutMs, @allowedTools, @enabled, @createdAt
       )
     `).run({
@@ -96,6 +120,7 @@ export class EventStore {
       prompt: s.prompt,
       tier: s.tier,
       preset: s.preset,
+      untrustedInput: s.untrustedInput === undefined ? null : (s.untrustedInput ? 1 : 0),
       maxBudgetUsd: s.maxBudgetUsd ?? null,
       maxTurns: s.maxTurns ?? null,
       timeoutMs: s.timeoutMs ?? null,
