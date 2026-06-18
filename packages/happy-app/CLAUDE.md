@@ -425,3 +425,11 @@ The E05 confidence gate (gate core in happy-cli `src/disposition/`) surfaces on 
 - `sources/app/(app)/runs/new.tsx` — the optional **`dispositionTopic`** field (e.g. `architecture/api-design`). Empty or unrecognized ⇒ the gate holds the job for approval before each run.
 - `sources/app/(app)/runs/[jobId].tsx` — shows the gate verdict (`gateAction` / `gateBucket` / `gateReason`) via the localized `gateActionLabel`/`gateBucketLabel` mappers (raw enums are internal, UX-002). **UX-006:** once `gateResolved` is set the held verdict is history — show only the topic, not the "why held" rows. A `gate:*`-parked job offers approve/reject (`machineResolveGate`); approve runs it at its gated tier, reject drives it to dead.
 - `sources/sync/runOps.ts` — the `JobRecordView` mirror (gate fields included). Source of truth = happy-cli `src/daemon/jobs/jobView.ts`; keep them in lockstep.
+- **`untrustedInput` toggle** (E05-sweep S1): a Yes/No field (reuses `common.yes/no`) on the runs/crons/event-subscriptions forms (`runs/new.tsx`, `crons/new.tsx`, `event-subscriptions/new.tsx`) with `fieldUntrustedInput`/`untrustedInputHint` copy. Flagging input as untrusted forces a `trusted` job to be held for supervision (containment, happy-cli side). Mirrored in `sync/{runOps,cronOps,eventOps}.ts` and read back on `runs/[jobId].tsx`.
+
+### E10 multi-account (run/spawn screens)
+
+The E10 multi-subscription UI is **per-machine** (the vault lives on the daemon, D-E10-18):
+
+- `sources/app/(app)/machine/[id]/{accounts,account-add,account-migrate}.tsx` — manage the machine's Claude-subscription accounts (list + per-account UsageBar, add via paste-token never logged, set-default/remove, multi-select migration → `account-switch`). Backed by the `machineRPC` account ops in `sources/sync/ops.ts`.
+- `sources/app/(app)/new/index.tsx` — the cloud-Claude account picker (`SpawnSessionOptions.account`, fail-soft, "Default account" item) on new-session.

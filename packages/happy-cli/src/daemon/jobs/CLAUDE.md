@@ -155,6 +155,14 @@ and spawns via the shared `runJob()` — the spawn block is extracted out of
 a `resolveGate` pre-check, so an explicit approve can never spawn a
 `trusted`/`bypassPermissions` job outside a git worktree.
 
+**`untrustedInput` containment flag** (E05-sweep S1): a persisted boolean job
+field (`jobStore.ts` column + migration) a caller sets when the job's input is
+untrusted. When set, `containmentBlock` parks a `trusted` job with
+`exitReason='untrusted-requires-supervision'` (after the worktree/protected-branch
+checks) — it must never run autonomously. The flag has to survive **both** submit
+surfaces (HTTP Zod + RPC destructure) and is forwarded from cron/event subscriptions;
+the surfaces silently dropped it before the sweep, so keep it threaded end-to-end.
+
 A runtime sibling of this gate lives in the keyed session process
 (`../../claude/utils/permissionHandler.ts`) and only auto-approves read-only
 tools under a high-trust topic (D-E05-8); see `../../disposition/CLAUDE.md`.

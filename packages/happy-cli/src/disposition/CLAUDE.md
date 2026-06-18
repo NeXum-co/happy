@@ -67,6 +67,15 @@ places with the same core:
   `scheduler.tick()`. Parks or downgrades before the session spawns.
 - **Runtime** — in the keyed session process, inside the `canUseTool` handler
   (`../claude/utils/permissionHandler.ts`), fed by `HAPPY_JOB_DISPOSITION_TOPIC`.
+  When the daemon already resolved a bucket pre-spawn it also passes
+  `HAPPY_JOB_GATE_BUCKET`; `runtimeGate.ts` honours that snapshot-consistent
+  bucket over re-reading the rollup (E05-sweep S3), so a mid-run rollup edit
+  cannot flip the live verdict. Unknown/absent bucket falls back to `loadRollup()`
+  and otherwise fails closed.
+
+The rollup JSON the loader reads lives at
+`~/.claude/memory/personal/disposition-rollup.json` (`rollup.ts`
+`DEFAULT_ROLLUP_PATH`); it is generated out-of-band by `~/.claude/scripts/disposition-rollup.js`.
 
 ## Files
 

@@ -171,6 +171,20 @@ executor or store; it gates the existing spawn. Two docs cover it:
 - `src/daemon/jobs/CLAUDE.md` (§ "E05 confidence gate") — how the pre-spawn gate,
   `resolveGate` approve/reject, and the AC-3 floor wire into the scheduler.
 
+### E10 multi-account (multi-subscription)
+
+Multiple Claude subscriptions behind a localhost auth-proxy: an encrypted,
+provider-generic token vault, per-spawn account selection, live `/login`-style
+switch without respawn, per-account usage scraping, and burn-order auto-switch.
+The whole subsystem lives under `src/accounts/` and is documented there:
+
+- `src/accounts/CLAUDE.md` — the vault/proxy/binding/usage/burn modules
+  (`accountVault.ts`, `authProxy.ts`, `accountBinding.ts`, `accountSwitch.ts`,
+  `usageStore.ts`, `burnPolicy.ts`) and the fail-closed token-hygiene contract.
+
+The daemon wires it into `spawnSession` and exposes the account/usage/burn verbs
+on both surfaces (RPC + HTTP control server) — see `src/daemon/CLAUDE.md`.
+
 
 # Running the Daemon
 

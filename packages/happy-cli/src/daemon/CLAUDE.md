@@ -22,7 +22,7 @@ Control Flow:
    - State persistence: writes PID, version, HTTP port to daemon.state.json
    - HTTP server: starts on random port for local CLI control (list, stop, spawn)
    - WebSocket: establishes persistent connection to backend via `ApiMachineClient`
-   - RPC registration: exposes `spawn-happy-session`, `stop-session`, `requestShutdown`, and the autonomous-job handlers (`submit-job`, `stop-job`, `cancel-job`, `resolve-gate`, `list-jobs`, `get-job`, `submit-cron`, `list-crons`, `delete-cron`, `submit-event-subscription`, `list-event-subscriptions`, `delete-event-subscription`, `trigger-event` — see `jobs/CLAUDE.md`)
+   - RPC registration: exposes `spawn-happy-session`, `stop-session`, `requestShutdown`, the autonomous-job handlers (`submit-job`, `stop-job`, `cancel-job`, `resolve-gate`, `list-jobs`, `get-job`, `submit-cron`, `list-crons`, `delete-cron`, `submit-event-subscription`, `list-event-subscriptions`, `delete-event-subscription`, `trigger-event` — see `jobs/CLAUDE.md`), and the E10 multi-account handlers (`account-switch`, `get-usage`, `list-accounts`, `add-account`, `set-default-account`, `remove-account`, `get-burn-policy`, `set-burn-policy` — see `../accounts/CLAUDE.md`)
    - Heartbeat loop: every 60s (or HAPPY_DAEMON_HEARTBEAT_INTERVAL) checks for version updates and prunes dead sessions
 5. Awaits shutdown promise which resolves when:
    - OS signal received (SIGINT/SIGTERM)
@@ -122,6 +122,16 @@ job/cron/event subsystem.
 - `/submit-event-subscription`, `/event-subscriptions`, `/delete-event-subscription` - event subscription CRUD
 - `/trigger-event` - deliver an event (the git post-commit hook POSTs here)
 - `/job-cost` - a cloud-preset job session reports its final cost
+
+### Multi-account (E10)
+
+The control server also mirrors the E10 account verbs (each calls the same
+closure as its matching RPC handler; see `../accounts/CLAUDE.md`):
+
+- `/account-switch` - live-remap running sessions to one account (no respawn)
+- `/usage` - per-account 5h/7d utilization; `/list-accounts` - vault accounts (no token)
+- `/add-account`, `/set-default-account`, `/remove-account` - vault CRUD
+- `/get-burn-policy`, `/set-burn-policy` - burn-order auto-switch config
 
 ## 4. Process Discovery and Cleanup
 
