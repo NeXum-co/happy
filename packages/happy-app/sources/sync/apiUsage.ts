@@ -43,7 +43,10 @@ export async function queryUsage(
 
         if (!response.ok) {
             if (response.status === 404 && params.sessionId) {
-                throw new Error('Session not found');
+                // A session with no usage rows is a normal, terminal answer — not a
+                // retryable failure. Returning empty avoids `backoff` retrying forever
+                // (and a single such session stalling the whole per-session load).
+                return { usage: [] };
             }
             throw new Error(`Failed to query usage: ${response.status}`);
         }
@@ -53,41 +56,45 @@ export async function queryUsage(
     });
 }
 
+export type UsagePeriod = 'today' | '7days' | '30days';
+
+/**
+ * Start of a usage period as a Unix timestamp in seconds. Exposed so callers
+ * (per-session queries) can use the exact period boundary instead of guessing
+ * it from the first returned data point.
+ */
+export function getPeriodStartTime(
+    period: UsagePeriod,
+    nowSeconds: number = Math.floor(Date.now() / 1000),
+): number {
+    const oneDaySeconds = 24 * 60 * 60;
+    switch (period) {
+        case 'today': {
+            const today = new Date(nowSeconds * 1000);
+            today.setHours(0, 0, 0, 0);
+            return Math.floor(today.getTime() / 1000);
+        }
+        case '7days':
+            return nowSeconds - 7 * oneDaySeconds;
+        case '30days':
+            return nowSeconds - 30 * oneDaySeconds;
+    }
+}
+
 /**
  * Helper function to get usage for a specific time period
  */
 export async function getUsageForPeriod(
     credentials: AuthCredentials,
-    period: 'today' | '7days' | '30days',
+    period: UsagePeriod,
     sessionId?: string
 ): Promise<UsageResponse> {
     const now = Math.floor(Date.now() / 1000);
-    const oneDaySeconds = 24 * 60 * 60;
-    
-    let startTime: number;
-    let groupBy: 'hour' | 'day';
-    
-    switch (period) {
-        case 'today':
-            // Start of today (local timezone)
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            startTime = Math.floor(today.getTime() / 1000);
-            groupBy = 'hour';
-            break;
-        case '7days':
-            startTime = now - (7 * oneDaySeconds);
-            groupBy = 'day';
-            break;
-        case '30days':
-            startTime = now - (30 * oneDaySeconds);
-            groupBy = 'day';
-            break;
-    }
-    
+    const groupBy: 'hour' | 'day' = period === 'today' ? 'hour' : 'day';
+
     return queryUsage(credentials, {
         sessionId,
-        startTime,
+        startTime: getPeriodStartTime(period, now),
         endTime: now,
         groupBy
     });

@@ -99,7 +99,7 @@ export function computeFleetLayout<S extends FleetSessionLike>(sessions: S[]): F
 
     const byProject = new Map<string, S[]>();
     for (const session of activeRest) {
-        const key = session.path ? projectKeyFromPath(session.path, session.homeDir) : '';
+        const key = projectKeyFromPath(session.path ?? '', session.homeDir);
         const group = byProject.get(key);
         if (group) {
             group.push(session);

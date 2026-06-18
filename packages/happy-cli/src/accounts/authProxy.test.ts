@@ -70,6 +70,16 @@ describe('authProxy', () => {
     expect(up.lastReq().headers['authorization']).toBe('Bearer sk-ant-oat01-B')
   })
 
+  it('unregister verwijdert de route → de key gedraagt zich als onbekend (401), token niet meer injecteerbaar (QUAL-001)', async () => {
+    up = await startMockUpstream()
+    proxy = await startAuthProxy({ upstreamHost: '127.0.0.1', upstreamPort: up.port, upstreamProtocol: 'http' })
+    proxy.register('rk-1', { account: 'work', realToken: 'sk-ant-oat01-REAL' })
+    expect((await post(proxy.port, 'rk-1')).status).toBe(200) // gebonden → forward
+    proxy.unregister('rk-1') // wat de daemon nu op sessie-exit doet (run.ts releaseProxyBinding)
+    const r = await post(proxy.port, 'rk-1')
+    expect(r.status).toBe(401) // de ontsleutelde token is uit de proxy-Map weg, geen upstream-call
+  })
+
   it('onResponse vuurt per response met account + scraped unified-header (S4/AC-5)', async () => {
     up = await startMockUpstream()
     const seen: Array<{ account: string; util: unknown }> = []

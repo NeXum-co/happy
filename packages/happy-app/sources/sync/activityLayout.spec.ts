@@ -66,7 +66,36 @@ describe('computeActivityLayout', () => {
         expect(row.project).toBe('/p');
         expect(row.count).toBe(2);
         expect(row.durationMs).toBe(1_000 + 4_000);
-        expect(row.lastActiveAt).toBe(day2);
+        // lastActiveAt reflects when the project was last active (effective end of its
+        // newest session = activeAt for inactive), not merely when it was created.
+        expect(row.lastActiveAt).toBe(day2 + 4_000);
+    });
+
+    it('uses now for the lastActiveAt of an active session', () => {
+        const now = day2Later + 9_000;
+        const layout = computeActivityLayout([
+            activitySession({ id: 'live', active: true, createdAt: day2, activeAt: day2 + 1_000, metadata: { path: '/p', machineId: 'm1' } }),
+        ], { now });
+        expect(layout.projectRollup[0].lastActiveAt).toBe(now);
+    });
+
+    it('keeps distinct machineId/project buckets that would collide under a naive `${a}:${b}` key', () => {
+        const layout = computeActivityLayout([
+            activitySession({ id: 'x', createdAt: day1, activeAt: day1, metadata: { path: 'b:c', machineId: 'a' } }),
+            activitySession({ id: 'y', createdAt: day1, activeAt: day1, metadata: { path: 'c', machineId: 'a:b' } }),
+        ], { now: day1 });
+        expect(layout.projectRollup).toHaveLength(2);
+    });
+
+    it('handles empty input and null metadata without crashing', () => {
+        expect(computeActivityLayout([], { now: day1 })).toEqual({ dayGroups: [], projectRollup: [] });
+
+        const layout = computeActivityLayout([
+            activitySession({ id: 'n', createdAt: day1, activeAt: day1, metadata: null }),
+        ], { now: day1 });
+        expect(layout.projectRollup).toHaveLength(1);
+        expect(layout.projectRollup[0].project).toBeNull();
+        expect(layout.projectRollup[0].machineId).toBeNull();
     });
 
     it('joins per-session cost from usageBySession and sums it in the rollup; missing entries stay undefined', () => {
