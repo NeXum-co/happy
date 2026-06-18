@@ -1154,12 +1154,23 @@ export async function startDaemon(): Promise<void> {
     const accountSwitch = async (sessionIds: string[], account: string): Promise<SwitchResult> => {
       const creds = await readCredentials();
       if (!creds) return { ok: false, error: 'geen credentials — switch geweigerd' };
-      return applyAccountSwitch(sessionIds, { account }, {
+      const result = await applyAccountSwitch(sessionIds, { account }, {
         vaultFile: configuration.accountsVaultFile,
         masterKey: await vaultMasterKey(creds),
         proxy: authProxy,
         lookupRoutingKey: (sid) => findTrackedSessionById(sid)?.routingKey,
       });
+      // BUG-M05-1: applyAccountSwitch only rewrites the authProxy route. Keep the
+      // daemon's tracked account in lockstep so /list reflects where traffic now
+      // goes AND the burn-monitor (reads TrackedSession.account via planBurnRemap)
+      // does not re-remap the same session every heartbeat (D-E10-19/20 no-spam).
+      if (result.ok) {
+        for (const sid of result.remapped) {
+          const tracked = findTrackedSessionById(sid);
+          if (tracked) tracked.account = account;
+        }
+      }
+      return result;
     };
 
     // Usage-read (AC-5): per-account laatst-geziene 5h/7d-utilisatie die de proxy
